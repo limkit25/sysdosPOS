@@ -16,7 +16,7 @@ import java.util.Calendar
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Kita pakai DAO langsung (sesuai kodingan Bapak)
+    // Kita pakai DAO langsung
     private val productDao = AppDatabase.getDatabase(application).productDao()
 
     // --- DATA PRODUK ---
@@ -41,12 +41,11 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { productDao.updateProduct(product) }
     }
 
-    // Fungsi delete yang dipakai ProductListActivity (FIXED: Pakai productDao)
+    // Fungsi delete (Pakai productDao langsung)
     fun delete(product: Product) = viewModelScope.launch(Dispatchers.IO) {
         productDao.deleteProduct(product)
     }
 
-    // Fungsi ini duplikat, tapi biarkan saja kalau ada yang pakai
     fun deleteProduct(product: Product) {
         viewModelScope.launch { productDao.deleteProduct(product) }
     }
@@ -59,7 +58,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     // --- LOGIKA KASIR (SCAN & CART) ---
     fun scanAndAddToCart(barcode: String, onResult: (Product?) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            // Ambil value terbaru dari LiveData
             val productList = allProducts.value ?: emptyList()
             val product = productList.find { it.barcode == barcode }
 
@@ -77,7 +75,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addToCart(product: Product, onMessage: (String) -> Unit) {
-        // 1. CEK STOK
         if (product.stock <= 0) {
             onMessage("Stok Habis!")
             return
@@ -162,10 +159,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 summaryBuilder.append("${item.name}\n")
                 summaryBuilder.append("   ${item.stock} x ${String.format("%,.0f", item.price)} = ${String.format("%,.0f", item.price * item.stock)}\n")
 
-                // Kurangi Stok di Database
                 productDao.decreaseStock(item.id, item.stock)
 
-                // Hitung Profit
                 val profitPerItem = (item.price - item.costPrice) * item.stock
                 totalProfit += profitPerItem
             }
@@ -184,7 +179,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             )
             val id = productDao.insertTransaction(trx)
 
-            // Reset Keranjang
             _cart.value = emptyList()
             _totalPrice.value = 0.0
 
@@ -218,7 +212,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- LAPORAN HARIAN ---
+    // --- LAPORAN HARIAN (INI YANG PENTING BUAT DASHBOARD) ---
+
+    // 1. Ambil List Transaksi Hari Ini
     fun getTodayTransactions(): List<Transaction> {
         val allTrx = allTransactions.value ?: emptyList()
         val calendar = Calendar.getInstance()
@@ -227,5 +223,15 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         calendar.set(Calendar.SECOND, 0)
         val startOfDay = calendar.timeInMillis
         return allTrx.filter { it.timestamp >= startOfDay }
+    }
+
+    // 2. [BARU] Hitung Total Omzet Hari Ini (Perbaikan Error Merah)
+    fun getTodaySalesTotal(): Double {
+        return getTodayTransactions().sumOf { it.totalAmount }
+    }
+
+    // 3. [BARU] Hitung Profit Hari Ini (Bonus)
+    fun getTodayProfitTotal(): Double {
+        return getTodayTransactions().sumOf { it.profit }
     }
 }
