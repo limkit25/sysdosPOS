@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">sysdos POS</string>
+    <string-array name="kategori_produk">
+        <item>Makanan</item>
+        <item>Minuman</item>
+        <item>Snack</item>
+        <item>Lainnya</item>
+    </string-array>
+    <string-array name="metode_pembayaran">
+        <item>💵 Tunai</item>
+        <item>📱 QRIS</item>
+        <item>💳 Kartu Debit/Kredit</item>
+        <item>👛 E-Wallet (OVO/Gopay)</item>
+    </string-array>
+</resources>

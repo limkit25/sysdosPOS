@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#F5F5F5">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pengaturan Toko"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/etStoreName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Nama Toko"
+        android:background="@android:drawable/edit_text"/>
+
+    <EditText
+        android:id="@+id/etStoreAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Alamat Toko"
+        android:layout_marginTop="8dp"
+        android:background="@android:drawable/edit_text"/>
+
+    <EditText
+        android:id="@+id/etStorePhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="No Telepon"
+        android:inputType="phone"
+        android:layout_marginTop="8dp"
+        android:background="@android:drawable/edit_text"/>
+
+    <EditText
+        android:id="@+id/etStoreFooter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Pesan Bawah Struk (Cth: Terima Kasih)"
+        android:layout_marginTop="8dp"
+        android:background="@android:drawable/edit_text"/>
+
+    <Button
+        android:id="@+id/btnSaveStore"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Simpan Info Toko"
+        android:layout_marginTop="16dp"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#CCC"
+        android:layout_marginVertical="20dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Setting Printer Bluetooth"
+        android:textSize="18sp"
+        android:textStyle="bold"/>
+
+    <Button
+        android:id="@+id/btnScanPrinter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔍 Cari Perangkat Bluetooth"
+        android:backgroundTint="#009688"
+        android:layout_marginTop="10dp"/>
+
+    <ListView
+        android:id="@+id/lvPrinters"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="10dp"
+        android:background="#FFF"/>
+
+</LinearLayout>
