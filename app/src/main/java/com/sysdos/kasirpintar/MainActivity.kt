@@ -1,6 +1,7 @@
 package com.sysdos.kasirpintar
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -8,23 +9,22 @@ import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
+import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.utils.PrinterHelper
 import com.sysdos.kasirpintar.viewmodel.ProductAdapter
@@ -36,26 +36,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var productAdapter: ProductAdapter
 
-    // UI Baru
+    // UI Elements di Layar Utama
+    private lateinit var svSearch: androidx.appcompat.widget.SearchView
+    private lateinit var llCategories: LinearLayout
     private lateinit var tvCartCount: TextView
     private lateinit var tvCartTotal: TextView
     private lateinit var btnCheckout: Button
-    private lateinit var svSearch: SearchView
-
-    // Tombol Filter
-    private lateinit var btnAll: Button
-    private lateinit var btnFood: Button
-    private lateinit var btnDrink: Button
-    private lateinit var btnSnack: Button
 
     private var fullList: List<Product> = ArrayList()
-    private var currentCategory = "Semua"
+    private var selectedCategory: String = "Semua"
 
-    // Printer & Scanner
+    // Printer
     private lateinit var printerHelper: PrinterHelper
     private var selectedPrinterAddress: String? = null
 
-    // Launcher Scanner
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         if (result.contents != null) {
             viewModel.scanAndAddToCart(
@@ -80,68 +74,52 @@ class MainActivity : AppCompatActivity() {
         selectedPrinterAddress = prefs.getString("printer_mac", null)
         if (selectedPrinterAddress != null) connectPrinterSilent(selectedPrinterAddress!!)
 
-        // 2. BIND UI
+        // 2. BIND VIEW LAYAR UTAMA
+        svSearch = findViewById(R.id.svSearch)
+        llCategories = findViewById(R.id.llCategories)
         tvCartCount = findViewById(R.id.tvCartCount)
         tvCartTotal = findViewById(R.id.tvCartTotal)
         btnCheckout = findViewById(R.id.btnCheckout)
-        svSearch = findViewById(R.id.svSearch)
-
-        btnAll = findViewById(R.id.btnCatAll)
-        btnFood = findViewById(R.id.btnCatFood)
-        btnDrink = findViewById(R.id.btnCatDrink)
-        btnSnack = findViewById(R.id.btnCatSnack)
-
         val btnScan = findViewById<ImageButton>(R.id.btnScan)
         val rvProducts = findViewById<RecyclerView>(R.id.rvProducts)
 
-        // 3. SETUP ADAPTER (GRID 3 KOLOM)
+        // Setup RecyclerView
         productAdapter = ProductAdapter(
             onItemClick = { product ->
                 viewModel.addToCart(product) { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
             },
             onItemLongClick = { product -> showCartActionDialog(product) }
         )
-
-        rvProducts.layoutManager = GridLayoutManager(this, 3) // Grid 3 Kolom
+        rvProducts.layoutManager = GridLayoutManager(this, 2)
         rvProducts.adapter = productAdapter
 
-        // 4. OBSERVERS
+        // 3. OBSERVE DATA
         viewModel.allProducts.observe(this) { products ->
             fullList = products
-            filterList(svSearch.query.toString())
+            filterData()
+        }
+        viewModel.allCategories.observe(this) { categories ->
+            setupCategoryButtons(categories ?: emptyList())
+        }
+        viewModel.cart.observe(this) {
+            productAdapter.updateCartCounts(it)
+            val itemCount = it.sumOf { item -> item.stock }
+            tvCartCount.text = "$itemCount Item"
+        }
+        viewModel.totalPrice.observe(this) {
+            tvCartTotal.text = formatRupiah(it)
         }
 
-        viewModel.cart.observe(this) { cartList ->
-            productAdapter.updateCartCounts(cartList)
-            updateBottomBar()
-        }
-
-        viewModel.totalPrice.observe(this) { updateBottomBar() }
-
-        // 5. SEARCH LISTENER
-        svSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?) = false
+        // 4. LOGIKA SEARCH & FILTER
+        svSearch.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = false
             override fun onQueryTextChange(newText: String?): Boolean {
-                filterList(newText)
+                filterData()
                 return true
             }
         })
 
-        // 6. FILTER BUTTONS
-        setupFilterButton(btnAll, "Semua")
-        setupFilterButton(btnFood, "Makanan")
-        setupFilterButton(btnDrink, "Minuman")
-        setupFilterButton(btnSnack, "Snack") // Pastikan ejaan sesuai database (Case Insensitive)
-
-        // 7. TOMBOL BAYAR -> DIALOG
-        btnCheckout.setOnClickListener {
-            if (viewModel.totalPrice.value == 0.0) {
-                Toast.makeText(this, "Keranjang Kosong!", Toast.LENGTH_SHORT).show()
-            } else {
-                showPaymentDialog()
-            }
-        }
-
+        // 5. TOMBOL AKSI
         btnScan.setOnClickListener {
             val options = ScanOptions()
             options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
@@ -151,174 +129,215 @@ class MainActivity : AppCompatActivity() {
             options.setCaptureActivity(com.journeyapps.barcodescanner.CaptureActivity::class.java)
             barcodeLauncher.launch(options)
         }
+        val bottomBar = findViewById<androidx.cardview.widget.CardView>(R.id.bottomBar)
+        bottomBar.setOnClickListener { showCartPreview() }
+
+        btnCheckout.setOnClickListener {
+            if (viewModel.totalPrice.value == 0.0) {
+                Toast.makeText(this, "Keranjang Kosong!", Toast.LENGTH_SHORT).show()
+            } else {
+                showCartPreview() // BUKA POPUP PEMBAYARAN
+            }
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { finish() }
         })
     }
 
-    // --- LOGIKA FILTER KATEGORI (VERSI FIX WARNA) ---
-    private fun setupFilterButton(btn: Button, category: String) {
-        btn.setOnClickListener {
-            currentCategory = category
-            filterList(svSearch.query.toString())
-
-            // Ubah Warna Tombol agar user tau mana yang aktif
-            val buttons = listOf(btnAll, btnFood, btnDrink, btnSnack)
-            buttons.forEach {
-                // Tombol TIDAK aktif (Putih, Teks Biru)
-                it.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.white)
-                it.setTextColor(Color.parseColor("#1976D2"))
-            }
-
-            // Tombol AKTIF (Biru, Teks Putih)
-            // Ganti R.color.design_default_color_primary dengan kode warna manual
-            btn.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#1976D2"))
-            btn.setTextColor(Color.WHITE)
-        }
-    }
-
-    private fun filterList(query: String?) {
-        val searchQuery = query?.lowercase() ?: ""
-
-        val filtered = fullList.filter { product ->
-            val matchName = product.name.lowercase().contains(searchQuery)
-            // Logic Filter Kategori
-            val matchCat = if (currentCategory == "Semua") true else product.category.equals(currentCategory, ignoreCase = true)
-            matchName && matchCat
-        }
-        productAdapter.submitList(filtered)
-    }
-
-    // --- UPDATE BOTTOM BAR ---
-    private fun updateBottomBar() {
-        val cartList = viewModel.cart.value ?: emptyList()
-        val totalItems = cartList.sumOf { it.stock } // stock di cart melambangkan quantity
-        val totalPrice = viewModel.totalPrice.value ?: 0.0
-
-        tvCartCount.text = "$totalItems Item"
-        tvCartTotal.text = formatRupiah(totalPrice)
-    }
-
-    // --- DIALOG PEMBAYARAN (FIX: LENGKAP DENGAN QRIS & TRANSFER) ---
+    // --- POPUP PEMBAYARAN (DIALOG) ---
     private fun showPaymentDialog() {
-        val dialog = BottomSheetDialog(this)
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_payment, null)
-        dialog.setContentView(view)
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_payment, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
 
-        // Bind View
-        val tvTotal = view.findViewById<TextView>(R.id.tvDialogTotal)
-        val etCash = view.findViewById<EditText>(R.id.etDialogCash)
-        val etDiscount = view.findViewById<EditText>(R.id.etDialogDiscount)
-        val tvChange = view.findViewById<TextView>(R.id.tvDialogChange)
-        val btnPay = view.findViewById<Button>(R.id.btnDialogPay)
-        val cbTax = view.findViewById<CheckBox>(R.id.cbDialogTax)
+        // Bind View Dialog
+        val tvTotal = dialogView.findViewById<TextView>(R.id.tvDialogTotal)
+        val etDiscount = dialogView.findViewById<EditText>(R.id.etDialogDiscount)
+        val cbTax = dialogView.findViewById<CheckBox>(R.id.cbDialogTax)
+        val spPayment = dialogView.findViewById<Spinner>(R.id.spDialogPayment)
+        val layoutCash = dialogView.findViewById<LinearLayout>(R.id.layoutDialogCash)
+        val etCash = dialogView.findViewById<EditText>(R.id.etDialogCash)
+        val tvChange = dialogView.findViewById<TextView>(R.id.tvDialogChange)
+        val btnPay = dialogView.findViewById<Button>(R.id.btnDialogPay)
 
-        // Komponen Baru
-        val rgPayment = view.findViewById<RadioGroup>(R.id.rgPaymentMethod)
-        val layoutTunai = view.findViewById<LinearLayout>(R.id.layoutTunai)
-        val rbTunai = view.findViewById<RadioButton>(R.id.rbTunai)
-        val rbQris = view.findViewById<RadioButton>(R.id.rbQris)
-        val rbTransfer = view.findViewById<RadioButton>(R.id.rbTransfer)
+        var currentTotal = viewModel.totalPrice.value ?: 0.0
+        var finalAmount = currentTotal
+        var diskon = 0.0
+        var pajak = 0.0
 
-        // Variabel penampung
-        var metodeBayar = "Tunai"
+        // Fungsi Hitung Realtime di Dialog
+        fun calculate() {
+            val discStr = etDiscount.text.toString()
+            diskon = if (discStr.isNotEmpty()) discStr.toDouble() else 0.0
 
-        fun hitung() {
-            val subtotal = viewModel.totalPrice.value ?: 0.0
-            val disc = etDiscount.text.toString().toDoubleOrNull() ?: 0.0
-            val tax = if (cbTax.isChecked) (subtotal - disc) * 0.1 else 0.0
-            val grandTotal = (subtotal - disc) + tax
+            var afterDisc = currentTotal - diskon
+            if (afterDisc < 0) afterDisc = 0.0
 
-            tvTotal.text = formatRupiah(grandTotal)
+            pajak = if (cbTax.isChecked) afterDisc * 0.10 else 0.0
+            finalAmount = afterDisc + pajak
 
-            // LOGIKA BEDAKAN TUNAI vs NON-TUNAI
-            if (metodeBayar == "Tunai") {
-                // Mode Tunai: Harus hitung kembalian
-                layoutTunai.visibility = View.VISIBLE
-                val cash = etCash.text.toString().toDoubleOrNull() ?: 0.0
-                val change = cash - grandTotal
+            tvTotal.text = formatRupiah(finalAmount)
+
+            // Hitung Kembalian
+            if (layoutCash.visibility == View.VISIBLE) {
+                val cashStr = etCash.text.toString()
+                val cash = if (cashStr.isNotEmpty()) cashStr.toDouble() else 0.0
+                val change = cash - finalAmount
 
                 if (change >= 0) {
                     tvChange.text = "Kembali: ${formatRupiah(change)}"
-                    tvChange.setTextColor(Color.parseColor("#388E3C")) // Hijau
+                    tvChange.setTextColor(Color.parseColor("#388E3C"))
                     btnPay.isEnabled = true
                 } else {
                     tvChange.text = "Kurang: ${formatRupiah(Math.abs(change))}"
                     tvChange.setTextColor(Color.RED)
-                    btnPay.isEnabled = false // Uang kurang, gak bisa bayar
+                    // btnPay.isEnabled = false // Opsional: Matikan tombol jika kurang
                 }
             } else {
-                // Mode QRIS/Transfer: Bayar PAS, langsung bisa klik
-                layoutTunai.visibility = View.GONE
                 btnPay.isEnabled = true
             }
-
-            // Simpan data di tag tombol untuk diambil saat klik
-            btnPay.tag = Triple(disc, tax, grandTotal)
         }
 
-        // Listener Ganti Metode Bayar
-        rgPayment.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
-                R.id.rbTunai -> metodeBayar = "Tunai"
-                R.id.rbQris -> metodeBayar = "QRIS"
-                R.id.rbTransfer -> metodeBayar = "Transfer"
+
+        // Listeners
+        spPayment.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                if (spPayment.selectedItem.toString().contains("Tunai")) {
+                    layoutCash.visibility = View.VISIBLE
+                    etCash.requestFocus()
+                } else {
+                    layoutCash.visibility = View.GONE
+                }
+                calculate()
             }
-            hitung() // Hitung ulang status tombol
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
-        // Listener Input Angka
-        etCash.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) = hitung()
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
         etDiscount.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) = hitung()
+            override fun afterTextChanged(s: Editable?) { calculate() }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
-        cbTax.setOnCheckedChangeListener { _, _ -> hitung() }
 
-        hitung() // Init awal
+        etCash.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) { calculate() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
 
-        // PROSES BAYAR
+        cbTax.setOnCheckedChangeListener { _, _ -> calculate() }
+
+        // Initial Calculation
+        calculate()
+
+        // KLIK BAYAR
         btnPay.setOnClickListener {
-            val (disc, tax, grandTotal) = btnPay.tag as Triple<Double, Double, Double>
+            val paymentMethod = spPayment.selectedItem.toString()
+            val cashStr = etCash.text.toString()
+            var cashReceived = if (cashStr.isNotEmpty()) cashStr.toDouble() else 0.0
 
-            var cashReceived = 0.0
-            var changeAmount = 0.0
-
-            if (metodeBayar == "Tunai") {
-                cashReceived = etCash.text.toString().toDoubleOrNull() ?: 0.0
-                changeAmount = cashReceived - grandTotal
-            } else {
-                // Kalau QRIS/Transfer, anggap uang pas
-                cashReceived = grandTotal
-                changeAmount = 0.0
+            if (!paymentMethod.contains("Tunai")) {
+                cashReceived = finalAmount
+            } else if (cashReceived < finalAmount) {
+                Toast.makeText(this, "Uang Kurang!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
 
-            // Panggil ViewModel
+            val changeAmount = cashReceived - finalAmount
+
             viewModel.checkout(
-                subtotal = viewModel.totalPrice.value ?: 0.0,
-                discount = disc,
-                tax = tax,
-                paymentMethod = metodeBayar, // Kirim Tunai/QRIS/Transfer
+                subtotal = currentTotal,
+                discount = diskon,
+                tax = pajak,
+                paymentMethod = paymentMethod,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount
-            ) { trx ->
-                if (trx != null) {
-                    Toast.makeText(this, "✅ Lunas via $metodeBayar!", Toast.LENGTH_SHORT).show()
-                    if (selectedPrinterAddress != null) printStruk(trx)
+            ) { transaction ->
+                if (transaction != null) {
+                    Toast.makeText(this, "✅ Transaksi Berhasil!", Toast.LENGTH_SHORT).show()
+                    if (selectedPrinterAddress != null) printStruk(transaction)
+
                     dialog.dismiss()
+                    resetUI()
+                } else {
+                    Toast.makeText(this, "Gagal Transaksi", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+
         dialog.show()
     }
 
+
+    private fun resetUI() {
+        svSearch.setQuery("", false)
+        selectedCategory = "Semua"
+        val allCats = viewModel.allCategories.value ?: emptyList()
+        setupCategoryButtons(allCats)
+        filterData()
+    }
+
     // --- HELPER LAINNYA ---
+    private fun setupCategoryButtons(categories: List<Category>) {
+        llCategories.removeAllViews()
+        addCategoryButton("Semua")
+        for (cat in categories) addCategoryButton(cat.name)
+    }
+
+    private fun addCategoryButton(categoryName: String) {
+        val btn = TextView(this)
+        btn.text = categoryName
+        btn.setPadding(40, 20, 40, 20)
+        btn.gravity = Gravity.CENTER
+
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        params.setMargins(0, 0, 16, 0)
+        btn.layoutParams = params
+
+        // --- LOGIKA WARNA TOMBOL ---
+        if (selectedCategory == categoryName) {
+            // JIKA DIPILIH (AKTIF) -> Teks Biru, Background Putih, Tebal
+            btn.setBackgroundResource(R.drawable.bg_rounded_white)
+            btn.background.setTint(Color.WHITE) // Tetap Putih
+            btn.setTextColor(Color.parseColor("#1976D2")) // Teks jadi Biru
+            btn.setTypeface(null, android.graphics.Typeface.BOLD) // Huruf Tebal
+
+            // Opsional: Tambahkan Border/Garis pinggir (Elevation) biar kelihatan beda
+            btn.elevation = 8f
+        } else {
+            // JIKA TIDAK DIPILIH -> Teks Abu, Background Putih, Biasa
+            btn.setBackgroundResource(R.drawable.bg_rounded_white)
+            btn.background.setTint(Color.WHITE) // Tetap Putih
+            btn.setTextColor(Color.parseColor("#757575")) // Teks Abu
+            btn.setTypeface(null, android.graphics.Typeface.NORMAL) // Huruf Biasa
+            btn.elevation = 0f
+        }
+
+        btn.setOnClickListener {
+            selectedCategory = categoryName
+            // Refresh tombol biar warnanya berubah
+            val allCats = viewModel.allCategories.value ?: emptyList()
+            setupCategoryButtons(allCats)
+            // Filter Produk
+            filterData()
+        }
+
+        llCategories.addView(btn)
+    }
+
+    private fun filterData() {
+        val query = svSearch.query.toString().lowercase()
+        val filtered = fullList.filter { product ->
+            val matchName = product.name.lowercase().contains(query)
+            val matchCategory = if (selectedCategory == "Semua") true else product.category == selectedCategory
+            matchName && matchCategory
+        }
+        productAdapter.submitList(filtered)
+    }
+
     private fun showCartActionDialog(product: Product) {
         val options = arrayOf("➖ Kurangi 1", "❌ Batal Item")
         AlertDialog.Builder(this)
@@ -332,19 +351,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun formatRupiah(number: Double): String {
-        return String.format(Locale("id", "ID"), "Rp %,d", number.toLong()).replace(',', '.')
-    }
-
-    private fun formatRow(kiri: String, kanan: String): String {
-        val maxChars = 30
-        val maxKiri = maxChars - kanan.length - 1
-        val textKiri = if (kiri.length > maxKiri) kiri.substring(0, maxKiri) else kiri
-        val textKanan = kanan
-        val sisaSpasi = maxChars - textKiri.length - textKanan.length
-        val spasi = if (sisaSpasi > 0) " ".repeat(sisaSpasi) else " "
-        return "$textKiri$spasi$textKanan"
-    }
+    private fun formatRupiah(number: Double): String = String.format(Locale("id", "ID"), "Rp %,d", number.toLong()).replace(',', '.')
 
     private fun connectPrinterSilent(address: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -353,78 +360,135 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        printerHelper.connectPrinter(address) { }
+        printerHelper.connectPrinter(address) {}
     }
+    private fun showCartPreview() {
+        val currentCart = viewModel.cart.value ?: emptyList()
+        if (currentCart.isEmpty()) {
+            Toast.makeText(this, "Keranjang kosong", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-    // --- FUNGSI PRINT STRUK (VERSI LENGKAP) ---
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cart_preview, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+
+        val container = dialogView.findViewById<LinearLayout>(R.id.llCartItems)
+        val tvTotal = dialogView.findViewById<TextView>(R.id.tvPreviewTotal)
+        val btnAddMore = dialogView.findViewById<Button>(R.id.btnAddMore)
+        val btnProceed = dialogView.findViewById<Button>(R.id.btnProceedToPay)
+
+        val currentTotal = viewModel.totalPrice.value ?: 0.0
+        tvTotal.text = formatRupiah(currentTotal)
+
+        for (item in currentCart) {
+            val itemView = LayoutInflater.from(this).inflate(R.layout.item_cart_row, null)
+
+            val tvName = itemView.findViewById<TextView>(R.id.tvCartName)
+            val tvPrice = itemView.findViewById<TextView>(R.id.tvCartPrice)
+            val tvQty = itemView.findViewById<TextView>(R.id.tvCartQty)
+            val tvSubtotal = itemView.findViewById<TextView>(R.id.tvCartSubtotal)
+
+            val btnMinus = itemView.findViewById<View>(R.id.btnMinus)
+            val btnPlus = itemView.findViewById<View>(R.id.btnPlus)
+            val btnRemove = itemView.findViewById<View>(R.id.btnRemoveItem)
+
+            tvName.text = item.name
+            tvPrice.text = "@ ${formatRupiah(item.price)}"
+            tvQty.text = item.stock.toString()
+            tvSubtotal.text = formatRupiah(item.price * item.stock)
+
+            // --- PERBAIKAN TOMBOL PLUS (+) ---
+            btnPlus.setOnClickListener {
+                // Cari Data Asli di Master List (fullList) untuk tahu Stok Gudang
+                val originalProduct = fullList.find { it.id == item.id }
+
+                if (originalProduct != null) {
+                    // Pakai originalProduct yang stoknya masih utuh (gudang)
+                    viewModel.addToCart(originalProduct) { msg ->
+                        // Kalau stok habis, munculkan pesan
+                        if (msg.contains("Stok", true)) {
+                            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    dialog.dismiss() // Tutup sebentar
+                    showCartPreview() // Buka lagi (Refresh)
+                }
+            }
+
+            // --- TOMBOL MINUS (-) ---
+            btnMinus.setOnClickListener {
+                viewModel.decreaseCartItem(item)
+                dialog.dismiss()
+                showCartPreview()
+            }
+            // Set icon minus jika belum ada
+            val imgMinus = btnMinus as? ImageButton
+            imgMinus?.setImageResource(android.R.drawable.btn_minus)
+
+            // --- TOMBOL SAMPAH ---
+            btnRemove.setOnClickListener {
+                viewModel.removeCartItem(item)
+                dialog.dismiss()
+                showCartPreview()
+                Toast.makeText(this, "${item.name} dihapus", Toast.LENGTH_SHORT).show()
+            }
+
+            container.addView(itemView)
+        }
+
+        btnAddMore.setOnClickListener { dialog.dismiss() }
+
+        btnProceed.setOnClickListener {
+            dialog.dismiss()
+            showPaymentDialog()
+        }
+
+        dialog.show()
+    }
     private fun printStruk(trx: com.sysdos.kasirpintar.data.model.Transaction) {
         try {
             val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
             val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-
             val storeName = prefs.getString("name", "WARUNG BERKAH POS")
             val storeAddress = prefs.getString("address", "Indonesia")
             val storePhone = prefs.getString("phone", "-")
-            val storeEmail = prefs.getString("email", "Terima Kasih!")
             val kasirName = session.getString("username", "Admin")
-
             val dateFormat = java.text.SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault())
-            val dateStr = dateFormat.format(java.util.Date(trx.timestamp))
 
-            printerHelper.setAlign(1) // Center
+            printerHelper.setAlign(1)
             printerHelper.setBold(true)
             printerHelper.printText("$storeName\n")
             printerHelper.setBold(false)
-            printerHelper.printText("$storeAddress\n")
-            printerHelper.printText("Telp: $storePhone\n")
-            printerHelper.printText("--------------------------------\n")
-
-            printerHelper.setAlign(0) // Left
-            printerHelper.printText("ID : #${trx.id}\n")
-            printerHelper.printText("Tgl: $dateStr\n")
-            printerHelper.printText("Kasir: $kasirName\n")
-            printerHelper.printText("--------------------------------\n")
-
+            printerHelper.printText("$storeAddress\nTelp: $storePhone\n--------------------------------\n")
+            printerHelper.setAlign(0)
+            printerHelper.printText("ID : #${trx.id}\nTgl: ${dateFormat.format(java.util.Date(trx.timestamp))}\nKasir: $kasirName\n--------------------------------\n")
             printerHelper.printText(trx.itemsSummary)
             printerHelper.printText("--------------------------------\n")
-
-            // --- [BAGIAN INI YANG KEMARIN HILANG] ---
             printerHelper.printText(formatRow("Subtotal", formatRupiah(trx.subtotal)) + "\n")
-
-            // Cek Diskon
-            if (trx.discount > 0) {
-                printerHelper.printText(formatRow("Diskon", "-" + formatRupiah(trx.discount)) + "\n")
-            }
-
-            // Cek Pajak
-            if (trx.tax > 0) {
-                printerHelper.printText(formatRow("Pajak 10%", "+" + formatRupiah(trx.tax)) + "\n")
-            }
-
+            if (trx.discount > 0) printerHelper.printText(formatRow("Diskon", "-" + formatRupiah(trx.discount)) + "\n")
+            if (trx.tax > 0) printerHelper.printText(formatRow("Pajak 10%", "+" + formatRupiah(trx.tax)) + "\n")
             printerHelper.printText("--------------------------------\n")
-
-            // Total Akhir
             printerHelper.setBold(true)
             printerHelper.printText(formatRow("TOTAL", formatRupiah(trx.totalAmount)) + "\n")
             printerHelper.setBold(false)
-
-            // Info Pembayaran (Tunai / QRIS / Transfer)
-            if (trx.paymentMethod == "Tunai") {
+            if (trx.paymentMethod.contains("Tunai")) {
                 printerHelper.printText(formatRow("Tunai", formatRupiah(trx.cashReceived)) + "\n")
                 printerHelper.printText(formatRow("Kembali", formatRupiah(trx.changeAmount)) + "\n")
             } else {
-                // Kalau QRIS / Transfer
                 printerHelper.printText(formatRow("Bayar", trx.paymentMethod) + "\n")
             }
-
             printerHelper.setAlign(1)
-            printerHelper.printText("--------------------------------\n")
-            printerHelper.printText("$storeEmail\n")
+            printerHelper.printText("--------------------------------\n${prefs.getString("email", "Terima Kasih!")}\n")
             printerHelper.feedPaper()
+        } catch (e: Exception) {}
+    }
 
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error Print: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
+    private fun formatRow(kiri: String, kanan: String): String {
+        val maxChars = 30
+        val maxKiri = maxChars - kanan.length - 1
+        val textKiri = if (kiri.length > maxKiri) kiri.substring(0, maxKiri) else kiri
+        val sisa = maxChars - textKiri.length - kanan.length
+        return "$textKiri${" ".repeat(if (sisa > 0) sisa else 1)}$kanan"
     }
 
     override fun onDestroy() {

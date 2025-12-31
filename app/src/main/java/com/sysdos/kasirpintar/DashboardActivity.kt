@@ -5,8 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
-import android.widget.Button
 import android.widget.EditText
+import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -30,81 +30,98 @@ class DashboardActivity : AppCompatActivity() {
         setContentView(R.layout.activity_dashboard)
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
-
-        // --- 1. OTOMATIS TANYA MODAL SAAT BUKA ---
         checkDailyModal()
 
-        // Hubungkan ID (Sesuai Layout Baru)
         val tvGreeting = findViewById<TextView>(R.id.tvGreeting)
         val tvRole = findViewById<TextView>(R.id.tvRole)
         val tvRevenue = findViewById<TextView>(R.id.tvTodayRevenue)
+        val btnLogout = findViewById<ImageView>(R.id.btnLogout)
+        val mainGrid = findViewById<GridLayout>(R.id.mainGrid)
 
+        // AMBIL SEMUA KARTU MENU
         val cardPOS = findViewById<CardView>(R.id.cardPOS)
         val cardProduct = findViewById<CardView>(R.id.cardProduct)
         val cardReport = findViewById<CardView>(R.id.cardReport)
         val cardUser = findViewById<CardView>(R.id.cardUser)
+        val cardStore = findViewById<CardView>(R.id.cardStore)
+        val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
 
-        val btnLogout = findViewById<Button>(R.id.btnLogout)
-        val btnSettingToko = findViewById<ImageView>(R.id.btnSettings)
-
-        // Session
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "Admin")
         val role = session.getString("role", "kasir")
 
-        // Set Teks Profil
         tvGreeting.text = "Halo, $username"
         tvRole.text = "Role: ${role?.uppercase()}"
 
-        // Atur Hak Akses
-        cardPOS.visibility = View.VISIBLE
-        cardProduct.visibility = View.VISIBLE
-        cardReport.visibility = View.VISIBLE
-        cardUser.visibility = View.VISIBLE
+        // --- LOGIKA SORTING (REVISI MANAGER) ---
+        // 1. Kosongkan Grid
+        mainGrid.removeAllViews()
 
-        if (role == "kasir") {
-            cardProduct.visibility = View.GONE
-            // cardReport.visibility = View.GONE // Kasir bisa lihat laporan? (Opsional)
-            cardUser.visibility = View.GONE
-        } else if (role == "manager") {
-            cardUser.visibility = View.GONE
+        // 2. Siapkan List
+        val authorizedCards = mutableListOf<View>()
+
+        // POS Selalu Ada untuk Semua Role
+        authorizedCards.add(cardPOS)
+
+        // 3. Cek Role
+        if (role == "admin") {
+            // ADMIN: Semua Menu Ada
+            authorizedCards.add(cardProduct)
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardUser)
+            authorizedCards.add(cardStore)
+            authorizedCards.add(cardPrinter)
+        }
+        else if (role == "manager") {
+            // MANAGER: Gudang, Laporan, Toko, Printer (Hanya User yang hilang)
+            authorizedCards.add(cardProduct)
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardStore)   // [SUDAH DITAMBAHKAN]
+            authorizedCards.add(cardPrinter) // [SUDAH DITAMBAHKAN]
+        }
+        else {
+            // KASIR: Hanya Laporan & Printer
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardPrinter)
+            // Kasir tidak boleh edit Gudang, User, Setting Toko
         }
 
-        // Hitung Pendapatan (CARA MANUAL YANG AMAN)
+        // 4. Masukkan ke Grid (Otomatis Rapi)
+        for (card in authorizedCards) {
+            mainGrid.addView(card)
+            card.visibility = View.VISIBLE
+        }
+
+        // --- LOGIKA LAINNYA TETAP SAMA ---
         viewModel.allTransactions.observe(this) { transactions ->
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val todayStr = sdf.format(Date())
             var totalHariIni = 0.0
-
             for (trx in transactions) {
-                // Konversi timestamp ke tanggal
                 val trxDateStr = sdf.format(Date(trx.timestamp))
-                // Cek apakah transaksi hari ini?
-                if (trxDateStr == todayStr) {
-                    totalHariIni += trx.totalAmount
-                }
+                if (trxDateStr == todayStr) totalHariIni += trx.totalAmount
             }
-            tvRevenue.text = String.format(Locale("id", "ID"), "Rp %,d", totalHariIni.toLong())
+            tvRevenue.text = formatRupiah(totalHariIni)
         }
 
-        // Tombol Navigasi Menu
         cardPOS.setOnClickListener { startActivity(Intent(this, MainActivity::class.java)) }
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
         cardReport.setOnClickListener { startActivity(Intent(this, ReportActivity::class.java)) }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
 
-        btnSettingToko.setOnClickListener {
-            if (role == "kasir") {
-                Toast.makeText(this, "Akses Ditolak: Hanya Admin/Manager", Toast.LENGTH_SHORT).show()
-            } else {
-                startActivity(Intent(this, StoreSettingsActivity::class.java))
-            }
+        cardStore.setOnClickListener {
+            val intent = Intent(this, StoreSettingsActivity::class.java)
+            intent.putExtra("TARGET", "STORE")
+            startActivity(intent)
+        }
+        cardPrinter.setOnClickListener {
+            val intent = Intent(this, StoreSettingsActivity::class.java)
+            intent.putExtra("TARGET", "PRINTER")
+            startActivity(intent)
         }
 
-        // --- LOGOUT LOGIC ---
         btnLogout.setOnClickListener {
             if (role == "kasir") {
-                // KASIR: Pilih Setor atau Logout Biasa
                 val options = arrayOf("💰 Tutup Kasir (Setor Harian)", "Log Out Biasa")
                 AlertDialog.Builder(this)
                     .setTitle("Pilih Aksi Keluar")
@@ -117,7 +134,6 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Batal", null)
                     .show()
             } else {
-                // ADMIN: Logout Biasa
                 AlertDialog.Builder(this)
                     .setTitle("Konfirmasi")
                     .setMessage("Yakin ingin keluar aplikasi?")
@@ -127,8 +143,6 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
     }
-
-    // --- FUNGSI PENDUKUNG (TETAP SAMA SEPERTI YANG LAMA) ---
 
     private fun performLogout(session: android.content.SharedPreferences) {
         session.edit().clear().apply()
@@ -152,8 +166,6 @@ class DashboardActivity : AppCompatActivity() {
                 val strFisik = input.text.toString()
                 if (strFisik.isNotEmpty()) {
                     val uangFisik = strFisik.toDouble()
-
-                    // Hitung Selisih
                     val tvRev = findViewById<TextView>(R.id.tvTodayRevenue)
                     val cleanString = tvRev.text.toString().replace("[^0-9]".toRegex(), "")
                     val omzetSistem = if (cleanString.isNotEmpty()) cleanString.toDouble() else 0.0

@@ -62,6 +62,8 @@
         <activity android:name=".ReportActivity" android:label="Laporan Keuangan"/>
         <activity android:name=".StoreSettingsActivity" android:label="Pengaturan Toko"/>
 
+        <activity android:name=".CategoryActivity" android:label="Kelola Kategori"/>
+
     </application>
 
 </manifest>

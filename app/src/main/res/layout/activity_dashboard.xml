@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="#F8F9FA">
 
     <FrameLayout
@@ -62,14 +63,15 @@
                 </LinearLayout>
 
                 <ImageView
-                    android:id="@+id/btnSettings"
+                    android:id="@+id/btnLogout"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@android:drawable/ic_menu_preferences"
-                    android:background="@drawable/bg_rounded_white"
-                    android:backgroundTint="#FFFFFF"
                     android:padding="8dp"
-                    app:tint="#1976D2"/>
+                    android:src="@android:drawable/ic_lock_power_off"
+                    app:tint="#FFFFFF"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"/>
             </LinearLayout>
 
             <androidx.cardview.widget.CardView
@@ -121,6 +123,7 @@
     </FrameLayout>
 
     <GridLayout
+        android:id="@+id/mainGrid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -143,19 +146,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:padding="16dp">
                 <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_add"
-                    app:tint="#1976D2"/>
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_kasir"
+                    android:layout_marginBottom="8dp"/>
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="KASIR"
                     android:textStyle="bold"
-                    android:textColor="#333"
-                    android:layout_marginTop="8dp"/>
+                    android:textColor="#333"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -173,19 +176,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:padding="16dp">
                 <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_sort_by_size"
-                    app:tint="#FF9800"/>
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_gudang"
+                    android:layout_marginBottom="8dp"/>
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GUDANG"
                     android:textStyle="bold"
-                    android:textColor="#333"
-                    android:layout_marginTop="8dp"/>
+                    android:textColor="#333"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -203,19 +206,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:padding="16dp">
                 <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_my_calendar"
-                    app:tint="#4CAF50"/>
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_laporan"
+                    android:layout_marginBottom="8dp"/>
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="LAPORAN"
                     android:textStyle="bold"
-                    android:textColor="#333"
-                    android:layout_marginTop="8dp"/>
+                    android:textColor="#333"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -233,36 +236,82 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:padding="16dp">
                 <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:src="@android:drawable/ic_menu_myplaces"
-                    app:tint="#9C27B0"/>
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_users"
+                    android:layout_marginBottom="8dp"/>
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="USERS"
                     android:textStyle="bold"
-                    android:textColor="#333"
-                    android:layout_marginTop="8dp"/>
+                    android:textColor="#333"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardStore"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_columnWeight="1"
+            android:layout_rowWeight="1"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            android:layout_margin="8dp"
+            android:foreground="?android:attr/selectableItemBackground">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="16dp">
+                <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_toko"
+                    android:layout_marginBottom="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="INFO TOKO"
+                    android:textStyle="bold"
+                    android:textColor="#333"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardPrinter"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_columnWeight="1"
+            android:layout_rowWeight="1"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            android:layout_margin="8dp"
+            android:foreground="?android:attr/selectableItemBackground">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="16dp">
+                <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/icon_menu_printer"
+                    android:layout_marginBottom="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PRINTER"
+                    android:textStyle="bold"
+                    android:textColor="#333"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
     </GridLayout>
-
-    <Button
-        android:id="@+id/btnLogout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Keluar Aplikasi"
-        android:textStyle="bold"
-        android:backgroundTint="#FFEBEE"
-        android:textColor="#D32F2F"
-        android:layout_margin="16dp"
-        app:cornerRadius="8dp"
-        app:icon="@android:drawable/ic_lock_power_off"
-        app:iconTint="#D32F2F"
-        app:iconGravity="textStart"/>
 
 </LinearLayout>

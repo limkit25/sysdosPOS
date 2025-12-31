@@ -5,18 +5,22 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.sysdos.kasirpintar.data.dao.CategoryDao // Import DAO Kategori
+import com.sysdos.kasirpintar.data.dao.ProductDao
+import com.sysdos.kasirpintar.data.model.Category // Import Model Kategori
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.Transaction
-import com.sysdos.kasirpintar.data.model.User // Import User
-import com.sysdos.kasirpintar.data.dao.ProductDao
+import com.sysdos.kasirpintar.data.model.User
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [Product::class, Transaction::class, User::class], version = 4, exportSchema = false)
+// VERSION NAIK JADI 5 (Karena nambah tabel Category)
+@Database(entities = [Product::class, Transaction::class, User::class, Category::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao
+    abstract fun categoryDao(): CategoryDao // AKSES DAO KATEGORI
 
     companion object {
         @Volatile
@@ -29,30 +33,34 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "kasir_pintar_db"
                 )
-                    .fallbackToDestructiveMigration()
-                    .addCallback(DatabaseCallback()) // Panggil Callback
+                    .fallbackToDestructiveMigration() // Hapus data lama biar aman saat update versi
+                    .addCallback(DatabaseCallback())  // TETAP PAKAI CALLBACK BAPAK
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
 
-        // FUNGSI UNTUK ISI DATA AWAL (SEEDING)
+        // --- CALLBACK SEEDING DATA AWAL ---
         private class DatabaseCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
-                        val dao = database.productDao()
+                        val productDao = database.productDao()
+                        val categoryDao = database.categoryDao()
 
-                        // 1. SUPERADMIN (Akses Full)
-                        dao.insertUser(User(username = "admin", password = "123", role = "superadmin"))
+                        // 1. BUAT USER BAWAAN
+                        productDao.insertUser(User(username = "admin", password = "123", role = "superadmin"))
+                        productDao.insertUser(User(username = "manajer", password = "123", role = "manager"))
+                        productDao.insertUser(User(username = "kasir", password = "123", role = "kasir"))
 
-                        // 2. MANAGER (Bisa Laporan, Gak bisa Setting)
-                        dao.insertUser(User(username = "manajer", password = "123", role = "manager"))
-
-                        // 3. KASIR (Cuma Jualan)
-                        dao.insertUser(User(username = "kasir", password = "123", role = "kasir"))
+                        // 2. [BARU] ISI KATEGORI BAWAAN (Bonus biar gak kosong)
+                        categoryDao.insertCategory(Category(name = "Makanan"))
+                        categoryDao.insertCategory(Category(name = "Minuman"))
+                        categoryDao.insertCategory(Category(name = "Snack"))
+                        categoryDao.insertCategory(Category(name = "Sembako"))
+                        categoryDao.insertCategory(Category(name = "Lainnya"))
                     }
                 }
             }

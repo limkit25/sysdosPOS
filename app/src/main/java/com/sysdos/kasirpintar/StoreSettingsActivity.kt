@@ -10,12 +10,15 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 
 class StoreSettingsActivity : AppCompatActivity() {
@@ -23,11 +26,15 @@ class StoreSettingsActivity : AppCompatActivity() {
     private lateinit var etStoreName: EditText
     private lateinit var etStoreAddress: EditText
     private lateinit var etStorePhone: EditText
-    private lateinit var etStoreFooter: EditText // Tambahan Variabel Footer
+    private lateinit var etStoreFooter: EditText
 
     private lateinit var btnSave: Button
     private lateinit var btnScanPrinter: Button
     private lateinit var lvPrinters: ListView
+    private lateinit var tvTitle: TextView
+
+    private lateinit var cardSectionStore: CardView
+    private lateinit var cardSectionPrinter: CardView
 
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private val deviceList = ArrayList<String>()
@@ -39,47 +46,58 @@ class StoreSettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_store_settings)
 
         // Bind View
+        tvTitle = findViewById(R.id.tvSettingsTitle)
+        cardSectionStore = findViewById(R.id.cardSectionStore)
+        cardSectionPrinter = findViewById(R.id.cardSectionPrinter)
+
         etStoreName = findViewById(R.id.etStoreName)
         etStoreAddress = findViewById(R.id.etStoreAddress)
         etStorePhone = findViewById(R.id.etStorePhone)
-        etStoreFooter = findViewById(R.id.etStoreFooter) // Bind ID Footer
+        etStoreFooter = findViewById(R.id.etStoreFooter)
 
         btnSave = findViewById(R.id.btnSaveStore)
         btnScanPrinter = findViewById(R.id.btnScanPrinter)
         lvPrinters = findViewById(R.id.lvPrinters)
 
-        // Load Data Toko (Footer disimpan di key "email" agar nyambung dgn MainActivity)
+        // --- CEK MODE TAMPILAN ---
+        val target = intent.getStringExtra("TARGET")
+        if (target == "STORE") {
+            cardSectionPrinter.visibility = View.GONE
+            tvTitle.text = "Info & Struk Toko"
+        } else if (target == "PRINTER") {
+            cardSectionStore.visibility = View.GONE
+            tvTitle.text = "Koneksi Printer"
+        }
+
+        // Load Data Toko
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         etStoreName.setText(prefs.getString("name", ""))
         etStoreAddress.setText(prefs.getString("address", ""))
         etStorePhone.setText(prefs.getString("phone", ""))
-        etStoreFooter.setText(prefs.getString("email", "Terima Kasih!")) // Default
+        etStoreFooter.setText(prefs.getString("email", "Terima Kasih!"))
 
-        val savedMac = prefs.getString("printer_mac", "Belum disetting")
-        supportActionBar?.subtitle = "Printer Aktif: $savedMac"
-
-        // Setup List Adapter
+        // Setup List
         listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
 
-        // OTOMATIS TAMPILKAN PRINTER PAIRED
-        if (checkPermission()) {
-            showPairedDevices()
+        // Tampilkan printer (hanya jika mode printer aktif atau default)
+        if (target == "PRINTER" || target == null) {
+            if (checkPermission()) showPairedDevices()
         }
 
-        // TOMBOL SIMPAN TOKO
+        // SIMPAN INFO TOKO
         btnSave.setOnClickListener {
             prefs.edit().apply {
                 putString("name", etStoreName.text.toString())
                 putString("address", etStoreAddress.text.toString())
                 putString("phone", etStorePhone.text.toString())
-                putString("email", etStoreFooter.text.toString()) // Simpan Footer
+                putString("email", etStoreFooter.text.toString())
                 apply()
             }
             Toast.makeText(this, "Info Toko & Struk Disimpan!", Toast.LENGTH_SHORT).show()
         }
 
-        // TOMBOL CARI PRINTER
+        // CARI PRINTER
         btnScanPrinter.setOnClickListener {
             if (checkPermission()) {
                 startDiscovery()
@@ -88,36 +106,52 @@ class StoreSettingsActivity : AppCompatActivity() {
             }
         }
 
-        // PILIH PRINTER
+        // --- [MODIFIKASI] KLIK PILIH PRINTER ---
         lvPrinters.setOnItemClickListener { _, _, position, _ ->
             if (checkPermission() && bluetoothAdapter?.isDiscovering == true) {
                 bluetoothAdapter.cancelDiscovery()
             }
 
             val selectedMac = deviceMacs[position]
-            val selectedName = deviceList[position].split("\n")[0]
+            // Ambil nama dari list, buang tanda [✅] kalau ada biar bersih
+            val rawName = deviceList[position].split("\n")[0].replace(" [✅ AKTIF]", "")
 
+            // Simpan ke memori
             prefs.edit().putString("printer_mac", selectedMac).apply()
 
-            Toast.makeText(this, "Printer Disimpan: $selectedName", Toast.LENGTH_SHORT).show()
-            supportActionBar?.subtitle = "Printer: $selectedName"
+            Toast.makeText(this, "Printer Utama: $rawName", Toast.LENGTH_SHORT).show()
+
+            // REFRESH LIST AGAR TANDA CENTANG PINDAH
+            showPairedDevices()
         }
 
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(receiver, filter)
     }
 
+    // --- [MODIFIKASI] TAMPILKAN LIST DENGAN PENANDA ---
     private fun showPairedDevices() {
         if (!checkPermission()) return
         deviceList.clear()
         deviceMacs.clear()
+
+        // Ambil MAC yang tersimpan saat ini
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val activeMac = prefs.getString("printer_mac", "")
 
         val pairedDevices = bluetoothAdapter?.bondedDevices
         if (!pairedDevices.isNullOrEmpty()) {
             for (device in pairedDevices) {
                 val name = device.name ?: "Unknown"
                 val mac = device.address
-                deviceList.add("$name\n$mac (Tersimpan)")
+
+                // LOGIKA PENANDA: Jika mac sama, tambah teks [✅ AKTIF]
+                var displayName = name
+                if (mac == activeMac) {
+                    displayName = "$name [✅ AKTIF]"
+                }
+
+                deviceList.add("$displayName\n$mac")
                 deviceMacs.add(mac)
             }
         }
@@ -141,7 +175,14 @@ class StoreSettingsActivity : AppCompatActivity() {
                         val name = it.name
                         val mac = it.address
                         if (name != null && !deviceMacs.contains(mac)) {
-                            deviceList.add("$name\n$mac (Baru)")
+                            // Cek juga untuk hasil scan
+                            val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                            val activeMac = prefs.getString("printer_mac", "")
+
+                            var displayName = name
+                            if (mac == activeMac) displayName = "$name [✅ AKTIF]"
+
+                            deviceList.add("$displayName\n$mac")
                             deviceMacs.add(mac)
                             listAdapter.notifyDataSetChanged()
                         }

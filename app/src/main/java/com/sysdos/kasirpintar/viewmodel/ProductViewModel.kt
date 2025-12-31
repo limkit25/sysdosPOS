@@ -7,6 +7,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.sysdos.kasirpintar.data.AppDatabase
+import com.sysdos.kasirpintar.data.model.Category // [1] PENTING: Import ini wajib ada!
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.data.model.User
@@ -16,11 +17,15 @@ import java.util.Calendar
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Kita pakai DAO langsung
-    private val productDao = AppDatabase.getDatabase(application).productDao()
+    private val database = AppDatabase.getDatabase(application)
+    private val productDao = database.productDao()
+    private val categoryDao = database.categoryDao() // [2] Akses DAO Kategori
 
-    // --- DATA PRODUK ---
+    // --- DATA PRODUK & KATEGORI ---
     val allProducts: LiveData<List<Product>> = productDao.getAllProducts().asLiveData()
+
+    // LiveData untuk Kategori (Dipakai di ProductEntryActivity & CategoryActivity)
+    val allCategories: LiveData<List<Category>> = categoryDao.getAllCategories().asLiveData()
 
     // --- RIWAYAT TRANSAKSI ---
     val allTransactions: LiveData<List<Transaction>> = productDao.getAllTransactions().asLiveData()
@@ -41,13 +46,21 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { productDao.updateProduct(product) }
     }
 
-    // Fungsi delete (Pakai productDao langsung)
     fun delete(product: Product) = viewModelScope.launch(Dispatchers.IO) {
         productDao.deleteProduct(product)
     }
 
-    fun deleteProduct(product: Product) {
-        viewModelScope.launch { productDao.deleteProduct(product) }
+    // --- MANAJEMEN KATEGORI (BARU) ---
+    fun addCategory(name: String) {
+        viewModelScope.launch {
+            categoryDao.insertCategory(Category(name = name))
+        }
+    }
+
+    fun deleteCategory(category: Category) {
+        viewModelScope.launch {
+            categoryDao.deleteCategory(category)
+        }
     }
 
     // Fungsi Ambil Produk by ID (Untuk Edit)
@@ -212,9 +225,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- LAPORAN HARIAN (INI YANG PENTING BUAT DASHBOARD) ---
-
-    // 1. Ambil List Transaksi Hari Ini
+    // --- LAPORAN HARIAN ---
     fun getTodayTransactions(): List<Transaction> {
         val allTrx = allTransactions.value ?: emptyList()
         val calendar = Calendar.getInstance()
@@ -223,15 +234,5 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         calendar.set(Calendar.SECOND, 0)
         val startOfDay = calendar.timeInMillis
         return allTrx.filter { it.timestamp >= startOfDay }
-    }
-
-    // 2. [BARU] Hitung Total Omzet Hari Ini (Perbaikan Error Merah)
-    fun getTodaySalesTotal(): Double {
-        return getTodayTransactions().sumOf { it.totalAmount }
-    }
-
-    // 3. [BARU] Hitung Profit Hari Ini (Bonus)
-    fun getTodayProfitTotal(): Double {
-        return getTodayTransactions().sumOf { it.profit }
     }
 }

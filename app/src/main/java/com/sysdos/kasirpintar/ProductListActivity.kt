@@ -2,14 +2,14 @@ package com.sysdos.kasirpintar
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.viewmodel.ProductAdapter
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
@@ -32,7 +32,7 @@ class ProductListActivity : AppCompatActivity() {
         // Hubungkan View
         svSearch = findViewById(R.id.svSearchGudang)
         val rvProductList = findViewById<RecyclerView>(R.id.rvProductList)
-        val btnAdd = findViewById<ImageView>(R.id.btnAddProduct)
+        val btnAdd = findViewById<FloatingActionButton>(R.id.btnAddProduct) // Sekarang tipe-nya FAB
 
         // Setup Adapter
         adapter = ProductAdapter(
@@ -46,7 +46,8 @@ class ProductListActivity : AppCompatActivity() {
             }
         )
 
-        rvProductList.layoutManager = LinearLayoutManager(this)
+        // GANTI KE GRID LAYOUT (2 KOLOM) AGAR RAPI SEPERTI KASIR
+        rvProductList.layoutManager = GridLayoutManager(this, 2)
         rvProductList.adapter = adapter
 
         // --- 1. OBSERVE DATA ---
@@ -73,8 +74,7 @@ class ProductListActivity : AppCompatActivity() {
             }
         })
 
-        // --- 3. TOMBOL TAMBAH BARANG (FIXED) ---
-        // Sekarang mengarah ke ProductEntryActivity milik Bapak
+        // --- 3. TOMBOL TAMBAH BARANG ---
         btnAdd.setOnClickListener {
             startActivity(Intent(this, ProductEntryActivity::class.java))
         }
@@ -89,24 +89,21 @@ class ProductListActivity : AppCompatActivity() {
         }
     }
 
-    // --- DIALOG EDIT (FIXED) ---
+    // --- DIALOG EDIT ---
     private fun showEditDialog(product: Product) {
-        val options = arrayOf("✏️ Edit Detail Barang", "📦 Update Stok Cepat")
+        val options = arrayOf("✏️ Edit Detail Barang", "📦 Hapus Barang")
         AlertDialog.Builder(this)
             .setTitle("Menu: ${product.name}")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
-                        // Buka halaman Edit (ProductEntryActivity)
+                        // Buka halaman Edit
                         val intent = Intent(this, ProductEntryActivity::class.java)
-
-                        // Kirim Data Barang (Sesuai kode Bapak: "PRODUCT_TO_EDIT")
-                        // Pastikan Product implements Parcelable ya Pak
-                        intent.putExtra("PRODUCT_TO_EDIT", product)
+                        intent.putExtra("PRODUCT_TO_EDIT", product) // Pastikan kuncinya sama dengan ProductEntryActivity
                         startActivity(intent)
                     }
                     1 -> {
-                        Toast.makeText(this, "Silakan edit lewat menu Detail dulu ya", Toast.LENGTH_SHORT).show()
+                        showDeleteDialog(product)
                     }
                 }
             }

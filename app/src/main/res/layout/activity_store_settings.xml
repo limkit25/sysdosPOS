@@ -1,85 +1,195 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:background="#F5F5F5">
+    android:fitsSystemWindows="true"
+    android:background="#F5F8FA">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Pengaturan Toko"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp"/>
-
-    <EditText
-        android:id="@+id/etStoreName"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Nama Toko"
-        android:background="@android:drawable/edit_text"/>
+        android:background="#1976D2"
+        android:padding="20dp"
+        android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/etStoreAddress"
+        <TextView
+            android:id="@+id/tvSettingsTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pengaturan Toko"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Atur informasi struk &amp; printer bluetooth"
+            android:textColor="#E3F2FD"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Alamat Toko"
-        android:layout_marginTop="8dp"
-        android:background="@android:drawable/edit_text"/>
+        android:layout_height="match_parent"
+        android:padding="16dp"
+        android:clipToPadding="false">
 
-    <EditText
-        android:id="@+id/etStorePhone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="No Telepon"
-        android:inputType="phone"
-        android:layout_marginTop="8dp"
-        android:background="@android:drawable/edit_text"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/etStoreFooter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Pesan Bawah Struk (Cth: Terima Kasih)"
-        android:layout_marginTop="8dp"
-        android:background="@android:drawable/edit_text"/>
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardSectionStore"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#FFFFFF"
+                android:layout_marginBottom="20dp">
 
-    <Button
-        android:id="@+id/btnSaveStore"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Simpan Info Toko"
-        android:layout_marginTop="16dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#CCC"
-        android:layout_marginVertical="20dp"/>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@android:drawable/ic_menu_edit"
+                            app:tint="#1976D2"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Informasi Struk"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:textColor="#1976D2"
+                            android:layout_marginStart="8dp"/>
+                    </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Setting Printer Bluetooth"
-        android:textSize="18sp"
-        android:textStyle="bold"/>
+                    <EditText
+                        android:id="@+id/etStoreName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Nama Toko"
+                        android:background="@android:drawable/editbox_background_normal"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp"/>
 
-    <Button
-        android:id="@+id/btnScanPrinter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="🔍 Cari Perangkat Bluetooth"
-        android:backgroundTint="#009688"
-        android:layout_marginTop="10dp"/>
+                    <EditText
+                        android:id="@+id/etStoreAddress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Alamat Toko"
+                        android:background="@android:drawable/editbox_background_normal"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp"/>
 
-    <ListView
-        android:id="@+id/lvPrinters"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="10dp"
-        android:background="#FFF"/>
+                    <EditText
+                        android:id="@+id/etStorePhone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="No Telepon"
+                        android:inputType="phone"
+                        android:background="@android:drawable/editbox_background_normal"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp"/>
 
+                    <EditText
+                        android:id="@+id/etStoreFooter"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Footer Struk (Cth: Terima Kasih)"
+                        android:background="@android:drawable/editbox_background_normal"
+                        android:padding="12dp"
+                        android:layout_marginBottom="16dp"/>
+
+                    <Button
+                        android:id="@+id/btnSaveStore"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="SIMPAN PERUBAHAN"
+                        android:textStyle="bold"
+                        android:backgroundTint="#1976D2"
+                        app:cornerRadius="8dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardSectionPrinter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#FFFFFF"
+                android:layout_marginBottom="32dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@android:drawable/stat_sys_data_bluetooth"
+                            app:tint="#009688"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Printer Bluetooth"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:textColor="#009688"
+                            android:layout_marginStart="8dp"/>
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnScanPrinter"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="🔍 CARI PRINTER BARU"
+                        android:backgroundTint="#009688"
+                        android:textStyle="bold"
+                        app:cornerRadius="8dp"
+                        android:layout_marginBottom="12dp"/>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Daftar Perangkat:"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp"/>
+
+                    <ListView
+                        android:id="@+id/lvPrinters"
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:background="#FAFAFA"
+                        android:dividerHeight="1dp"/>
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

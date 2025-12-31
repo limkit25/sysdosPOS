@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_rounded_white"
+    android:layout_marginBottom="6dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginEnd="8dp">
+
+        <TextView
+            android:id="@+id/tvCartName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nama Produk"
+            android:textStyle="bold"
+            android:textColor="#333"
+            android:textSize="13sp"
+            android:maxLines="2"
+            android:ellipsize="end"/>
+        <TextView
+            android:id="@+id/tvCartPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@ 15.000"
+            android:textSize="11sp"
+            android:textColor="#757575"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="28dp"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_rounded_white"
+        android:backgroundTint="#F5F5F5"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="2dp"
+        android:layout_marginEnd="8dp">
+
+        <ImageButton
+            android:id="@+id/btnMinus"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/logo_toko"
+            android:padding="4dp"
+            android:scaleType="fitCenter"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#D32F2F"/>
+
+        <TextView
+            android:id="@+id/tvCartQty"
+            android:layout_width="20dp"
+            android:layout_height="wrap_content"
+            android:text="1"
+            android:textStyle="bold"
+            android:textColor="#333"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginHorizontal="2dp"/>
+
+        <ImageButton
+            android:id="@+id/btnPlus"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@android:drawable/ic_input_add"
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#388E3C"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvCartSubtotal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="30.000"
+        android:textStyle="bold"
+        android:textColor="#1976D2"
+        android:textSize="12sp"
+        android:layout_marginEnd="4dp"/>
+
+    <ImageView
+        android:id="@+id/btnRemoveItem"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@android:drawable/ic_menu_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:tint="#B0BEC5"/>
+
+</LinearLayout>
