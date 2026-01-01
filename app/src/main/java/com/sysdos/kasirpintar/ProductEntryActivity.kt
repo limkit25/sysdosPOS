@@ -63,7 +63,17 @@ class ProductEntryActivity : AppCompatActivity() {
             etBarcode.setText(result.contents)
         }
     }
+    private val scanLauncher = registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
+        if (result.contents != null) {
+            // [PERBAIKAN] Gunakan ID yang benar: etProductBarcode
+            // Kalau variabel 'etBarcode' (global) sudah diinisialisasi, pakai itu saja.
+            // Tapi kalau mau aman cari ulang, pakai ini:
+            val inputBarcode = findViewById<TextInputEditText>(R.id.etProductBarcode)
+            inputBarcode.setText(result.contents)
 
+            android.widget.Toast.makeText(this, "Scan Sukses!", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_product_entry)
@@ -127,12 +137,18 @@ class ProductEntryActivity : AppCompatActivity() {
         btnTakePhoto.setOnClickListener { checkCameraPermissionAndOpen() }
 
         btnScan.setOnClickListener {
-            val options = ScanOptions()
-            options.setPrompt("Scan Barcode Produk")
+            val options = com.journeyapps.barcodescanner.ScanOptions()
+
+            // Setting Standar
+            options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.ALL_CODE_TYPES)
             options.setBeepEnabled(true)
             options.setOrientationLocked(true)
-            options.setCaptureActivity(com.journeyapps.barcodescanner.CaptureActivity::class.java)
-            barcodeLauncher.launch(options)
+
+            // --- [INI KUNCI BIAR TAMPILANNYA SAMA] ---
+            options.setCaptureActivity(ScanActivity::class.java)
+            // ------------------------------------------
+
+            scanLauncher.launch(options)
         }
 
         btnSave.setOnClickListener {

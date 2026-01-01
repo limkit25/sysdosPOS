@@ -50,7 +50,8 @@
                     android:hint="Username"
                     android:background="@drawable/bg_rounded_white"
                     android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="12dp"/>
+                    android:layout_marginBottom="12dp"
+                    android:inputType="text"  android:maxLines="1" android:imeOptions="actionNext"/>
 
                 <EditText
                     android:id="@+id/etPassword"
@@ -60,7 +61,8 @@
                     android:inputType="textPassword"
                     android:background="@drawable/bg_rounded_white"
                     android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="24dp"/>
+                    android:layout_marginBottom="24dp"
+                    android:imeOptions="actionDone"/>
 
                 <Button
                     android:id="@+id/btnLogin"
@@ -94,7 +96,10 @@
                     android:hint="Buat Username Admin"
                     android:background="@drawable/bg_rounded_white"
                     android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="12dp"/>
+                    android:layout_marginBottom="12dp"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:imeOptions="actionNext"/>
 
                 <EditText
                     android:id="@+id/etRegPassword"
@@ -104,7 +109,8 @@
                     android:inputType="textPassword"
                     android:background="@drawable/bg_rounded_white"
                     android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="24dp"/>
+                    android:layout_marginBottom="24dp"
+                    android:imeOptions="actionDone"/>
 
                 <Button
                     android:id="@+id/btnRegister"
@@ -121,7 +127,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="v1.0.1 by sysdos"
+
         android:textColor="#BDBDBD"
         android:layout_marginTop="32dp"/>
 

@@ -8,6 +8,8 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.ImageButton
+import android.widget.LinearLayout // Tambahan
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -31,18 +33,19 @@ class ReportActivity : AppCompatActivity() {
     private lateinit var tvOmzet: TextView
     private lateinit var tvProfit: TextView
     private lateinit var tvTotalTrx: TextView
+    private lateinit var tvDateDisplay: TextView
     private lateinit var spnFilter: Spinner
     private lateinit var btnExport: Button
 
-    // UI Elements Arus Kas
     private lateinit var cardCashFlow: CardView
     private lateinit var tvModalReport: TextView
     private lateinit var tvTotalCashReport: TextView
 
-    // --- 1. VARIABEL ADMIN (PENTING) ---
-    private var isAdmin = false
+    // Elemen yang akan disembunyikan dari Kasir
+    private lateinit var cardProfit: CardView
+    private lateinit var layoutAdminButtons: LinearLayout // Wadah tombol Modal & Shift
 
-    // Data Penampung
+    private var isAdmin = false
     private var allDataTransactions: List<Transaction> = emptyList()
     private var filteredTransactions: List<Transaction> = emptyList()
 
@@ -52,10 +55,11 @@ class ReportActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // HUBUNGKAN VIEW
-        tvOmzet = findViewById(R.id.tvTotalOmzet)
-        tvProfit = findViewById(R.id.tvTotalProfit)
-        tvTotalTrx = findViewById(R.id.tvTotalTrx)
+        // --- 1. HUBUNGKAN VIEW ---
+        tvOmzet = findViewById(R.id.tvOmzetNew)
+        tvProfit = findViewById(R.id.tvProfitNew)
+        tvTotalTrx = findViewById(R.id.tvTotalTrxNew)
+        tvDateDisplay = findViewById(R.id.tvDateDisplay)
         spnFilter = findViewById(R.id.spnFilter)
         btnExport = findViewById(R.id.btnExport)
 
@@ -63,35 +67,44 @@ class ReportActivity : AppCompatActivity() {
         tvModalReport = findViewById(R.id.tvModalReport)
         tvTotalCashReport = findViewById(R.id.tvTotalCashReport)
 
-        val cardProfit = findViewById<androidx.cardview.widget.CardView>(R.id.cardProfit)
-        val cardTrx = findViewById<androidx.cardview.widget.CardView>(R.id.cardTotalTrx)
+        // Elemen Sensitif
+        cardProfit = findViewById(R.id.cardProfitNew)
+        layoutAdminButtons = findViewById(R.id.layoutAdminButtons) // ID Baru Wadah Tombol
 
-        // --- 2. CEK ROLE USER & SET VARIABEL ADMIN ---
+        // Kartu Transaksi (Untuk diklik)
+        val cardTrx = findViewById<CardView>(R.id.cardTotalTrxNew)
+
+        // Tombol Back
+        val btnBack = findViewById<ImageButton>(R.id.btnBackReport)
+        btnBack.setOnClickListener { finish() }
+
+        // --- 2. CEK ROLE USER & KEAMANAN ---
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        val role = session.getString("role", "kasir")?.lowercase() // lowercase biar aman (Admin/admin sama saja)
+        val role = session.getString("role", "kasir")?.lowercase()
 
-        // [PERBAIKAN] Izinkan jika role adalah 'admin' ATAU 'manager'
         isAdmin = (role == "admin" || role == "manager")
 
-        // Kalau BUKAN Admin, sembunyikan elemen sensitif
+        // [PENTING] Sembunyikan Fitur Admin dari Kasir
         if (!isAdmin) {
-            cardProfit.visibility = View.GONE
-            cardCashFlow.visibility = View.GONE
-            btnExport.visibility = View.GONE
+            cardProfit.visibility = View.GONE        // Sembunyikan Profit
+            cardCashFlow.visibility = View.GONE      // Sembunyikan Arus Kas
+            btnExport.visibility = View.GONE         // Sembunyikan Download Excel
+            layoutAdminButtons.visibility = View.GONE // Sembunyikan Tombol Set Modal & Shift
         }
 
-        // KLIK KARTU -> HISTORY
+        // --- 3. KLIK KARTU TRANSAKSI -> LIHAT DETAIL ---
         cardTrx.setOnClickListener {
+            // Membuka halaman HistoryActivity (Daftar Riwayat Transaksi)
             startActivity(Intent(this, HistoryActivity::class.java))
         }
 
-        // SETUP SPINNER
+        // Setup Spinner
         val options = arrayOf("Hari Ini", "Bulan Ini", "Semua Waktu")
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, options)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spnFilter.adapter = adapter
 
-        // OBSERVE DATA
+        // Observe Data
         viewModel.allTransactions.observe(this) { list ->
             allDataTransactions = list
             calculateReport(spnFilter.selectedItemPosition)
@@ -104,29 +117,22 @@ class ReportActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // TOMBOL DOWNLOAD (CSV/EXCEL)
-        btnExport.setOnClickListener {
-            exportToCSV()
-        }
+        // Tombol-tombol Admin
+        btnExport.setOnClickListener { exportToCSV() }
 
-        // SETUP TOMBOL EDIT MODAL
-        val btnSetModal = findViewById<Button>(R.id.btnSetModal)
-        btnSetModal.setOnClickListener {
-            showInputModalDialog()
-        }
+        findViewById<Button>(R.id.btnSetModal).setOnClickListener { showInputModalDialog() }
 
-        // SETUP TOMBOL RIWAYAT SHIFT
-        val btnHistory = findViewById<Button>(R.id.btnShiftHistory)
-        btnHistory.setOnClickListener {
+        findViewById<Button>(R.id.btnShiftHistory).setOnClickListener {
             startActivity(Intent(this, ShiftHistoryActivity::class.java))
         }
     }
 
-    // --- FUNGSI POPUP INPUT MODAL ---
     private fun showInputModalDialog() {
         val input = android.widget.EditText(this)
         input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        input.hint = "Masukkan jumlah uang (contoh: 200000)"
+        input.hint = "Contoh: 200000"
+
+        // ... (Kode Dialog Modal sama seperti sebelumnya) ...
 
         val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
         val oldModal = prefs.getFloat("modal_awal", 0f)
@@ -134,7 +140,7 @@ class ReportActivity : AppCompatActivity() {
 
         val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Set Modal Awal")
-            .setMessage("Masukkan jumlah uang tunai yang ada di laci sebelum mulai jualan.")
+            .setMessage("Masukkan uang tunai di laci sebelum jualan.")
             .setView(input)
             .setPositiveButton("SIMPAN") { _, _ ->
                 val str = input.text.toString()
@@ -148,6 +154,7 @@ class ReportActivity : AppCompatActivity() {
             .setNegativeButton("Batal", null)
             .create()
 
+        // Style margin input
         val margin = (16 * resources.displayMetrics.density).toInt()
         val params = android.widget.FrameLayout.LayoutParams(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -156,11 +163,9 @@ class ReportActivity : AppCompatActivity() {
         params.leftMargin = margin
         params.rightMargin = margin
         input.layoutParams = params
-
         val container = android.widget.FrameLayout(this)
         container.addView(input)
         dialog.setView(container)
-
         dialog.show()
     }
 
@@ -170,11 +175,22 @@ class ReportActivity : AppCompatActivity() {
         val now = Date()
         val todayStr = sdfDate.format(now)
         val monthStr = sdfMonth.format(now)
+        val displayDateFormatter = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID"))
+        val todayDisplay = displayDateFormatter.format(now)
 
         filteredTransactions = when (filterMode) {
-            0 -> allDataTransactions.filter { sdfDate.format(Date(it.timestamp)) == todayStr }
-            1 -> allDataTransactions.filter { sdfMonth.format(Date(it.timestamp)) == monthStr }
-            else -> allDataTransactions
+            0 -> {
+                tvDateDisplay.text = "Laporan Hari Ini ($todayDisplay)"
+                allDataTransactions.filter { sdfDate.format(Date(it.timestamp)) == todayStr }
+            }
+            1 -> {
+                tvDateDisplay.text = "Laporan Bulan Ini"
+                allDataTransactions.filter { sdfMonth.format(Date(it.timestamp)) == monthStr }
+            }
+            else -> {
+                tvDateDisplay.text = "Semua Riwayat Transaksi"
+                allDataTransactions
+            }
         }
 
         var totalOmzet = 0.0
@@ -186,10 +202,8 @@ class ReportActivity : AppCompatActivity() {
 
         tvOmzet.text = formatRupiah(totalOmzet)
         tvProfit.text = formatRupiah(totalProfit)
-        tvTotalTrx.text = "${filteredTransactions.size} Transaksi"
+        tvTotalTrx.text = "${filteredTransactions.size}"
 
-        // --- 3. PROTEKSI LOGIKA TAMPILAN ARUS KAS ---
-        // Hanya muncul jika filter "Hari Ini" DAN User adalah ADMIN
         if (filterMode == 0 && isAdmin) {
             cardCashFlow.visibility = View.VISIBLE
             val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
@@ -198,59 +212,36 @@ class ReportActivity : AppCompatActivity() {
             tvModalReport.text = formatRupiah(modal)
             tvTotalCashReport.text = formatRupiah(uangLaci)
         } else {
-            // Kalau bukan hari ini, ATAU bukan Admin -> Sembunyikan
             cardCashFlow.visibility = View.GONE
         }
     }
 
     private fun exportToCSV() {
         if (filteredTransactions.isEmpty()) {
-            Toast.makeText(this, "Data kosong, tidak ada yang bisa di-download.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Data kosong.", Toast.LENGTH_SHORT).show()
             return
         }
-
         try {
-            val fileName = "Laporan_Transaksi_${System.currentTimeMillis()}.csv"
+            val fileName = "Laporan_${System.currentTimeMillis()}.csv"
             val file = File(cacheDir, fileName)
             val writer = FileWriter(file)
-
-            writer.append("ID Transaksi,Tanggal,Jam,Metode Bayar,Subtotal,Diskon,Pajak,TOTAL BAYAR,Laba (Profit),Detail Barang\n")
-
+            writer.append("ID,Tanggal,Jam,Metode,Subtotal,Diskon,Pajak,TOTAL,Profit,Items\n")
             val sdfDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val sdfTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-
             for (trx in filteredTransactions) {
                 val dateStr = sdfDate.format(Date(trx.timestamp))
                 val timeStr = sdfTime.format(Date(trx.timestamp))
-
                 val rawItems = trx.itemsSummary.split(";")
                 val readableItems = rawItems.joinToString("; ") { itemStr ->
                     val parts = itemStr.split("|")
-                    if (parts.size == 4) {
-                        "${parts[0]} (x${parts[1]})"
-                    } else {
-                        itemStr
-                    }
+                    if (parts.size == 4) "${parts[0]} (x${parts[1]})" else itemStr
                 }
-
                 val cleanDetail = readableItems.replace(",", ".").replace("\n", " ")
-
-                writer.append("${trx.id},")
-                writer.append("$dateStr,")
-                writer.append("$timeStr,")
-                writer.append("${trx.paymentMethod},")
-                writer.append("${trx.subtotal.toLong()},")
-                writer.append("${trx.discount.toLong()},")
-                writer.append("${trx.tax.toLong()},")
-                writer.append("${trx.totalAmount.toLong()},")
-                writer.append("${trx.profit.toLong()},")
-                writer.append("\"$cleanDetail\"\n")
+                writer.append("${trx.id},${dateStr},${timeStr},${trx.paymentMethod},${trx.subtotal.toLong()},${trx.discount.toLong()},${trx.tax.toLong()},${trx.totalAmount.toLong()},${trx.profit.toLong()},\"$cleanDetail\"\n")
             }
-
             writer.flush()
             writer.close()
             shareFile(file)
-
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(this, "Gagal export: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -261,10 +252,10 @@ class ReportActivity : AppCompatActivity() {
         val uri = FileProvider.getUriForFile(this, "${packageName}.provider", file)
         val intent = Intent(Intent.ACTION_SEND)
         intent.type = "text/csv"
-        intent.putExtra(Intent.EXTRA_SUBJECT, "Laporan Penjualan")
+        intent.putExtra(Intent.EXTRA_SUBJECT, "Laporan Kasir")
         intent.putExtra(Intent.EXTRA_STREAM, uri)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(Intent.createChooser(intent, "Buka Excel dengan..."))
+        startActivity(Intent.createChooser(intent, "Buka Excel..."))
     }
 
     private fun formatRupiah(amount: Double): String {

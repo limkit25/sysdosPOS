@@ -49,6 +49,25 @@ class MainActivity : AppCompatActivity() {
     // Printer
     private lateinit var printerHelper: PrinterHelper
     private var selectedPrinterAddress: String? = null
+    // 1. Taruh variabel ini di dalam Class MainActivity
+    private val scanLauncher = registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
+        if (result.contents != null) {
+            val barcode = result.contents
+            Toast.makeText(this, "Hasil Scan: $barcode", Toast.LENGTH_SHORT).show()
+
+            // PANGGIL FUNGSI ADD TO CART DI SINI
+            viewModel.scanAndAddToCart(barcode,
+                onResult = { product ->
+                    // Refresh list belanja
+                    Toast.makeText(this, "Barang masuk: ${product?.name}", Toast.LENGTH_SHORT).show()
+                },
+                onError = { msg ->
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+
 
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         if (result.contents != null) {
@@ -68,6 +87,8 @@ class MainActivity : AppCompatActivity() {
 
         printerHelper = PrinterHelper(this)
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+
+
 
         // 1. AUTO CONNECT PRINTER
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
@@ -119,14 +140,23 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 5. TOMBOL AKSI
+
+        // 5. TOMBOL AKSI (UPDATE)
         btnScan.setOnClickListener {
-            val options = ScanOptions()
-            options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
-            options.setPrompt("Scan Barcode")
+            val options = com.journeyapps.barcodescanner.ScanOptions()
+
+            options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.ALL_CODE_TYPES)
+
+            // options.setPrompt("Scan Barcode") // <-- INI BOLEH DIHAPUS (Karena kita sudah bikin tulisan sendiri di layout XML)
+
             options.setBeepEnabled(true)
-            options.setOrientationLocked(true)
-            options.setCaptureActivity(com.journeyapps.barcodescanner.CaptureActivity::class.java)
+            options.setOrientationLocked(true) // Biar tetap Portrait
+
+            // --- [BAGIAN PENTING YANG DIUBAH] ---
+            // Arahkan ke Activity Custom kita tadi (ScanActivity)
+            options.setCaptureActivity(ScanActivity::class.java)
+            // ------------------------------------
+
             barcodeLauncher.launch(options)
         }
         val bottomBar = findViewById<androidx.cardview.widget.CardView>(R.id.bottomBar)

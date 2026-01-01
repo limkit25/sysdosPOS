@@ -148,68 +148,61 @@ class DashboardActivity : AppCompatActivity() {
     // --- FUNGSI 1: CEK MODAL SEBELUM MASUK KASIR ---
     private fun checkModalBeforePOS() {
         val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
-        val todayDate = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
-        val lastSavedDate = prefs.getString("last_date", "")
 
-        // Cek: Apakah hari ini sudah input modal?
-        if (lastSavedDate != todayDate) {
-            // JIKA BELUM (Atau ganti hari) -> RESET & TAMPILKAN POPUP
-            prefs.edit().clear().apply()
-            showInputModalDialogForPOS(prefs, todayDate)
+        // Cek Status: Apakah Shift sedang Terbuka?
+        val isShiftOpen = prefs.getBoolean("is_shift_open", false)
+
+        if (!isShiftOpen) {
+            // JIKA TUTUP -> WAJIB INPUT MODAL BARU (Buka Shift Baru)
+            // Walaupun hari yang sama, kalau statusnya tutup, ya harus buka lagi.
+            showInputModalDialogForPOS(prefs)
         } else {
-            // JIKA SUDAH -> LOAD DATANYA (PENTING! Biar saat tutup kasir nanti angkanya ada)
+            // JIKA BUKA -> LANJUT JUALAN
+            // Load modal yang sedang aktif biar gak 0
             modalHarian = prefs.getFloat("modal_awal", 0f).toDouble()
-
-            // LANJUT MASUK KASIR TANPA GANGGUAN
             startActivity(Intent(this, MainActivity::class.java))
         }
     }
 
     // --- FUNGSI 2: POPUP INPUT MODAL (DENGAN LOG KE DATABASE) ---
-    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences, todayStr: String) {
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
+    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences) {
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
         input.hint = "Contoh: 200000"
 
-        AlertDialog.Builder(this)
-            .setTitle("🏪 Buka Shift Kasir")
-            .setMessage("Masukkan Modal Awal (Uang Tunai di Laci) hari ini:")
+        val todayStr = java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🏪 Buka Shift Baru")
+            .setMessage("Masukkan Modal Awal untuk shift ini:")
             .setView(input)
-            .setCancelable(false) // Wajib isi, tidak bisa dicancel
-            .setPositiveButton("BUKA KASIR") { _, _ ->
+            .setCancelable(false)
+            .setPositiveButton("BUKA SHIFT") { _, _ ->
                 val modalStr = input.text.toString()
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toFloat()
 
-                    // 1. SIMPAN KE MEMORI HP (Untuk hitungan setoran nanti sore)
                     prefs.edit().apply {
                         putString("last_date", todayStr)
                         putFloat("modal_awal", modal)
+                        putBoolean("is_shift_open", true) // <--- TANDAI SHIFT DIBUKA
                         apply()
                     }
                     modalHarian = modal.toDouble()
 
-                    // 2. SIMPAN KE DATABASE (Agar masuk Laporan Shift Log)
-                    // Ambil nama user yang login
+                    // Catat ke Database
                     val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
                     val user = session.getString("username", "Kasir") ?: "Kasir"
-
-                    // Panggil fungsi insertShiftLog di ViewModel (Pastikan ProductViewModel sudah diupdate)
                     viewModel.insertShiftLog("OPEN", user, 0.0, modal.toDouble())
 
-                    Toast.makeText(this, "Shift Dibuka. Tercatat di Laporan.", Toast.LENGTH_SHORT).show()
-
-                    // LANGSUNG PINDAH KE HALAMAN POS
+                    android.widget.Toast.makeText(this, "Shift Dibuka!", android.widget.Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, MainActivity::class.java))
                 } else {
-                    Toast.makeText(this, "Modal harus diisi!", Toast.LENGTH_SHORT).show()
-                    showInputModalDialogForPOS(prefs, todayStr) // Panggil lagi kalau kosong
+                    android.widget.Toast.makeText(this, "Wajib isi modal!", android.widget.Toast.LENGTH_SHORT).show()
+                    showInputModalDialogForPOS(prefs)
                 }
             }
-            .setNegativeButton("Batal") { dialog, _ ->
-                dialog.dismiss()
-                // Kalau batal, dia tetap di Dashboard, tidak masuk Kasir
-            }
+            .setNegativeButton("Batal") { dialog, _ -> dialog.dismiss() }
             .show()
     }
 
@@ -222,43 +215,45 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
         input.hint = "Total uang fisik di laci"
 
-        AlertDialog.Builder(this)
-            .setTitle("🔒 Tutup Kasir & Setor")
-            .setMessage("Hitung uang fisik dan masukkan jumlahnya:")
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🔒 Tutup Shift & Logout")
+            .setMessage("Masukkan total uang tunai yang ada di laci saat ini:")
             .setView(input)
             .setCancelable(false)
-            .setPositiveButton("SETOR & LOGOUT") { _, _ ->
+            .setPositiveButton("TUTUP SHIFT") { _, _ ->
                 val strFisik = input.text.toString()
                 if (strFisik.isNotEmpty()) {
                     val uangFisik = strFisik.toDouble()
 
                     // Hitung Omzet Sistem (Ambil dari TextView Dashboard)
-                    val tvRev = findViewById<TextView>(R.id.tvTodayRevenue)
+                    val tvRev = findViewById<android.widget.TextView>(R.id.tvTodayRevenue)
                     val cleanString = tvRev.text.toString().replace("[^0-9]".toRegex(), "")
                     val omzetSistem = if (cleanString.isNotEmpty()) cleanString.toDouble() else 0.0
 
-                    // Total yang Seharusnya Ada = Modal Awal + Omzet Hari Ini
+                    // Total Seharusnya (Modal Shift Ini + Omzet Hari Ini)
                     val totalHarusAda = modalHarian + omzetSistem
                     val selisih = uangFisik - totalHarusAda
 
-                    // [BARU] SIMPAN KE DATABASE (History Close Shift)
+                    // Catat ke Database
                     val user = session.getString("username", "Kasir") ?: "Kasir"
                     viewModel.insertShiftLog("CLOSE", user, totalHarusAda, uangFisik)
 
-                    // Pesan Feedback
-                    var pesan = "Shift Ditutup. "
-                    pesan += if (selisih == 0.0) "Klop! 👍"
-                    else if (selisih < 0) "⚠️ MINUS Rp ${formatRupiah(abs(selisih))}"
-                    else "⚠️ LEBIH Rp ${formatRupiah(selisih)}"
+                    // [PENTING] Reset Status Shift jadi TUTUP
+                    val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
+                    prefs.edit().apply {
+                        putBoolean("is_shift_open", false) // <--- TANDAI SHIFT DITUTUP
+                        putFloat("modal_awal", 0f) // Reset modal biar aman
+                        apply()
+                    }
 
-                    Toast.makeText(this, pesan, Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(this, "Shift Berhasil Ditutup.", android.widget.Toast.LENGTH_LONG).show()
                     performLogout(session)
                 } else {
-                    Toast.makeText(this, "Isi jumlah uang!", Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(this, "Isi jumlah uang!", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Batal", null)
