@@ -1,95 +1,216 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="#FFFFFF">
+    android:background="#FFFFFF"
+    android:padding="16dp">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pembayaran"
-        android:textSize="20sp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginBottom="24dp">
+
+        <ImageView
+            android:id="@+id/btnBackPayment"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="#757575"/>
+
+        <TextView
+            android:id="@+id/tvPaymentTitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Total : Rp 30.000"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:textColor="#333"/>
+
+        <ImageView
+            android:id="@+id/btnConfirmPayment"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="#1976D2"/>
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/etAmountReceived"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textSize="40sp"
         android:textStyle="bold"
+        android:gravity="center"
+        android:inputType="number"
+        android:background="@null"
         android:textColor="#333"
-        android:gravity="center"
-        android:layout_marginBottom="16dp"/>
-
-    <TextView
-        android:id="@+id/tvDialogTotal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Rp 0"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:textColor="#1976D2"
-        android:gravity="center"
         android:layout_marginBottom="24dp"/>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
-
-        <EditText
-            android:id="@+id/etDialogDiscount"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Diskon (Rp)"
-            android:inputType="number"
-            android:textSize="14sp"/>
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
 
         <CheckBox
-            android:id="@+id/cbDialogTax"
+            android:id="@+id/cbCredit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Pajak 10%"/>
+            android:text="Piutang"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnCustomer"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="Pelanggan"
+            android:textSize="12sp"
+            android:background="@drawable/bg_outline_primary"
+            android:textColor="#1976D2"
+            android:layout_marginStart="8dp"
+            android:textAllCaps="false"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnTable"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="No Meja"
+            android:textSize="12sp"
+            android:background="@drawable/bg_outline_primary"
+            android:textColor="#1976D2"
+            android:layout_marginStart="8dp"
+            android:textAllCaps="false"/>
     </LinearLayout>
 
-    <Spinner
-        android:id="@+id/spDialogPayment"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="#F5F5F5"
-        android:entries="@array/metode_pembayaran"
-        android:layout_marginBottom="12dp"/>
-
     <LinearLayout
-        android:id="@+id/layoutDialogCash"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#E8F5E9"
-        android:padding="12dp"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnDisc"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="Disc : 0%"
+            android:textSize="12sp"
+            android:background="@drawable/bg_outline_primary"
+            android:textColor="#1976D2"
+            android:layout_marginEnd="4dp"
+            android:textAllCaps="false"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnTax"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:text="Tax : 0%"
+            android:textSize="12sp"
+            android:background="@drawable/bg_outline_primary"
+            android:textColor="#1976D2"
+            android:layout_marginStart="4dp"
+            android:textAllCaps="false"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:layout_marginBottom="16dp">
 
         <EditText
-            android:id="@+id/etDialogCash"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Uang Diterima"
-            android:inputType="number"
-            android:textStyle="bold"/>
+            android:id="@+id/etNote"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:hint="Keterangan"
+            android:background="@drawable/bg_outline_primary"
+            android:paddingHorizontal="12dp"
+            android:textSize="12sp"
+            android:layout_marginEnd="8dp"/>
 
-        <TextView
-            android:id="@+id/tvDialogChange"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Kembali: Rp 0"
-            android:textColor="#388E3C"
-            android:textStyle="bold"
-            android:gravity="end"
-            android:layout_marginTop="8dp"/>
+        <Spinner
+            android:id="@+id/spPaymentMethod"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_outline_primary"
+            android:paddingHorizontal="4dp"/>
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnDialogPay"
+    <GridLayout
+        android:id="@+id/gridQuickCash"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="BAYAR &amp; CETAK STRUK"
-        android:textStyle="bold"
-        android:backgroundTint="#4CAF50"/>
+        android:layout_height="wrap_content"
+        android:columnCount="2"
+        android:rowCount="3">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnExactMoney"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_columnWeight="1"
+            android:text="Uang Pas"
+            android:textColor="#FFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_solid_primary"
+            android:layout_margin="4dp"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn20k"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_columnWeight="1"
+            android:text="20.000"
+            android:textColor="#FFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_solid_primary"
+            android:layout_margin="4dp"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn50k"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_columnWeight="1"
+            android:text="50.000"
+            android:textColor="#FFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_solid_primary"
+            android:layout_margin="4dp"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn100k"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_columnWeight="1"
+            android:text="100.000"
+            android:textColor="#FFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_solid_primary"
+            android:layout_margin="4dp"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnOtherAmount"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_columnWeight="1"
+            android:layout_columnSpan="2"
+            android:text="Lainnya"
+            android:textColor="#FFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_solid_primary"
+            android:layout_margin="4dp"/>
+
+    </GridLayout>
+
 </LinearLayout>

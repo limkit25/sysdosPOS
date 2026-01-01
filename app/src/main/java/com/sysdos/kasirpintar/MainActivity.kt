@@ -147,124 +147,165 @@ class MainActivity : AppCompatActivity() {
 
     // --- POPUP PEMBAYARAN (DIALOG) ---
     private fun showPaymentDialog() {
+        val currentSubtotal = viewModel.totalPrice.value ?: 0.0
+        if (currentSubtotal <= 0) return
+
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_payment, null)
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        // Bind View Dialog
-        val tvTotal = dialogView.findViewById<TextView>(R.id.tvDialogTotal)
-        val etDiscount = dialogView.findViewById<EditText>(R.id.etDialogDiscount)
-        val cbTax = dialogView.findViewById<CheckBox>(R.id.cbDialogTax)
-        val spPayment = dialogView.findViewById<Spinner>(R.id.spDialogPayment)
-        val layoutCash = dialogView.findViewById<LinearLayout>(R.id.layoutDialogCash)
-        val etCash = dialogView.findViewById<EditText>(R.id.etDialogCash)
-        val tvChange = dialogView.findViewById<TextView>(R.id.tvDialogChange)
-        val btnPay = dialogView.findViewById<Button>(R.id.btnDialogPay)
+        // --- BINDING VIEW ---
+        val tvTitle = dialogView.findViewById<TextView>(R.id.tvPaymentTitle)
+        val etReceived = dialogView.findViewById<EditText>(R.id.etAmountReceived)
 
-        var currentTotal = viewModel.totalPrice.value ?: 0.0
-        var finalAmount = currentTotal
-        var diskon = 0.0
-        var pajak = 0.0
+        val btnBack = dialogView.findViewById<View>(R.id.btnBackPayment)
+        val btnConfirm = dialogView.findViewById<View>(R.id.btnConfirmPayment)
+        val spMethod = dialogView.findViewById<Spinner>(R.id.spPaymentMethod)
 
-        // Fungsi Hitung Realtime di Dialog
-        fun calculate() {
-            val discStr = etDiscount.text.toString()
-            diskon = if (discStr.isNotEmpty()) discStr.toDouble() else 0.0
+        // [BARU] Grid Tombol Uang Cepat (yang sudah dikasih ID tadi)
+        val gridQuickCash = dialogView.findViewById<View>(R.id.gridQuickCash)
 
-            var afterDisc = currentTotal - diskon
-            if (afterDisc < 0) afterDisc = 0.0
+        // Tombol Opsi & Uang Cepat
+        val btnDisc = dialogView.findViewById<Button>(R.id.btnDisc)
+        val btnTax = dialogView.findViewById<Button>(R.id.btnTax)
+        val btnExact = dialogView.findViewById<Button>(R.id.btnExactMoney)
+        val btn20k = dialogView.findViewById<Button>(R.id.btn20k)
+        val btn50k = dialogView.findViewById<Button>(R.id.btn50k)
+        val btn100k = dialogView.findViewById<Button>(R.id.btn100k)
+        val btnOther = dialogView.findViewById<Button>(R.id.btnOtherAmount)
 
-            pajak = if (cbTax.isChecked) afterDisc * 0.10 else 0.0
-            finalAmount = afterDisc + pajak
+        var grandTotal = currentSubtotal
+        var discValue = 0.0
+        var taxValue = 0.0
+        var isTaxActive = false
+        var isDiscActive = false
 
-            tvTotal.text = formatRupiah(finalAmount)
+        // Setup Spinner
+        val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer")
+        spMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
 
-            // Hitung Kembalian
-            if (layoutCash.visibility == View.VISIBLE) {
-                val cashStr = etCash.text.toString()
-                val cash = if (cashStr.isNotEmpty()) cashStr.toDouble() else 0.0
-                val change = cash - finalAmount
+        // --- FUNGSI HITUNG REALTIME ---
+        fun recalculate() {
+            // Hitung Diskon & Pajak
+            discValue = if (isDiscActive) currentSubtotal * 0.10 else 0.0
+            val afterDisc = currentSubtotal - discValue
+            taxValue = if (isTaxActive) afterDisc * 0.10 else 0.0
+            grandTotal = afterDisc + taxValue
 
-                if (change >= 0) {
-                    tvChange.text = "Kembali: ${formatRupiah(change)}"
-                    tvChange.setTextColor(Color.parseColor("#388E3C"))
-                    btnPay.isEnabled = true
-                } else {
-                    tvChange.text = "Kurang: ${formatRupiah(Math.abs(change))}"
-                    tvChange.setTextColor(Color.RED)
-                    // btnPay.isEnabled = false // Opsional: Matikan tombol jika kurang
-                }
-            } else {
-                btnPay.isEnabled = true
+            tvTitle.text = "Total : ${formatRupiah(grandTotal)}"
+
+            // Update Tampilan Tombol Tax/Disc
+            val activeBg = R.drawable.bg_solid_primary // Biru
+            val inactiveBg = R.drawable.bg_outline_primary // Putih
+            val white = android.graphics.Color.WHITE
+            val blue = android.graphics.Color.parseColor("#1976D2")
+
+            btnTax.setBackgroundResource(if (isTaxActive) activeBg else inactiveBg)
+            btnTax.setTextColor(if (isTaxActive) white else blue)
+            btnTax.text = if (isTaxActive) "Tax : 10%" else "Tax : 0%"
+
+            btnDisc.setBackgroundResource(if (isDiscActive) activeBg else inactiveBg)
+            btnDisc.setTextColor(if (isDiscActive) white else blue)
+            btnDisc.text = if (isDiscActive) "Disc : 10%" else "Disc : 0%"
+
+            // [LOGIKA PINTAR] Update Nominal Otomatis jika BUKAN Tunai
+            // Misal: Lagi QRIS, terus tekan Pajak -> Nominal harus update ikut naik
+            val currentMethod = spMethod.selectedItem?.toString() ?: "Tunai"
+            if (currentMethod != "Tunai") {
+                etReceived.setText(grandTotal.toInt().toString())
             }
         }
 
+        // --- LISTENER SPINNER (INTI PERUBAHANNYA DISINI) ---
+        spMethod.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedMethod = methods[position]
 
-        // Listeners
-        spPayment.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                if (spPayment.selectedItem.toString().contains("Tunai")) {
-                    layoutCash.visibility = View.VISIBLE
-                    etCash.requestFocus()
+                if (selectedMethod == "Tunai") {
+                    // JIKA TUNAI:
+                    gridQuickCash.visibility = View.VISIBLE // Munculkan tombol uang
+                    etReceived.isEnabled = true // Kasir bisa ketik manual
+                    etReceived.setText("0") // Reset ke 0 biar kasir input uang pelanggan
+                    etReceived.requestFocus()
                 } else {
-                    layoutCash.visibility = View.GONE
+                    // JIKA NON-TUNAI (QRIS/DEBIT):
+                    gridQuickCash.visibility = View.GONE // Hilangkan tombol uang
+                    etReceived.isEnabled = false // Kunci input (biar gak salah ketik)
+                    etReceived.setText(grandTotal.toInt().toString()) // OTOMATIS ISI HARGA PAS
                 }
-                calculate()
             }
-            override fun onNothingSelected(p0: AdapterView<*>?) {}
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        etDiscount.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) { calculate() }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
+        // --- LOGIKA LAINNYA ---
+        btnTax.setOnClickListener { isTaxActive = !isTaxActive; recalculate() }
+        btnDisc.setOnClickListener { isDiscActive = !isDiscActive; recalculate() }
 
-        etCash.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) { calculate() }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
+        btnExact.setOnClickListener { etReceived.setText(grandTotal.toInt().toString()) }
+        btn20k.setOnClickListener { etReceived.setText("20000") }
+        btn50k.setOnClickListener { etReceived.setText("50000") }
+        btn100k.setOnClickListener { etReceived.setText("100000") }
+        btnOther.setOnClickListener { etReceived.setText(""); etReceived.requestFocus() }
 
-        cbTax.setOnCheckedChangeListener { _, _ -> calculate() }
+        btnBack.setOnClickListener { dialog.dismiss() }
 
-        // Initial Calculation
-        calculate()
+        btnConfirm.setOnClickListener {
+            val method = spMethod.selectedItem.toString()
+            val receivedStr = etReceived.text.toString()
+            var cashReceived = if (receivedStr.isNotEmpty()) receivedStr.toDouble() else 0.0
 
-        // KLIK BAYAR
-        btnPay.setOnClickListener {
-            val paymentMethod = spPayment.selectedItem.toString()
-            val cashStr = etCash.text.toString()
-            var cashReceived = if (cashStr.isNotEmpty()) cashStr.toDouble() else 0.0
-
-            if (!paymentMethod.contains("Tunai")) {
-                cashReceived = finalAmount
-            } else if (cashReceived < finalAmount) {
-                Toast.makeText(this, "Uang Kurang!", Toast.LENGTH_SHORT).show()
+            // Validasi Tunai
+            if (method == "Tunai" && cashReceived < grandTotal) {
+                Toast.makeText(this, "⚠️ Uang Kurang!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            val changeAmount = cashReceived - finalAmount
+            // Jika Non-Tunai, pastikan amount = grandTotal (double check)
+            if (method != "Tunai") cashReceived = grandTotal
+
+            val changeAmount = cashReceived - grandTotal
 
             viewModel.checkout(
-                subtotal = currentTotal,
-                discount = diskon,
-                tax = pajak,
-                paymentMethod = paymentMethod,
+                subtotal = currentSubtotal,
+                discount = discValue,
+                tax = taxValue,
+                paymentMethod = method,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount
             ) { transaction ->
                 if (transaction != null) {
-                    Toast.makeText(this, "✅ Transaksi Berhasil!", Toast.LENGTH_SHORT).show()
-                    if (selectedPrinterAddress != null) printStruk(transaction)
+                    dialog.dismiss() // Tutup Dialog Bayar
 
-                    dialog.dismiss()
-                    resetUI()
+                    // --- [PERBAIKAN] OTOMATIS PRINT ---
+                    val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                    val printerMac = prefs.getString("printer_mac", "") // Ambil MAC Printer
+
+                    if (!printerMac.isNullOrEmpty()) {
+                        printStruk(transaction) // <--- INI YANG TADI HILANG!
+                        Toast.makeText(this, "Mencetak Struk...", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Printer belum disetting!", Toast.LENGTH_SHORT).show()
+                    }
+
+                    // Tampilkan Dialog Sukses
+                    AlertDialog.Builder(this)
+                        .setTitle("✅ Transaksi Berhasil")
+                        .setMessage(if (changeAmount > 0) "Kembalian: ${formatRupiah(changeAmount)}" else "Pembayaran Lunas")
+                        .setPositiveButton("TUTUP") { _, _ ->
+                            // Keranjang otomatis bersih
+                        }
+                        .setNeutralButton("CETAK LAGI") { _, _ ->
+                            // Opsi buat jaga-jaga kalau kertas macet
+                            if (!printerMac.isNullOrEmpty()) printStruk(transaction)
+                        }
+                        .show()
                 } else {
                     Toast.makeText(this, "Gagal Transaksi", Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
+        recalculate() // Jalankan hitungan awal
         dialog.show()
     }
 
@@ -365,21 +406,26 @@ class MainActivity : AppCompatActivity() {
     private fun showCartPreview() {
         val currentCart = viewModel.cart.value ?: emptyList()
         if (currentCart.isEmpty()) {
-            Toast.makeText(this, "Keranjang kosong", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Keranjang masih kosong", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cart_preview, null)
-        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        // --- [UBAH DI SINI] PAKAI DIALOG FULLSCREEN ---
+        // Kita pakai Theme_Material_Light_NoActionBar_Fullscreen agar penuh satu layar
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
+        dialog.setContentView(R.layout.dialog_cart_preview)
 
-        val container = dialogView.findViewById<LinearLayout>(R.id.llCartItems)
-        val tvTotal = dialogView.findViewById<TextView>(R.id.tvPreviewTotal)
-        val btnAddMore = dialogView.findViewById<Button>(R.id.btnAddMore)
-        val btnProceed = dialogView.findViewById<Button>(R.id.btnProceedToPay)
+        val container = dialog.findViewById<LinearLayout>(R.id.llCartItems)
+        val tvTotalTop = dialog.findViewById<TextView>(R.id.tvPreviewTotalTop)
+        val btnClose = dialog.findViewById<View>(R.id.btnCloseCart) // Tombol X di kiri atas
+        val btnAddMore = dialog.findViewById<Button>(R.id.btnAddMore)
+        val btnProceed = dialog.findViewById<Button>(R.id.btnProceedToPay)
 
+        // Update Total di Header
         val currentTotal = viewModel.totalPrice.value ?: 0.0
-        tvTotal.text = formatRupiah(currentTotal)
+        tvTotalTop.text = formatRupiah(currentTotal)
 
+        // Loop isi keranjang
         for (item in currentCart) {
             val itemView = LayoutInflater.from(this).inflate(R.layout.item_cart_row, null)
 
@@ -397,90 +443,158 @@ class MainActivity : AppCompatActivity() {
             tvQty.text = item.stock.toString()
             tvSubtotal.text = formatRupiah(item.price * item.stock)
 
-            // --- PERBAIKAN TOMBOL PLUS (+) ---
+            // Logic Tombol (+) (-) (Hapus) SAMA PERSIS SEPERTI SEBELUMNYA
             btnPlus.setOnClickListener {
-                // Cari Data Asli di Master List (fullList) untuk tahu Stok Gudang
                 val originalProduct = fullList.find { it.id == item.id }
-
                 if (originalProduct != null) {
-                    // Pakai originalProduct yang stoknya masih utuh (gudang)
                     viewModel.addToCart(originalProduct) { msg ->
-                        // Kalau stok habis, munculkan pesan
-                        if (msg.contains("Stok", true)) {
-                            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                        }
+                        if (msg.contains("Stok", true)) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                     }
-                    dialog.dismiss() // Tutup sebentar
-                    showCartPreview() // Buka lagi (Refresh)
+                    dialog.dismiss()
+                    showCartPreview() // Refresh Fullscreen
                 }
             }
 
-            // --- TOMBOL MINUS (-) ---
             btnMinus.setOnClickListener {
                 viewModel.decreaseCartItem(item)
                 dialog.dismiss()
                 showCartPreview()
             }
+
             // Set icon minus jika belum ada
             val imgMinus = btnMinus as? ImageButton
             imgMinus?.setImageResource(android.R.drawable.btn_minus)
 
-            // --- TOMBOL SAMPAH ---
             btnRemove.setOnClickListener {
                 viewModel.removeCartItem(item)
                 dialog.dismiss()
                 showCartPreview()
-                Toast.makeText(this, "${item.name} dihapus", Toast.LENGTH_SHORT).show()
             }
 
             container.addView(itemView)
         }
 
-        btnAddMore.setOnClickListener { dialog.dismiss() }
+        // TOMBOL-TOMBOL AKSI
+        btnClose.setOnClickListener { dialog.dismiss() } // Tombol X header
+        btnAddMore.setOnClickListener { dialog.dismiss() } // Tombol Tambah Menu
 
         btnProceed.setOnClickListener {
             dialog.dismiss()
-            showPaymentDialog()
+            showPaymentDialog() // Lanjut ke Pembayaran
         }
 
         dialog.show()
     }
+    // --- FUNGSI CETAK STRUK (BLUETOOTH) ---
     private fun printStruk(trx: com.sysdos.kasirpintar.data.model.Transaction) {
-        try {
-            val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-            val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-            val storeName = prefs.getString("name", "WARUNG BERKAH POS")
-            val storeAddress = prefs.getString("address", "Indonesia")
-            val storePhone = prefs.getString("phone", "-")
-            val kasirName = session.getString("username", "Admin")
-            val dateFormat = java.text.SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault())
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val printerMac = prefs.getString("printer_mac", "")
+        val storeName = prefs.getString("name", "Toko Saya")
+        val storeAddress = prefs.getString("address", "Alamat Toko")
+        val storeFooter = prefs.getString("email", "Terima Kasih")
 
-            printerHelper.setAlign(1)
-            printerHelper.setBold(true)
-            printerHelper.printText("$storeName\n")
-            printerHelper.setBold(false)
-            printerHelper.printText("$storeAddress\nTelp: $storePhone\n--------------------------------\n")
-            printerHelper.setAlign(0)
-            printerHelper.printText("ID : #${trx.id}\nTgl: ${dateFormat.format(java.util.Date(trx.timestamp))}\nKasir: $kasirName\n--------------------------------\n")
-            printerHelper.printText(trx.itemsSummary)
-            printerHelper.printText("--------------------------------\n")
-            printerHelper.printText(formatRow("Subtotal", formatRupiah(trx.subtotal)) + "\n")
-            if (trx.discount > 0) printerHelper.printText(formatRow("Diskon", "-" + formatRupiah(trx.discount)) + "\n")
-            if (trx.tax > 0) printerHelper.printText(formatRow("Pajak 10%", "+" + formatRupiah(trx.tax)) + "\n")
-            printerHelper.printText("--------------------------------\n")
-            printerHelper.setBold(true)
-            printerHelper.printText(formatRow("TOTAL", formatRupiah(trx.totalAmount)) + "\n")
-            printerHelper.setBold(false)
-            if (trx.paymentMethod.contains("Tunai")) {
-                printerHelper.printText(formatRow("Tunai", formatRupiah(trx.cashReceived)) + "\n")
-                printerHelper.printText(formatRow("Kembali", formatRupiah(trx.changeAmount)) + "\n")
-            } else {
-                printerHelper.printText(formatRow("Bayar", trx.paymentMethod) + "\n")
+        if (printerMac.isNullOrEmpty()) return
+
+        // Jalankan di Background Thread biar UI gak macet
+        Thread {
+            try {
+                val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                val device = bluetoothAdapter.getRemoteDevice(printerMac)
+
+                // Cek Permission Bluetooth (Standar Android 12+)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    if (androidx.core.app.ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        return@Thread
+                    }
+                }
+
+                val socket = device.createRfcommSocketToServiceRecord(java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                socket.connect()
+                val outputStream = socket.outputStream
+
+                // --- FORMAT STRUK ---
+                val ESC_ALIGN_CENTER = byteArrayOf(0x1B, 0x61, 0x01)
+                val ESC_ALIGN_LEFT = byteArrayOf(0x1B, 0x61, 0x00)
+                val TEXT_BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
+                val TEXT_BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
+                val TEXT_SIZE_NORMAL = byteArrayOf(0x1D, 0x21, 0x00)
+                val TEXT_SIZE_LARGE = byteArrayOf(0x1D, 0x21, 0x11)
+                val FEED_PAPER = byteArrayOf(0x0A, 0x0A, 0x0A) // 3x Enter
+
+                // 1. HEADER
+                outputStream.write(ESC_ALIGN_CENTER)
+                outputStream.write(TEXT_BOLD_ON)
+                outputStream.write(TEXT_SIZE_LARGE)
+                outputStream.write("$storeName\n".toByteArray())
+                outputStream.write(TEXT_SIZE_NORMAL)
+                outputStream.write(TEXT_BOLD_OFF)
+                outputStream.write("$storeAddress\n".toByteArray())
+                outputStream.write("--------------------------------\n".toByteArray())
+
+                // 2. INFO TRANSAKSI
+                outputStream.write(ESC_ALIGN_LEFT)
+                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                val dateStr = sdf.format(java.util.Date(trx.timestamp))
+                outputStream.write("Tgl : $dateStr\n".toByteArray())
+                outputStream.write("No  : TRX-${trx.id}\n".toByteArray())
+                outputStream.write("--------------------------------\n".toByteArray())
+
+                // 3. ITEM BELANJA
+                // Kita butuh detail item. Karena Transaction object biasanya cuma simpan total,
+                // idealnya kita ambil dari 'trx.items' kalau Bapak sudah relasikan.
+                // TAPI, untuk saat ini kita ambil dari viewModel.cart.value SEBELUM DIHAPUS
+                // (Catatan: Ini trik cepat. Idealnya ambil dari database relation)
+
+                val itemsToPrint = viewModel.cart.value ?: emptyList()
+                for (item in itemsToPrint) {
+                    outputStream.write("${item.name}\n".toByteArray())
+                    val qtyPrice = "${item.stock} x ${item.price.toInt()}"
+                    val subtotal = item.stock * item.price
+
+                    // Format rata kanan manual sederhana
+                    val line = String.format("%-20s %10s\n", qtyPrice, subtotal.toInt().toString())
+                    outputStream.write(line.toByteArray())
+                }
+
+                outputStream.write("--------------------------------\n".toByteArray())
+
+                // 4. TOTAL & PEMBAYARAN
+                outputStream.write(ESC_ALIGN_LEFT)
+                outputStream.write("Total    : ${trx.totalAmount.toInt()}\n".toByteArray())
+                if (trx.discount > 0) outputStream.write("Diskon   : -${trx.discount.toInt()}\n".toByteArray())
+                if (trx.tax > 0) outputStream.write("Pajak    : +${trx.tax.toInt()}\n".toByteArray())
+
+                outputStream.write(TEXT_BOLD_ON)
+                outputStream.write("TAGIHAN  : ${trx.totalAmount.toInt()}\n".toByteArray())
+                outputStream.write(TEXT_BOLD_OFF)
+
+                outputStream.write("Bayar    : ${trx.cashReceived.toInt()}\n".toByteArray())
+                outputStream.write("Kembali  : ${trx.changeAmount.toInt()}\n".toByteArray())
+
+                outputStream.write("--------------------------------\n".toByteArray())
+
+                // 5. FOOTER
+                outputStream.write(ESC_ALIGN_CENTER)
+                outputStream.write("$storeFooter\n".toByteArray())
+                outputStream.write("Powered by Sysdos POS\n".toByteArray())
+                outputStream.write(FEED_PAPER) // Spasi bawah biar gampang sobek
+
+                // SELESAI
+                outputStream.flush()
+                socket.close()
+
+                // Bersihkan keranjang setelah struk tercetak (Opsional, atau di tombol Tutup)
+                runOnUiThread {
+                    viewModel.clearCart()
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                runOnUiThread {
+                    android.widget.Toast.makeText(this, "Gagal Print: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
-            printerHelper.setAlign(1)
-            printerHelper.printText("--------------------------------\n${prefs.getString("email", "Terima Kasih!")}\n")
-            printerHelper.feedPaper()
-        } catch (e: Exception) {}
+        }.start()
     }
 
     private fun formatRow(kiri: String, kanan: String): String {

@@ -41,7 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- CALLBACK SEEDING DATA AWAL ---
+        // --- CALLBACK SEEDING DATA ---
         private class DatabaseCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
@@ -50,12 +50,13 @@ abstract class AppDatabase : RoomDatabase() {
                         val productDao = database.productDao()
                         val categoryDao = database.categoryDao()
 
-                        // 1. BUAT USER BAWAAN
-                        productDao.insertUser(User(username = "admin", password = "123", role = "superadmin"))
-                        productDao.insertUser(User(username = "manajer", password = "123", role = "manager"))
-                        productDao.insertUser(User(username = "kasir", password = "123", role = "kasir"))
+                        // 1. [HAPUS/KOMENTARI BAGIAN INI]
+                        // Supaya aplikasi mendeteksi ini sebagai "Toko Baru"
+                        // productDao.insertUser(User(username = "admin", password = "123", role = "superadmin"))
+                        // productDao.insertUser(User(username = "manajer", password = "123", role = "manager"))
+                        // productDao.insertUser(User(username = "kasir", password = "123", role = "kasir"))
 
-                        // 2. [BARU] ISI KATEGORI BAWAAN (Bonus biar gak kosong)
+                        // 2. ISI KATEGORI BAWAAN (Ini Boleh Dipertahankan, Membantu User)
                         categoryDao.insertCategory(Category(name = "Makanan"))
                         categoryDao.insertCategory(Category(name = "Minuman"))
                         categoryDao.insertCategory(Category(name = "Snack"))

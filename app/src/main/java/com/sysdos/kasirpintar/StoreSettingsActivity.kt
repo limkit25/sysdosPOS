@@ -11,44 +11,55 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ListView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 
 class StoreSettingsActivity : AppCompatActivity() {
 
+    // UI Store
     private lateinit var etStoreName: EditText
     private lateinit var etStoreAddress: EditText
     private lateinit var etStorePhone: EditText
     private lateinit var etStoreFooter: EditText
-
     private lateinit var btnSave: Button
+    private lateinit var layoutSaveBtn: LinearLayout
+
+    // UI Printer
     private lateinit var btnScanPrinter: Button
     private lateinit var lvPrinters: ListView
-    private lateinit var tvTitle: TextView
 
+    // UI Umum
+    private lateinit var tvTitle: TextView
+    private lateinit var btnBack: ImageButton
     private lateinit var cardSectionStore: CardView
     private lateinit var cardSectionPrinter: CardView
 
+    // Bluetooth Var
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private val deviceList = ArrayList<String>()
     private val deviceMacs = ArrayList<String>()
     private lateinit var listAdapter: ArrayAdapter<String>
 
+    // Logic Vars
+    private var isInitialSetup = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_store_settings)
 
-        // Bind View
+        // 1. CEK INTENT (Dari mana asal user?)
+        isInitialSetup = intent.getBooleanExtra("IS_INITIAL_SETUP", false)
+        val target = intent.getStringExtra("TARGET") // "STORE", "PRINTER", atau null
+
+        // 2. BIND VIEW
         tvTitle = findViewById(R.id.tvSettingsTitle)
+        btnBack = findViewById(R.id.btnBack)
+
         cardSectionStore = findViewById(R.id.cardSectionStore)
         cardSectionPrinter = findViewById(R.id.cardSectionPrinter)
+        layoutSaveBtn = findViewById(R.id.layoutSaveBtn)
 
         etStoreName = findViewById(R.id.etStoreName)
         etStoreAddress = findViewById(R.id.etStoreAddress)
@@ -59,83 +70,112 @@ class StoreSettingsActivity : AppCompatActivity() {
         btnScanPrinter = findViewById(R.id.btnScanPrinter)
         lvPrinters = findViewById(R.id.lvPrinters)
 
-        // --- CEK MODE TAMPILAN ---
-        val target = intent.getStringExtra("TARGET")
-        if (target == "STORE") {
-            cardSectionPrinter.visibility = View.GONE
-            tvTitle.text = "Info & Struk Toko"
-        } else if (target == "PRINTER") {
-            cardSectionStore.visibility = View.GONE
-            tvTitle.text = "Koneksi Printer"
-        }
-
-        // Load Data Toko
+        // 3. LOAD DATA TOKO
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         etStoreName.setText(prefs.getString("name", ""))
         etStoreAddress.setText(prefs.getString("address", ""))
         etStorePhone.setText(prefs.getString("phone", ""))
         etStoreFooter.setText(prefs.getString("email", "Terima Kasih!"))
 
-        // Setup List
+        // 4. SETUP LIST PRINTER
         listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
 
-        // Tampilkan printer (hanya jika mode printer aktif atau default)
-        if (target == "PRINTER" || target == null) {
-            if (checkPermission()) showPairedDevices()
-        }
+        // 5. ATUR TAMPILAN BERDASARKAN KONDISI
+        setupUI(target)
 
-        // SIMPAN INFO TOKO
-        btnSave.setOnClickListener {
-            prefs.edit().apply {
-                putString("name", etStoreName.text.toString())
-                putString("address", etStoreAddress.text.toString())
-                putString("phone", etStorePhone.text.toString())
-                putString("email", etStoreFooter.text.toString())
-                apply()
-            }
-            Toast.makeText(this, "Info Toko & Struk Disimpan!", Toast.LENGTH_SHORT).show()
-        }
+        // 6. LISTENER TOMBOL
+        btnBack.setOnClickListener { finish() }
 
-        // CARI PRINTER
+        btnSave.setOnClickListener { saveStoreSettings() }
+
         btnScanPrinter.setOnClickListener {
-            if (checkPermission()) {
-                startDiscovery()
-            } else {
-                requestBTPermissions()
-            }
+            if (checkPermission()) startDiscovery() else requestBTPermissions()
         }
 
-        // --- [MODIFIKASI] KLIK PILIH PRINTER ---
+        // 7. LISTENER KLIK LIST PRINTER
         lvPrinters.setOnItemClickListener { _, _, position, _ ->
             if (checkPermission() && bluetoothAdapter?.isDiscovering == true) {
                 bluetoothAdapter.cancelDiscovery()
             }
 
             val selectedMac = deviceMacs[position]
-            // Ambil nama dari list, buang tanda [✅] kalau ada biar bersih
             val rawName = deviceList[position].split("\n")[0].replace(" [✅ AKTIF]", "")
 
-            // Simpan ke memori
+            // Simpan MAC Printer Utama
             prefs.edit().putString("printer_mac", selectedMac).apply()
-
             Toast.makeText(this, "Printer Utama: $rawName", Toast.LENGTH_SHORT).show()
 
-            // REFRESH LIST AGAR TANDA CENTANG PINDAH
+            // Refresh List agar centang pindah
             showPairedDevices()
         }
 
+        // Register Bluetooth Receiver
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(receiver, filter)
+
+        // Auto Load Paired jika di menu printer
+        if (target == "PRINTER") {
+            if (checkPermission()) showPairedDevices()
+        }
     }
 
-    // --- [MODIFIKASI] TAMPILKAN LIST DENGAN PENANDA ---
+    private fun setupUI(target: String?) {
+        if (isInitialSetup) {
+            // MODE: SETUP AWAL (Login Pertama)
+            tvTitle.text = "Setup Profil Toko"
+            btnBack.visibility = View.GONE // Wajib isi, gak boleh back
+            cardSectionPrinter.visibility = View.GONE // Fokus isi data toko dulu
+            btnSave.text = "SIMPAN & MASUK DASHBOARD"
+        }
+        else if (target == "PRINTER") {
+            // MODE: SETTING PRINTER (Dari Dashboard)
+            tvTitle.text = "Koneksi Printer"
+            cardSectionStore.visibility = View.GONE
+            layoutSaveBtn.visibility = View.GONE // Printer auto save saat diklik
+        }
+        else {
+            // MODE: EDIT INFO TOKO (Dari Dashboard)
+            tvTitle.text = "Informasi Toko"
+            cardSectionPrinter.visibility = View.GONE
+            btnSave.text = "SIMPAN PERUBAHAN"
+        }
+    }
+
+    private fun saveStoreSettings() {
+        val name = etStoreName.text.toString()
+        if (name.isEmpty()) {
+            Toast.makeText(this, "Nama Toko Wajib Diisi!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("name", name)
+            putString("address", etStoreAddress.text.toString())
+            putString("phone", etStorePhone.text.toString())
+            putString("email", etStoreFooter.text.toString())
+            apply()
+        }
+
+        if (isInitialSetup) {
+            Toast.makeText(this, "Selamat Datang di Kasir Pintar! 🚀", Toast.LENGTH_LONG).show()
+            val intent = Intent(this, DashboardActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        } else {
+            Toast.makeText(this, "Info Toko Disimpan!", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
+
+    // --- LOGIKA BLUETOOTH ---
     private fun showPairedDevices() {
         if (!checkPermission()) return
         deviceList.clear()
         deviceMacs.clear()
 
-        // Ambil MAC yang tersimpan saat ini
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val activeMac = prefs.getString("printer_mac", "")
 
@@ -145,11 +185,8 @@ class StoreSettingsActivity : AppCompatActivity() {
                 val name = device.name ?: "Unknown"
                 val mac = device.address
 
-                // LOGIKA PENANDA: Jika mac sama, tambah teks [✅ AKTIF]
                 var displayName = name
-                if (mac == activeMac) {
-                    displayName = "$name [✅ AKTIF]"
-                }
+                if (mac == activeMac) displayName = "$name [✅ AKTIF]"
 
                 deviceList.add("$displayName\n$mac")
                 deviceMacs.add(mac)
@@ -175,7 +212,6 @@ class StoreSettingsActivity : AppCompatActivity() {
                         val name = it.name
                         val mac = it.address
                         if (name != null && !deviceMacs.contains(mac)) {
-                            // Cek juga untuk hasil scan
                             val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
                             val activeMac = prefs.getString("printer_mac", "")
 

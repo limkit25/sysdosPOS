@@ -13,6 +13,7 @@ import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.data.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
@@ -148,7 +149,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         _totalPrice.value = sum
     }
 
-    // --- CHECKOUT ---
+    // --- FUNGSI CHECKOUT (SESUAI STRUKTUR DB BAPAK) ---
     fun checkout(
         subtotal: Double,
         discount: Double,
@@ -156,33 +157,32 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         paymentMethod: String,
         cashReceived: Double,
         changeAmount: Double,
-        onSuccess: (Transaction?) -> Unit
+        onResult: (Transaction?) -> Unit
     ) {
-        val currentCart = _cart.value ?: return
-        if (currentCart.isEmpty()) { onSuccess(null); return }
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentItems = _cart.value ?: emptyList()
 
-        viewModelScope.launch {
-            val total = (subtotal - discount) + tax
-            val timestamp = System.currentTimeMillis()
+            // 1. Hitung Total Akhir (Sesuai rumus Bapak)
+            val finalTotal = subtotal - discount + tax
 
-            val summaryBuilder = StringBuilder()
+            // 2. Buat Ringkasan Item (itemsSummary)
+            // Contoh hasil: "Nasi Goreng x2, Es Teh x1"
+            val summary = currentItems.joinToString(", ") { "${it.name} x${it.stock}" }
+
+            // 3. Hitung Profit/Keuntungan (Harga Jual - Modal)
             var totalProfit = 0.0
-
-            for (item in currentCart) {
-                summaryBuilder.append("${item.name}\n")
-                summaryBuilder.append("   ${item.stock} x ${String.format("%,.0f", item.price)} = ${String.format("%,.0f", item.price * item.stock)}\n")
-
-                productDao.decreaseStock(item.id, item.stock)
-
-                val profitPerItem = (item.price - item.costPrice) * item.stock
-                totalProfit += profitPerItem
+            for (item in currentItems) {
+                // Profit per item = (Harga Jual - Harga Modal) * Jumlah Beli
+                val itemProfit = (item.price - item.costPrice) * item.stock
+                totalProfit += itemProfit
             }
 
-            val trx = Transaction(
-                itemsSummary = summaryBuilder.toString(),
-                totalAmount = total,
+            // 4. Masukkan ke Objek Transaction
+            val newTrx = Transaction(
+                itemsSummary = summary,
+                totalAmount = finalTotal,    // Ini yang tadi namanya 'totalAmount'
                 profit = totalProfit,
-                timestamp = timestamp,
+                timestamp = System.currentTimeMillis(),
                 paymentMethod = paymentMethod,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount,
@@ -190,13 +190,35 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 discount = discount,
                 tax = tax
             )
-            val id = productDao.insertTransaction(trx)
 
-            _cart.value = emptyList()
-            _totalPrice.value = 0.0
+            // 5. Simpan ke Database
+            val id = productDao.insertTransaction(newTrx)
 
-            onSuccess(trx.copy(id = id.toInt()))
+            // 6. Update Stok Barang (Kurangi stok di Gudang)
+            for (cartItem in currentItems) {
+                // Ambil data asli biar aman
+                val originalItem = productDao.getProductById(cartItem.id)
+                if (originalItem != null) {
+                    val newStock = originalItem.stock - cartItem.stock
+                    // Update stok baru
+                    val updatedProduct = originalItem.copy(stock = if (newStock < 0) 0 else newStock)
+                    productDao.update(updatedProduct)
+                }
+            }
+
+            // 7. Bersihkan Keranjang di UI
+            withContext(Dispatchers.Main) {
+                clearCart() // Panggil fungsi pembersih
+                // Kembalikan objek transaksi (yang sudah ada ID-nya) ke UI untuk di-print
+                onResult(newTrx.copy(id = id.toInt()))
+            }
         }
+    }
+
+    // --- FUNGSI BERSIHKAN KERANJANG (YANG TADI HILANG) ---
+    fun clearCart() {
+        _cart.value = emptyList() // Kosongkan List
+        calculateTotal()          // Reset Total Harga jadi 0
     }
 
     // --- USER MANAGEMENT ---
