@@ -14,13 +14,16 @@ import com.sysdos.kasirpintar.data.model.User
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.sysdos.kasirpintar.data.model.ShiftLog // <--- Tambah Import
+import com.sysdos.kasirpintar.data.dao.ShiftDao   // <--- Tambah Import
 
 // VERSION NAIK JADI 5 (Karena nambah tabel Category)
-@Database(entities = [Product::class, Transaction::class, User::class, Category::class], version = 5, exportSchema = false)
+@Database(entities = [Product::class, Category::class, Transaction::class, User::class, ShiftLog::class], version = 2, exportSchema = false) // <--- Tambah ShiftLog::class, Version ganti jadi 2 (biar aman)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao
-    abstract fun categoryDao(): CategoryDao // AKSES DAO KATEGORI
+    abstract fun categoryDao(): CategoryDao
+    abstract fun shiftDao(): ShiftDao // <--- Tambahkan Baris Ini
 
     companion object {
         @Volatile

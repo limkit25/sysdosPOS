@@ -63,6 +63,10 @@
         <activity android:name=".StoreSettingsActivity" android:label="Pengaturan Toko"/>
 
         <activity android:name=".CategoryActivity" android:label="Kelola Kategori"/>
+        <activity
+            android:name=".ShiftHistoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
     </application>
 

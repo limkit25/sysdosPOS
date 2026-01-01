@@ -488,111 +488,151 @@ class MainActivity : AppCompatActivity() {
     // --- FUNGSI CETAK STRUK (BLUETOOTH) ---
     private fun printStruk(trx: com.sysdos.kasirpintar.data.model.Transaction) {
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        val printerMac = prefs.getString("printer_mac", "")
-        val storeName = prefs.getString("name", "Toko Saya")
-        val storeAddress = prefs.getString("address", "Alamat Toko")
-        val storeFooter = prefs.getString("email", "Terima Kasih")
+        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+        val targetMac = prefs.getString("printer_mac", "")
 
-        if (printerMac.isNullOrEmpty()) return
+        if (targetMac.isNullOrEmpty()) {
+            Toast.makeText(this, "Printer belum diatur", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        // Jalankan di Background Thread biar UI gak macet
         Thread {
-            try {
-                val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
-                val device = bluetoothAdapter.getRemoteDevice(printerMac)
+            var socket: android.bluetooth.BluetoothSocket? = null
+            var isConnected = false
+            var attempt = 0
 
-                // Cek Permission Bluetooth (Standar Android 12+)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                    if (androidx.core.app.ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        return@Thread
-                    }
+            // LOGIKA AUTO-RETRY
+            val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (androidx.core.app.ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    if (bluetoothAdapter.isDiscovering) bluetoothAdapter.cancelDiscovery()
                 }
+            } else {
+                if (bluetoothAdapter.isDiscovering) bluetoothAdapter.cancelDiscovery()
+            }
 
-                val socket = device.createRfcommSocketToServiceRecord(java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-                socket.connect()
-                val outputStream = socket.outputStream
+            while (attempt < 3 && !isConnected) {
+                try {
+                    attempt++
+                    val device = bluetoothAdapter.getRemoteDevice(targetMac)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        if (androidx.core.app.ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            return@Thread
+                        }
+                    }
+                    val uuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                    socket = device.createRfcommSocketToServiceRecord(uuid)
+                    socket.connect()
+                    isConnected = true
+                } catch (e: Exception) {
+                    try { socket?.close() } catch (x: Exception) {}
+                    if (attempt < 3) Thread.sleep(1000)
+                }
+            }
 
-                // --- FORMAT STRUK ---
-                val ESC_ALIGN_CENTER = byteArrayOf(0x1B, 0x61, 0x01)
-                val ESC_ALIGN_LEFT = byteArrayOf(0x1B, 0x61, 0x00)
-                val TEXT_BOLD_ON = byteArrayOf(0x1B, 0x45, 0x01)
-                val TEXT_BOLD_OFF = byteArrayOf(0x1B, 0x45, 0x00)
-                val TEXT_SIZE_NORMAL = byteArrayOf(0x1D, 0x21, 0x00)
-                val TEXT_SIZE_LARGE = byteArrayOf(0x1D, 0x21, 0x11)
-                val FEED_PAPER = byteArrayOf(0x0A, 0x0A, 0x0A) // 3x Enter
+            if (!isConnected) {
+                runOnUiThread { Toast.makeText(this, "Gagal Konek Printer", Toast.LENGTH_SHORT).show() }
+                return@Thread
+            }
+
+            try {
+                val outputStream = socket!!.outputStream
+                val storeName = prefs.getString("name", "Toko Saya")
+                val storeAddress = prefs.getString("address", "Indonesia")
+                val storePhone = prefs.getString("phone", "")
+                val kasirName = session.getString("username", "Admin")
+                val sdf = java.text.SimpleDateFormat("dd/MM/yy HH:mm", java.util.Locale.getDefault())
+                val dateStr = sdf.format(java.util.Date(trx.timestamp))
+
+                val p = StringBuilder()
 
                 // 1. HEADER
-                outputStream.write(ESC_ALIGN_CENTER)
-                outputStream.write(TEXT_BOLD_ON)
-                outputStream.write(TEXT_SIZE_LARGE)
-                outputStream.write("$storeName\n".toByteArray())
-                outputStream.write(TEXT_SIZE_NORMAL)
-                outputStream.write(TEXT_BOLD_OFF)
-                outputStream.write("$storeAddress\n".toByteArray())
-                outputStream.write("--------------------------------\n".toByteArray())
+                p.append("\u001B\u0061\u0001") // Tengah
+                p.append("\u001B\u0045\u0001") // Bold ON
+                p.append("$storeName\n")
+                p.append("\u001B\u0045\u0000") // Bold OFF
+                p.append("$storeAddress\n")
+                if (!storePhone.isNullOrEmpty()) p.append("Telp: $storePhone\n")
+                p.append("--------------------------------\n")
 
-                // 2. INFO TRANSAKSI
-                outputStream.write(ESC_ALIGN_LEFT)
-                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
-                val dateStr = sdf.format(java.util.Date(trx.timestamp))
-                outputStream.write("Tgl : $dateStr\n".toByteArray())
-                outputStream.write("No  : TRX-${trx.id}\n".toByteArray())
-                outputStream.write("--------------------------------\n".toByteArray())
+                // 2. INFO TRX
+                p.append("\u001B\u0061\u0000") // Kiri
+                p.append("ID   : #${trx.id}\n")
+                p.append("Tgl  : $dateStr\n")
+                p.append("Kasir: $kasirName\n")
+                p.append("--------------------------------\n")
 
-                // 3. ITEM BELANJA
-                // Kita butuh detail item. Karena Transaction object biasanya cuma simpan total,
-                // idealnya kita ambil dari 'trx.items' kalau Bapak sudah relasikan.
-                // TAPI, untuk saat ini kita ambil dari viewModel.cart.value SEBELUM DIHAPUS
-                // (Catatan: Ini trik cepat. Idealnya ambil dari database relation)
+                // 3. FUNGSI ROW (Untuk bikin rata kanan kiri)
+                fun row(kiri: String, valDbl: Double, isMinus: Boolean = false): String {
+                    val formattedVal = String.format(java.util.Locale("id","ID"), "Rp %,d", valDbl.toLong()).replace(',', '.')
+                    val kanan = if(isMinus) "-$formattedVal" else formattedVal
 
-                val itemsToPrint = viewModel.cart.value ?: emptyList()
-                for (item in itemsToPrint) {
-                    outputStream.write("${item.name}\n".toByteArray())
-                    val qtyPrice = "${item.stock} x ${item.price.toInt()}"
-                    val subtotal = item.stock * item.price
+                    val maxChars = 32
+                    val maxKiri = maxChars - kanan.length - 1
+                    val textKiri = if (kiri.length > maxKiri) kiri.substring(0, maxKiri) else kiri
 
-                    // Format rata kanan manual sederhana
-                    val line = String.format("%-20s %10s\n", qtyPrice, subtotal.toInt().toString())
-                    outputStream.write(line.toByteArray())
+                    val sisa = maxChars - textKiri.length - kanan.length
+                    val spasi = if (sisa > 0) " ".repeat(sisa) else " "
+                    return "$textKiri$spasi$kanan\n"
                 }
 
-                outputStream.write("--------------------------------\n".toByteArray())
+                // 4. DAFTAR BARANG (LOGIKA BARU)
+                // Kita pisah berdasarkan ";" lalu pisah lagi berdasarkan "|"
+                val items = trx.itemsSummary.split(";")
+                for (itemStr in items) {
+                    val parts = itemStr.split("|")
 
-                // 4. TOTAL & PEMBAYARAN
-                outputStream.write(ESC_ALIGN_LEFT)
-                outputStream.write("Total    : ${trx.totalAmount.toInt()}\n".toByteArray())
-                if (trx.discount > 0) outputStream.write("Diskon   : -${trx.discount.toInt()}\n".toByteArray())
-                if (trx.tax > 0) outputStream.write("Pajak    : +${trx.tax.toInt()}\n".toByteArray())
+                    if (parts.size == 4) {
+                        // FORMAT BARU: Nama|Qty|Harga|Total
+                        val name = parts[0]
+                        val qty = parts[1]
+                        val price = parts[2].toDoubleOrNull() ?: 0.0
+                        val totalLine = parts[3].toDoubleOrNull() ?: 0.0
 
-                outputStream.write(TEXT_BOLD_ON)
-                outputStream.write("TAGIHAN  : ${trx.totalAmount.toInt()}\n".toByteArray())
-                outputStream.write(TEXT_BOLD_OFF)
+                        // Cetak Nama Barang
+                        p.append("$name\n")
+                        // Cetak:  2 x 15.000      30.000
+                        val formatHarga = String.format(java.util.Locale("id","ID"), "%,d", price.toLong()).replace(',', '.')
+                        p.append(row("  $qty x $formatHarga", totalLine))
+                    } else {
+                        // FORMAT LAMA (Fallback biar gak error print data lama)
+                        p.append("$itemStr\n")
+                    }
+                }
+                p.append("--------------------------------\n")
 
-                outputStream.write("Bayar    : ${trx.cashReceived.toInt()}\n".toByteArray())
-                outputStream.write("Kembali  : ${trx.changeAmount.toInt()}\n".toByteArray())
+                // 5. HITUNGAN
+                p.append(row("Subtotal", trx.subtotal))
+                if (trx.discount > 0) p.append(row("Diskon", trx.discount, true))
+                if (trx.tax > 0) p.append(row("Pajak", trx.tax))
+                p.append("--------------------------------\n")
 
-                outputStream.write("--------------------------------\n".toByteArray())
+                // TOTAL
+                p.append("\u001B\u0045\u0001") // Bold ON
+                p.append(row("TOTAL", trx.totalAmount))
+                p.append("\u001B\u0045\u0000") // Bold OFF
 
-                // 5. FOOTER
-                outputStream.write(ESC_ALIGN_CENTER)
-                outputStream.write("$storeFooter\n".toByteArray())
-                outputStream.write("Powered by Sysdos POS\n".toByteArray())
-                outputStream.write(FEED_PAPER) // Spasi bawah biar gampang sobek
+                if (trx.paymentMethod.contains("Tunai")) {
+                    p.append(row("Tunai", trx.cashReceived))
+                    p.append(row("Kembali", trx.changeAmount))
+                } else {
+                    p.append("Metode: ${trx.paymentMethod}\n")
+                }
 
-                // SELESAI
+                // FOOTER
+                p.append("\u001B\u0061\u0001") // Tengah
+                p.append("--------------------------------\n")
+                val footerMsg = prefs.getString("email", "Terima Kasih!")
+                p.append("$footerMsg\n")
+                p.append("\n\n\n")
+
+                outputStream.write(p.toString().toByteArray())
                 outputStream.flush()
+                Thread.sleep(1500)
                 socket.close()
 
-                // Bersihkan keranjang setelah struk tercetak (Opsional, atau di tombol Tutup)
-                runOnUiThread {
-                    viewModel.clearCart()
-                }
-
             } catch (e: Exception) {
-                e.printStackTrace()
-                runOnUiThread {
-                    android.widget.Toast.makeText(this, "Gagal Print: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                }
+                try { socket?.close() } catch (e: Exception) {}
             }
         }.start()
     }

@@ -8,12 +8,11 @@
     android:background="#F5F8FA">
 
     <LinearLayout
-        android:id="@+id/headerLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1976D2"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="16dp"
+        android:orientation="vertical">
 
         <TextView
             android:layout_width="wrap_content"
@@ -21,132 +20,63 @@
             android:text="Laporan Keuangan"
             android:textColor="#FFFFFF"
             android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:textStyle="bold"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="#FFFFFF">
-            <Spinner
-                android:id="@+id/spnFilter"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@android:color/transparent"
-                android:paddingStart="12dp"
-                android:overlapAnchor="false"/>
-        </androidx.cardview.widget.CardView>
+            android:text="Ringkasan omzet &amp; profit toko"
+            android:textColor="#E3F2FD"
+            android:textSize="14sp"/>
     </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp"
-        android:clipToPadding="false">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="16dp">
 
             <androidx.cardview.widget.CardView
-                android:id="@+id/cardCashFlow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="8dp"
+                android:layout_marginBottom="16dp">
+                <Spinner
+                    android:id="@+id/spnFilter"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:padding="8dp"/>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="#FFF8E1"
-                android:layout_marginBottom="16dp">
-
+                android:layout_marginBottom="12dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="POSISI KAS (UANG DI LACI)"
-                        android:textStyle="bold"
-                        android:textColor="#FF8F00"
-                        android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Modal Awal:"/>
-                        <TextView
-                            android:id="@+id/tvModalReport"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Rp 0"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#E0E0E0"
-                        android:layout_marginVertical="8dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="TOTAL AKHIR (Hitung Fisik):"
-                            android:textStyle="bold"/>
-                        <TextView
-                            android:id="@+id/tvTotalCashReport"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Rp 0"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:textColor="#1976D2"/>
-                    </LinearLayout>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardOmzet"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="#2196F3"
-                android:layout_marginBottom="16dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Total Omzet (Pendapatan)"
-                        android:textColor="#E3F2FD"
-                        android:textSize="14sp"/>
+                        android:text="Total Omzet (Penjualan)"
+                        android:textColor="#757575"/>
                     <TextView
                         android:id="@+id/tvTotalOmzet"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Rp 0"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold"
-                        android:textColor="#FFFFFF"
-                        android:layout_marginTop="4dp"/>
+                        android:textColor="#1976D2"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -156,28 +86,116 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="#4CAF50"
-                android:layout_marginBottom="16dp">
+                app:cardBackgroundColor="#E8F5E9"
+                android:layout_marginBottom="12dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="20dp">
+                    android:padding="16dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Total Laba Bersih (Profit)"
-                        android:textColor="#E8F5E9"
-                        android:textSize="14sp"/>
+                        android:text="Laba Bersih (Profit)"
+                        android:textColor="#2E7D32"
+                        android:textStyle="bold"/>
                     <TextView
                         android:id="@+id/tvTotalProfit"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Rp 0"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold"
-                        android:textColor="#FFFFFF"
-                        android:layout_marginTop="4dp"/>
+                        android:textColor="#2E7D32"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardCashFlow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                android:layout_marginBottom="12dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Arus Kas Kasir (Hari Ini)"
+                            android:textStyle="bold"
+                            android:textColor="#333"/>
+
+                        <Button
+                            android:id="@+id/btnSetModal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="Edit Modal"
+                            android:textSize="10sp"
+                            android:backgroundTint="#FF9800"/>
+                        <Button
+                            android:id="@+id/btnShiftHistory"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="📜 Riwayat"
+                            android:textSize="10sp"
+                            android:backgroundTint="#607D8B"
+                            android:layout_marginStart="8dp"/>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#EEE"
+                        android:layout_marginVertical="8dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="4dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Modal Awal:"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvModalReport"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rp 0"
+                            android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Total Uang Laci:"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvTotalCashReport"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rp 0"
+                            android:textStyle="bold"
+                            android:textColor="#1976D2"/>
+                    </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -187,39 +205,31 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="#FFFFFF"
-                android:layout_marginBottom="24dp"
-                android:foreground="?android:attr/selectableItemBackground">
-
+                android:clickable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:layout_marginBottom="12dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:padding="16dp"
                     android:gravity="center_vertical">
-
                     <ImageView
                         android:layout_width="40dp"
                         android:layout_height="40dp"
                         android:src="@android:drawable/ic_menu_sort_by_size"
-                        app:tint="#757575"
-                        android:background="@drawable/bg_rounded_white"
-                        android:padding="8dp"/>
-
+                        app:tint="#1976D2"
+                        android:layout_marginEnd="16dp"/>
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginStart="12dp">
-
+                        android:orientation="vertical">
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Jumlah Transaksi"
-                            android:textColor="#757575"
-                            android:textSize="12sp"/>
-
+                            android:text="Total Transaksi"
+                            android:textColor="#757575"/>
                         <TextView
                             android:id="@+id/tvTotalTrx"
                             android:layout_width="wrap_content"
@@ -229,25 +239,31 @@
                             android:textStyle="bold"
                             android:textColor="#333"/>
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@android:drawable/ic_media_play"
-                        app:tint="#BDBDBD"/>
+                        app:tint="#CCC"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <Button
-                android:id="@+id/btnExport"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="DOWNLOAD EXCEL (.CSV)"
-                android:textStyle="bold"
-                android:backgroundTint="#FF9800"
-                app:cornerRadius="8dp"
-                android:paddingVertical="12dp"/>
-
         </LinearLayout>
     </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:background="#FFFFFF"
+        android:elevation="8dp">
+        <Button
+            android:id="@+id/btnExport"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="📄 DOWNLOAD LAPORAN (EXCEL)"
+            android:textStyle="bold"
+            android:backgroundTint="#4CAF50"
+            app:cornerRadius="8dp"/>
+    </LinearLayout>
+
 </LinearLayout>

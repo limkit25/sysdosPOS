@@ -18,10 +18,13 @@ interface ProductDao {
     @Query("SELECT * FROM products ORDER BY name ASC")
     fun getAllProducts(): Flow<List<Product>>
 
-    // [!!! INI YANG TADI HILANG !!!]
-    // Fungsi ini wajib ada supaya Edit Barang bisa jalan
+    // Fungsi untuk LiveData (Async)
     @Query("SELECT * FROM products WHERE id = :id")
     fun getProductById(id: Int): Flow<Product>
+
+    // [BARU] Fungsi untuk ambil data MENTAH saat Checkout (Synchronous/Suspend)
+    @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
+    suspend fun getProductRaw(id: Int): Product?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProduct(product: Product)
@@ -32,7 +35,7 @@ interface ProductDao {
     @Delete
     suspend fun deleteProduct(product: Product)
 
-    // Update stok
+    // Update stok langsung (Opsional, tapi kita pakai logika updateProduct di VM biar aman)
     @Query("UPDATE products SET stock = stock - :quantity WHERE id = :productId")
     suspend fun decreaseStock(productId: Int, quantity: Int)
 

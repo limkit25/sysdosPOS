@@ -7,25 +7,24 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.sysdos.kasirpintar.data.AppDatabase
-import com.sysdos.kasirpintar.data.model.Category // [1] PENTING: Import ini wajib ada!
+import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.data.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withContext // <--- PENTING
 import java.util.Calendar
+import com.sysdos.kasirpintar.data.model.ShiftLog // <--- INI OBAT ERRORNYA
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getDatabase(application)
     private val productDao = database.productDao()
-    private val categoryDao = database.categoryDao() // [2] Akses DAO Kategori
+    private val categoryDao = database.categoryDao()
 
     // --- DATA PRODUK & KATEGORI ---
     val allProducts: LiveData<List<Product>> = productDao.getAllProducts().asLiveData()
-
-    // LiveData untuk Kategori (Dipakai di ProductEntryActivity & CategoryActivity)
     val allCategories: LiveData<List<Category>> = categoryDao.getAllCategories().asLiveData()
 
     // --- RIWAYAT TRANSAKSI ---
@@ -51,7 +50,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         productDao.deleteProduct(product)
     }
 
-    // --- MANAJEMEN KATEGORI (BARU) ---
+    // --- MANAJEMEN KATEGORI ---
     fun addCategory(name: String) {
         viewModelScope.launch {
             categoryDao.insertCategory(Category(name = name))
@@ -64,7 +63,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Fungsi Ambil Produk by ID (Untuk Edit)
     fun getProductById(id: Int): LiveData<Product> {
         return productDao.getProductById(id).asLiveData()
     }
@@ -149,7 +147,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         _totalPrice.value = sum
     }
 
-    // --- FUNGSI CHECKOUT (SESUAI STRUKTUR DB BAPAK) ---
+    // --- FUNGSI CHECKOUT (VERSI FIX & LENGKAP) ---
     fun checkout(
         subtotal: Double,
         discount: Double,
@@ -162,25 +160,28 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             val currentItems = _cart.value ?: emptyList()
 
-            // 1. Hitung Total Akhir (Sesuai rumus Bapak)
+            // 1. Hitung Total Akhir
             val finalTotal = subtotal - discount + tax
 
-            // 2. Buat Ringkasan Item (itemsSummary)
-            // Contoh hasil: "Nasi Goreng x2, Es Teh x1"
-            val summary = currentItems.joinToString(", ") { "${it.name} x${it.stock}" }
+            // 2. Buat Ringkasan Item (Format: Nama|Qty|Harga|Total) dipisah titik koma (;)
+            // Ini supaya printer bisa membaca harga detail per barang
+            val summary = currentItems.joinToString(";") { item ->
+                val totalItem = item.price * item.stock
+                "${item.name}|${item.stock}|${item.price.toInt()}|${totalItem.toInt()}"
+            }
 
-            // 3. Hitung Profit/Keuntungan (Harga Jual - Modal)
+            // 3. Hitung Profit (Keuntungan)
             var totalProfit = 0.0
             for (item in currentItems) {
-                // Profit per item = (Harga Jual - Harga Modal) * Jumlah Beli
+                // Profit = (Harga Jual - Harga Modal) * Jumlah
                 val itemProfit = (item.price - item.costPrice) * item.stock
                 totalProfit += itemProfit
             }
 
-            // 4. Masukkan ke Objek Transaction
+            // 4. Buat Objek Transaksi
             val newTrx = Transaction(
                 itemsSummary = summary,
-                totalAmount = finalTotal,    // Ini yang tadi namanya 'totalAmount'
+                totalAmount = finalTotal,
                 profit = totalProfit,
                 timestamp = System.currentTimeMillis(),
                 paymentMethod = paymentMethod,
@@ -191,31 +192,37 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 tax = tax
             )
 
-            // 5. Simpan ke Database
+            // 5. Simpan Transaksi ke DB
             val id = productDao.insertTransaction(newTrx)
 
-            // 6. Update Stok Barang (Kurangi stok di Gudang)
+            // 6. UPDATE STOK BARANG (Menggunakan getProductRaw)
             for (cartItem in currentItems) {
-                // Ambil data asli biar aman
-                val originalItem = productDao.getProductById(cartItem.id)
+                // Ambil data asli (bukan LiveData) supaya bisa diedit
+                val originalItem = productDao.getProductRaw(cartItem.id)
+
                 if (originalItem != null) {
                     val newStock = originalItem.stock - cartItem.stock
-                    // Update stok baru
-                    val updatedProduct = originalItem.copy(stock = if (newStock < 0) 0 else newStock)
-                    productDao.update(updatedProduct)
+
+                    // Pastikan stok tidak minus
+                    val fixedStock = if (newStock < 0) 0 else newStock
+
+                    // Copy object dengan stok baru
+                    val updatedProduct = originalItem.copy(stock = fixedStock)
+
+                    // Simpan perubahan ke DB
+                    productDao.updateProduct(updatedProduct)
                 }
             }
 
-            // 7. Bersihkan Keranjang di UI
+            // 7. Bersihkan Keranjang & Kembali ke UI
             withContext(Dispatchers.Main) {
-                clearCart() // Panggil fungsi pembersih
-                // Kembalikan objek transaksi (yang sudah ada ID-nya) ke UI untuk di-print
-                onResult(newTrx.copy(id = id.toInt()))
+                clearCart() // Panggil fungsi reset keranjang
+                onResult(newTrx.copy(id = id.toInt())) // Kirim hasil sukses
             }
         }
     }
 
-    // --- FUNGSI BERSIHKAN KERANJANG (YANG TADI HILANG) ---
+    // --- FUNGSI BERSIHKAN KERANJANG ---
     fun clearCart() {
         _cart.value = emptyList() // Kosongkan List
         calculateTotal()          // Reset Total Harga jadi 0
@@ -256,5 +263,24 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         calendar.set(Calendar.SECOND, 0)
         val startOfDay = calendar.timeInMillis
         return allTrx.filter { it.timestamp >= startOfDay }
+    }
+    // --- TAMBAHAN UNTUK SHIFT LOG ---
+    private val shiftDao = database.shiftDao() // Inisialisasi DAO baru
+    val allShiftLogs = shiftDao.getAllLogs().asLiveData()
+
+    fun insertShiftLog(type: String, kasir: String, expected: Double, actual: Double) {
+        viewModelScope.launch {
+            val diff = actual - expected
+            val log = ShiftLog(
+                type = type, // "OPEN" atau "CLOSE"
+                timestamp = System.currentTimeMillis(),
+                kasirName = kasir,
+                expectedAmount = expected,
+                actualAmount = actual,
+                difference = diff
+            )
+            shiftDao.insertLog(log)
+        }
+        val allShiftLogs = shiftDao.getAllLogs().asLiveData()
     }
 }

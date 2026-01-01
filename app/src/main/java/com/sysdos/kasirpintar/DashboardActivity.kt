@@ -30,7 +30,7 @@ class DashboardActivity : AppCompatActivity() {
         setContentView(R.layout.activity_dashboard)
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
-        checkDailyModal()
+
 
         val tvGreeting = findViewById<TextView>(R.id.tvGreeting)
         val tvRole = findViewById<TextView>(R.id.tvRole)
@@ -104,7 +104,9 @@ class DashboardActivity : AppCompatActivity() {
             tvRevenue.text = formatRupiah(totalHariIni)
         }
 
-        cardPOS.setOnClickListener { startActivity(Intent(this, MainActivity::class.java)) }
+        cardPOS.setOnClickListener {
+            checkModalBeforePOS() // <--- Panggil fungsi ini, jangan langsung startActivity
+        }
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
         cardReport.setOnClickListener { startActivity(Intent(this, ReportActivity::class.java)) }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
@@ -143,6 +145,73 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
     }
+    // --- FUNGSI 1: CEK MODAL SEBELUM MASUK KASIR ---
+    private fun checkModalBeforePOS() {
+        val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
+        val todayDate = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
+        val lastSavedDate = prefs.getString("last_date", "")
+
+        // Cek: Apakah hari ini sudah input modal?
+        if (lastSavedDate != todayDate) {
+            // JIKA BELUM (Atau ganti hari) -> RESET & TAMPILKAN POPUP
+            prefs.edit().clear().apply()
+            showInputModalDialogForPOS(prefs, todayDate)
+        } else {
+            // JIKA SUDAH -> LOAD DATANYA (PENTING! Biar saat tutup kasir nanti angkanya ada)
+            modalHarian = prefs.getFloat("modal_awal", 0f).toDouble()
+
+            // LANJUT MASUK KASIR TANPA GANGGUAN
+            startActivity(Intent(this, MainActivity::class.java))
+        }
+    }
+
+    // --- FUNGSI 2: POPUP INPUT MODAL (DENGAN LOG KE DATABASE) ---
+    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences, todayStr: String) {
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
+        input.hint = "Contoh: 200000"
+
+        AlertDialog.Builder(this)
+            .setTitle("🏪 Buka Shift Kasir")
+            .setMessage("Masukkan Modal Awal (Uang Tunai di Laci) hari ini:")
+            .setView(input)
+            .setCancelable(false) // Wajib isi, tidak bisa dicancel
+            .setPositiveButton("BUKA KASIR") { _, _ ->
+                val modalStr = input.text.toString()
+                if (modalStr.isNotEmpty()) {
+                    val modal = modalStr.toFloat()
+
+                    // 1. SIMPAN KE MEMORI HP (Untuk hitungan setoran nanti sore)
+                    prefs.edit().apply {
+                        putString("last_date", todayStr)
+                        putFloat("modal_awal", modal)
+                        apply()
+                    }
+                    modalHarian = modal.toDouble()
+
+                    // 2. SIMPAN KE DATABASE (Agar masuk Laporan Shift Log)
+                    // Ambil nama user yang login
+                    val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                    val user = session.getString("username", "Kasir") ?: "Kasir"
+
+                    // Panggil fungsi insertShiftLog di ViewModel (Pastikan ProductViewModel sudah diupdate)
+                    viewModel.insertShiftLog("OPEN", user, 0.0, modal.toDouble())
+
+                    Toast.makeText(this, "Shift Dibuka. Tercatat di Laporan.", Toast.LENGTH_SHORT).show()
+
+                    // LANGSUNG PINDAH KE HALAMAN POS
+                    startActivity(Intent(this, MainActivity::class.java))
+                } else {
+                    Toast.makeText(this, "Modal harus diisi!", Toast.LENGTH_SHORT).show()
+                    showInputModalDialogForPOS(prefs, todayStr) // Panggil lagi kalau kosong
+                }
+            }
+            .setNegativeButton("Batal") { dialog, _ ->
+                dialog.dismiss()
+                // Kalau batal, dia tetap di Dashboard, tidak masuk Kasir
+            }
+            .show()
+    }
 
     private fun performLogout(session: android.content.SharedPreferences) {
         session.edit().clear().apply()
@@ -158,7 +227,7 @@ class DashboardActivity : AppCompatActivity() {
         input.hint = "Total uang fisik di laci"
 
         AlertDialog.Builder(this)
-            .setTitle("🔒 Tutup Kasir")
+            .setTitle("🔒 Tutup Kasir & Setor")
             .setMessage("Hitung uang fisik dan masukkan jumlahnya:")
             .setView(input)
             .setCancelable(false)
@@ -166,14 +235,22 @@ class DashboardActivity : AppCompatActivity() {
                 val strFisik = input.text.toString()
                 if (strFisik.isNotEmpty()) {
                     val uangFisik = strFisik.toDouble()
+
+                    // Hitung Omzet Sistem (Ambil dari TextView Dashboard)
                     val tvRev = findViewById<TextView>(R.id.tvTodayRevenue)
                     val cleanString = tvRev.text.toString().replace("[^0-9]".toRegex(), "")
                     val omzetSistem = if (cleanString.isNotEmpty()) cleanString.toDouble() else 0.0
 
+                    // Total yang Seharusnya Ada = Modal Awal + Omzet Hari Ini
                     val totalHarusAda = modalHarian + omzetSistem
                     val selisih = uangFisik - totalHarusAda
 
-                    var pesan = "Sesi Ditutup. "
+                    // [BARU] SIMPAN KE DATABASE (History Close Shift)
+                    val user = session.getString("username", "Kasir") ?: "Kasir"
+                    viewModel.insertShiftLog("CLOSE", user, totalHarusAda, uangFisik)
+
+                    // Pesan Feedback
+                    var pesan = "Shift Ditutup. "
                     pesan += if (selisih == 0.0) "Klop! 👍"
                     else if (selisih < 0) "⚠️ MINUS Rp ${formatRupiah(abs(selisih))}"
                     else "⚠️ LEBIH Rp ${formatRupiah(selisih)}"
@@ -194,9 +271,25 @@ class DashboardActivity : AppCompatActivity() {
         val lastSavedDate = prefs.getString("last_date", "")
 
         if (lastSavedDate != todayDate) {
-            prefs.edit().clear().apply()
-            showInputModalDialog(prefs, todayDate)
+            // Cek: Apakah ini akun baru / baru install? (lastSavedDate masih kosong)
+            if (lastSavedDate == "") {
+                // KASUS 1: BARU PERTAMA KALI -> JANGAN GANGGU DENGAN POPUP
+                // Kita set otomatis 0 dulu. Kalau mau isi, bisa lewat menu Laporan nanti.
+                prefs.edit().apply {
+                    putString("last_date", todayDate)
+                    putFloat("modal_awal", 0f)
+                    apply()
+                }
+                modalHarian = 0.0
+            } else {
+                // KASUS 2: SUDAH LAMA TAPI GANTI HARI (BESOKNYA) -> WAJIB INPUT MODAL BARU
+                // Reset data kemarin
+                prefs.edit().clear().apply()
+                // Tampilkan Popup
+                showInputModalDialog(prefs, todayDate)
+            }
         } else {
+            // HARI YANG SAMA -> AMBIL DATA YG ADA
             modalHarian = prefs.getFloat("modal_awal", 0f).toDouble()
         }
     }
