@@ -45,10 +45,7 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".LoginActivity"
-            android:exported="false" />
-
+        <activity android:name=".LoginActivity" android:exported="false" />
         <activity android:name=".DashboardActivity" />
         <activity android:name=".MainActivity" android:exported="false" />
 
@@ -61,12 +58,18 @@
         <activity android:name=".ProductListActivity" android:label="Daftar Produk"/>
         <activity android:name=".ReportActivity" android:label="Laporan Keuangan"/>
         <activity android:name=".StoreSettingsActivity" android:label="Pengaturan Toko"/>
-
         <activity android:name=".CategoryActivity" android:label="Kelola Kategori"/>
+
         <activity
             android:name=".ShiftHistoryActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".StockReportActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <activity
             android:name=".ScanActivity"
             android:screenOrientation="portrait"

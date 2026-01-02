@@ -17,5 +17,6 @@ data class Product(
     val category: String = "Lainnya", // Tambahan: Kategori
     val barcode: String? = null,
     val imagePath: String? = null,
+    val supplier: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 ) : Parcelable

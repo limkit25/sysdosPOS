@@ -144,6 +144,42 @@ class DashboardActivity : AppCompatActivity() {
                     .show()
             }
         }
+        val tvLowStock = findViewById<TextView>(R.id.tvLowStockCount)
+        val cardLowStockInfo = findViewById<CardView>(R.id.cardLowStockInfo)
+
+        // 1. OBSERVE TRANSAKSI (Untuk Omzet - SUDAH ADA)
+        viewModel.allTransactions.observe(this) { transactions ->
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val todayStr = sdf.format(Date())
+            var totalHariIni = 0.0
+            for (trx in transactions) {
+                val trxDateStr = sdf.format(Date(trx.timestamp))
+                if (trxDateStr == todayStr) totalHariIni += trx.totalAmount
+            }
+            tvRevenue.text = formatRupiah(totalHariIni)
+        }
+
+        // 2. OBSERVE PRODUK (UNTUK HITUNG STOK MENIPIS - BARU)
+        viewModel.allProducts.observe(this) { products ->
+            // Hitung barang yang stoknya kurang dari 5 tapi lebih dari 0
+            val lowStockCount = products.count { it.stock < 5 }
+
+            tvLowStock.text = "$lowStockCount Item"
+
+            // Ubah warna teks kalau ada isinya biar eye-catching
+            if (lowStockCount > 0) {
+                tvLowStock.setTextColor(android.graphics.Color.RED)
+            } else {
+                tvLowStock.setTextColor(android.graphics.Color.parseColor("#E65100")) // Orange Tua
+                tvLowStock.text = "Aman"
+            }
+        }
+
+        // 3. KLIK KARTU STOK -> BUKA LAPORAN STOK
+        cardLowStockInfo.setOnClickListener {
+            // Kita bisa langsung buka Activity Laporan Stok
+            startActivity(Intent(this, StockReportActivity::class.java))
+        }
     }
     // --- FUNGSI 1: CEK MODAL SEBELUM MASUK KASIR ---
     private fun checkModalBeforePOS() {

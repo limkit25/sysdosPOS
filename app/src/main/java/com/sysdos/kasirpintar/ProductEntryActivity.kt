@@ -9,11 +9,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.Button
-import android.widget.ImageButton // [PENTING] Import ImageButton
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,7 +24,6 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.textfield.TextInputEditText
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
@@ -50,6 +48,9 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etCategory: AutoCompleteTextView
     private lateinit var ivProduct: ImageView
 
+    // 1. TAMBAHKAN VARIABEL UI SUPPLIER DI SINI
+    private lateinit var etSupplier: TextInputEditText // <--- TAMBAHAN BARU
+
     // --- LAUNCHER KAMERA ---
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -58,30 +59,21 @@ class ProductEntryActivity : AppCompatActivity() {
     }
 
     // --- LAUNCHER SCANNER ---
-    private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
+    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
             etBarcode.setText(result.contents)
+            Toast.makeText(this, "Scan Sukses!", Toast.LENGTH_SHORT).show()
         }
     }
-    private val scanLauncher = registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
-        if (result.contents != null) {
-            // [PERBAIKAN] Gunakan ID yang benar: etProductBarcode
-            // Kalau variabel 'etBarcode' (global) sudah diinisialisasi, pakai itu saja.
-            // Tapi kalau mau aman cari ulang, pakai ini:
-            val inputBarcode = findViewById<TextInputEditText>(R.id.etProductBarcode)
-            inputBarcode.setText(result.contents)
 
-            android.widget.Toast.makeText(this, "Scan Sukses!", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_product_entry)
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // 1. BINDING VIEW (Sesuaikan dengan Layout Baru)
-        val btnBack = findViewById<ImageButton>(R.id.btnBack) // Tombol Kembali di Header
+        // BINDING VIEW
+        val btnBack = findViewById<ImageButton>(R.id.btnBack)
 
         etName = findViewById(R.id.etProductName)
         etPrice = findViewById(R.id.etProductPrice)
@@ -91,18 +83,17 @@ class ProductEntryActivity : AppCompatActivity() {
         ivProduct = findViewById(R.id.ivProductImage)
         etCategory = findViewById(R.id.etProductCategory)
 
-        // Tombol-tombol Aksi
+        // 2. HUBUNGKAN ID XML (Pastikan ID di XML Bapak sudah: etProductSupplier)
+        etSupplier = findViewById(R.id.etProductSupplier) // <--- TAMBAHAN BARU
+
         val btnTakePhoto = findViewById<Button>(R.id.btnTakePhoto)
         val btnSave = findViewById<Button>(R.id.btnSaveProduct)
-
-        // [PERBAIKAN] Ubah jadi ImageButton (Ikon)
         val btnScan = findViewById<ImageButton>(R.id.btnScanBarcode)
         val btnAddCategory = findViewById<ImageButton>(R.id.btnAddCategoryLink)
 
-        // 2. FUNGSI TOMBOL BACK (HEADER)
         btnBack.setOnClickListener { finish() }
 
-        // 3. LOGIKA KATEGORI DINAMIS
+        // LOGIKA KATEGORI
         viewModel.allCategories.observe(this) { categories ->
             val safeCategories: List<Category> = categories ?: emptyList()
             val categoryNames = safeCategories.map { it.name }
@@ -110,12 +101,11 @@ class ProductEntryActivity : AppCompatActivity() {
             etCategory.setAdapter(adapter)
         }
 
-        // Tombol [+] Kategori
         btnAddCategory.setOnClickListener {
             startActivity(Intent(this, CategoryActivity::class.java))
         }
 
-        // 4. CEK MODE EDIT ATAU BARU
+        // CEK MODE EDIT
         if (intent.hasExtra("PRODUCT_TO_EDIT")) {
             productToEdit = intent.getParcelableExtra("PRODUCT_TO_EDIT")
             productToEdit?.let {
@@ -126,6 +116,9 @@ class ProductEntryActivity : AppCompatActivity() {
                 etCategory.setText(it.category, false)
                 etBarcode.setText(it.barcode)
 
+                // 3. TAMPILKAN SUPPLIER SAAT EDIT
+                etSupplier.setText(it.supplier) // <--- TAMBAHAN BARU
+
                 currentPhotoPath = it.imagePath
                 if (currentPhotoPath != null) setPic()
 
@@ -133,21 +126,14 @@ class ProductEntryActivity : AppCompatActivity() {
             }
         }
 
-        // 5. LISTENERS LAINNYA
         btnTakePhoto.setOnClickListener { checkCameraPermissionAndOpen() }
 
         btnScan.setOnClickListener {
-            val options = com.journeyapps.barcodescanner.ScanOptions()
-
-            // Setting Standar
-            options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.ALL_CODE_TYPES)
+            val options = ScanOptions()
+            options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
             options.setBeepEnabled(true)
             options.setOrientationLocked(true)
-
-            // --- [INI KUNCI BIAR TAMPILANNYA SAMA] ---
             options.setCaptureActivity(ScanActivity::class.java)
-            // ------------------------------------------
-
             scanLauncher.launch(options)
         }
 
@@ -164,6 +150,9 @@ class ProductEntryActivity : AppCompatActivity() {
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
 
+        // 4. AMBIL TEKS DARI INPUT SUPPLIER
+        val supplier = etSupplier.text.toString() // <--- TAMBAHAN BARU
+
         if (name.isEmpty() || priceStr.isEmpty() || stockStr.isEmpty()) {
             Toast.makeText(this, "Nama, Harga, dan Stok wajib diisi!", Toast.LENGTH_SHORT).show()
             return
@@ -178,17 +167,28 @@ class ProductEntryActivity : AppCompatActivity() {
                 .setTitle("⚠️ Potensi Rugi")
                 .setMessage("Harga Jual (Rp ${price.toInt()}) lebih murah dari Modal (Rp ${cost.toInt()}).\n\nYakin tetap simpan?")
                 .setPositiveButton("Ya, Simpan") { _, _ ->
-                    processSave(name, price, cost, stock, category, barcode)
+                    // KIRIM SUPPLIER KE FUNGSI SIMPAN
+                    processSave(name, price, cost, stock, category, barcode, supplier)
                 }
                 .setNegativeButton("Perbaiki Harga", null)
                 .show()
             return
         }
 
-        processSave(name, price, cost, stock, category, barcode)
+        // KIRIM SUPPLIER KE FUNGSI SIMPAN
+        processSave(name, price, cost, stock, category, barcode, supplier)
     }
 
-    private fun processSave(name: String, price: Double, cost: Double, stock: Int, category: String, barcode: String) {
+    // 5. TAMBAHKAN PARAMETER 'supplier' DI SINI
+    private fun processSave(
+        name: String,
+        price: Double,
+        cost: Double,
+        stock: Int,
+        category: String,
+        barcode: String,
+        supplier: String // <--- TAMBAHAN BARU
+    ) {
         val newProduct = Product(
             id = productToEdit?.id ?: 0,
             name = name,
@@ -197,7 +197,10 @@ class ProductEntryActivity : AppCompatActivity() {
             stock = stock,
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
-            imagePath = currentPhotoPath
+            imagePath = currentPhotoPath,
+
+            // 6. SIMPAN KE DATABASE
+            supplier = supplier.ifEmpty { null } // <--- TAMBAHAN BARU
         )
 
         if (productToEdit == null) {
