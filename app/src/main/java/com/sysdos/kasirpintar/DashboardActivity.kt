@@ -175,10 +175,12 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        // 3. KLIK KARTU STOK -> BUKA LAPORAN STOK
+        // KLIK KARTU STOK MENIPIS -> BUKA GUDANG TAB KE-3
         cardLowStockInfo.setOnClickListener {
-            // Kita bisa langsung buka Activity Laporan Stok
-            startActivity(Intent(this, StockReportActivity::class.java))
+            val intent = Intent(this, ProductListActivity::class.java)
+            // Kirim kode "2" artinya buka Tab index ke-2 (Laporan/Aset)
+            intent.putExtra("OPEN_TAB_INDEX", 2)
+            startActivity(intent)
         }
     }
     // --- FUNGSI 1: CEK MODAL SEBELUM MASUK KASIR ---

@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext // <--- PENTING
 import java.util.Calendar
 import com.sysdos.kasirpintar.data.model.ShiftLog // <--- INI OBAT ERRORNYA
 
+
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getDatabase(application)
@@ -41,6 +42,16 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     fun insert(product: Product) {
         viewModelScope.launch { productDao.insertProduct(product) }
     }
+    private val supplierDao = database.supplierDao()
+    val allSuppliers: LiveData<List<com.sysdos.kasirpintar.data.model.Supplier>> = supplierDao.getAllSuppliers()
+
+    fun insertSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch { supplierDao.insert(supplier) }
+    }
+
+    fun deleteSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch { supplierDao.delete(supplier) }
+    }
 
     fun update(product: Product) {
         viewModelScope.launch { productDao.updateProduct(product) }
@@ -48,6 +59,22 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     fun delete(product: Product) = viewModelScope.launch(Dispatchers.IO) {
         productDao.deleteProduct(product)
+    }
+
+    // TAMBAHKAN FUNGSI INI UNTUK UPDATE
+    fun updateSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch {
+            supplierDao.update(supplier)
+        }
+    }
+
+    private val stockLogDao = database.stockLogDao()
+
+    // Fungsi Simpan Riwayat Pembelian
+    fun recordPurchase(log: com.sysdos.kasirpintar.data.model.StockLog) {
+        viewModelScope.launch {
+            stockLogDao.insert(log)
+        }
     }
 
     // --- MANAJEMEN KATEGORI ---

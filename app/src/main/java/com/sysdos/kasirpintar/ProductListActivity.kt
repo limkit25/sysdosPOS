@@ -1,219 +1,138 @@
 package com.sysdos.kasirpintar
 
-import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
-import android.view.Gravity
 import android.widget.EditText
-import android.widget.ImageButton // Pastikan pakai ImageButton sesuai XML
-import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
-import androidx.core.view.setPadding
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import com.sysdos.kasirpintar.data.model.Product
-import com.sysdos.kasirpintar.viewmodel.ProductAdapter
+import com.sysdos.kasirpintar.data.model.StockLog
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import java.util.Locale
+import android.widget.Spinner
+import android.widget.ArrayAdapter
 
 class ProductListActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
-    private lateinit var adapter: ProductAdapter
-
-    // Variabel Search & List
-    private lateinit var svSearch: SearchView
-    private var fullList: List<Product> = ArrayList()
-
-    // --- 1. SCANNER BARCODE (Untuk Cari Barang Cepat) ---
-    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
-        if (result.contents != null) {
-            val barcode = result.contents
-            svSearch.setQuery(barcode, true) // Otomatis ketik barcode di kolom cari
-            Toast.makeText(this, "Scan: $barcode", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_product_list)
+        setContentView(R.layout.activity_product_list) // Pastikan XML-nya sudah yang versi TAB
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // --- HUBUNGKAN VIEW (DENGAN PENGAMAN '?' AGAR TIDAK CRASH) ---
-        // Kalau ID tidak ketemu di XML, variabel akan bernilai null (aman)
-        svSearch = findViewById(R.id.svProduct)
-        val btnScan = findViewById<ImageView?>(R.id.btnScanGudang)
-        val rvProductList = findViewById<RecyclerView>(R.id.rvProductList)
-        val btnAdd = findViewById<FloatingActionButton>(R.id.btnAddProduct)
+        // Tombol Kembali
+        findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
 
-        // Tombol Laporan Stok (Ini tersangka utama penyebab crash)
-        val btnReport = findViewById<android.view.View?>(R.id.btnStockReport)
+        val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
+        val viewPager = findViewById<ViewPager2>(R.id.viewPager)
 
-        // --- SETUP ADAPTER ---
-        adapter = ProductAdapter(
-            onItemClick = { product -> showMenuDialog(product) },
-            onItemLongClick = { product -> showDeleteDialog(product) }
-        )
-
-        rvProductList.layoutManager = GridLayoutManager(this, 2)
-        rvProductList.adapter = adapter
-
-        // --- OBSERVE DATA ---
-        viewModel.allProducts.observe(this) { products ->
-            fullList = products
-            val query = svSearch.query.toString()
-            if (query.isNotEmpty()) filterList(query) else adapter.submitList(products)
-        }
-
-        // --- LOGIKA SEARCH ---
-        svSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean = false
-            override fun onQueryTextChange(newText: String?): Boolean {
-                filterList(newText)
-                return true
-            }
-        })
-
-        // --- LOGIKA TOMBOL (DENGAN PENGAMAN '?.') ---
-
-        // 1. Tombol Scan (Hanya jalan kalau tombolnya ada)
-        btnScan?.setOnClickListener {
-            val options = ScanOptions()
-            options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
-            options.setBeepEnabled(true)
-            options.setOrientationLocked(true)
-            options.setCaptureActivity(ScanActivity::class.java)
-            scanLauncher.launch(options)
-        }
-
-        // 2. Tombol Laporan Stok (Hanya jalan kalau tombolnya ada)
-        btnReport?.setOnClickListener {
-            startActivity(Intent(this, StockReportActivity::class.java))
-        }
-
-        // 3. Tombol Tambah Barang
-        btnAdd.setOnClickListener {
-            startActivity(Intent(this, ProductEntryActivity::class.java))
-        }
-    }
-
-    private fun filterList(query: String?) {
-        val searchText = query ?: return
-        val filtered = fullList.filter { product ->
-            val pName = product.name ?: ""
-            val pBarcode = product.barcode ?: ""
-
-            pName.lowercase().contains(searchText.lowercase()) ||
-                    pBarcode.contains(searchText)
-        }
-        adapter.submitList(filtered)
-    }
-
-    // --- DIALOG MENU UTAMA ---
-    private fun showMenuDialog(product: Product) {
-        // KITA TAMBAHKAN MENU "RESTOCK" DI SINI
-        val options = arrayOf(
-            "🚛 Restock (Barang Masuk)",  // <--- FITUR BARU
-            "✏️ Edit Detail Barang",
-            "📦 Hapus Barang"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("Menu: ${product.name}")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showRestockDialog(product) // Buka Dialog Restock
-                    1 -> {
-                        // Buka Halaman Edit Full
-                        val intent = Intent(this, ProductEntryActivity::class.java)
-                        intent.putExtra("PRODUCT_TO_EDIT", product)
-                        startActivity(intent)
-                    }
-                    2 -> showDeleteDialog(product)
+        // KONFIGURASI ADAPTER TAB (JADI 4 TAB)
+        viewPager.adapter = object : FragmentStateAdapter(this) {
+            override fun getItemCount(): Int = 4 // <--- Ubah jadi 4
+            override fun createFragment(position: Int): Fragment {
+                return when (position) {
+                    0 -> ProductFragment()   // 1. Produk
+                    1 -> SupplierFragment()  // 2. Supplier
+                    2 -> ReportFragment()    // 3. LAPORAN STOK (BARU)
+                    3 -> HistoryFragment()   // 4. Riwayat
+                    else -> ProductFragment()
                 }
             }
-            .show()
+        }
+
+        // JUDUL TAB
+        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tab.text = when (position) {
+                0 -> "PRODUK"
+                1 -> "SUPPLIER"
+                2 -> "ASET/STOK" // Nama Tab Pendek agar muat
+                3 -> "RIWAYAT"
+                else -> ""
+            }
+        }.attach()
+        val targetTab = intent.getIntExtra("OPEN_TAB_INDEX", -1)
+        if (targetTab != -1) {
+            // Geser ViewPager ke tab yang diminta (Index 2 = Laporan)
+            viewPager.setCurrentItem(targetTab, false)
+        }
     }
 
-    // --- [FITUR BARU] DIALOG RESTOCK / PEMBELIAN KE SUPPLIER ---
-    private fun showRestockDialog(product: Product) {
-        // Kita bikin Layout Dialognya pakai kodingan saja (biar praktis gak perlu XML baru)
+    // FUNGSI RESTOCK (Dipanggil dari Tab Product)
+    fun showRestockDialog(product: Product) {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
-        layout.setPadding(50)
+        layout.setPadding(50, 40, 50, 10)
 
-        // Input 1: Jumlah Masuk
-        val etQty = EditText(this)
-        etQty.hint = "Jumlah Barang Masuk (Qty)"
-        etQty.inputType = InputType.TYPE_CLASS_NUMBER
+        // 1. SPINNER SUPPLIER
+        val spnSupplier = Spinner(this)
+        var supplierList: List<com.sysdos.kasirpintar.data.model.Supplier> = emptyList()
 
-        // Input 2: Update Harga Modal (Opsional)
-        val etCost = EditText(this)
-        etCost.hint = "Update Harga Beli/Modal (Per Pcs)"
-        etCost.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-        etCost.setText(product.costPrice.toInt().toString()) // Isi otomatis dengan modal lama
+        viewModel.allSuppliers.observe(this) { suppliers ->
+            supplierList = suppliers
+            val names = suppliers.map { it.name }.toMutableList()
+            names.add(0, "-- Pilih Supplier --")
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
+            spnSupplier.adapter = adapter
+        }
 
-        // Tambahkan ke Layout
+        // 2. INPUT JUMLAH & HARGA
+        val etQty = EditText(this).apply {
+            hint = "Jumlah Masuk (Qty)"; inputType = InputType.TYPE_CLASS_NUMBER
+        }
+        val etCost = EditText(this).apply {
+            hint = "Harga Beli Baru"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(product.costPrice.toInt().toString())
+        }
+
+        layout.addView(spnSupplier)
         layout.addView(etQty)
-
-        // Jarak antar input
-        val space = TextView(this)
-        space.height = 30
-        layout.addView(space)
-
         layout.addView(etCost)
 
         AlertDialog.Builder(this)
             .setTitle("Restock: ${product.name}")
-            .setMessage("Masukkan jumlah barang yang baru dibeli dari Supplier.")
             .setView(layout)
-            .setPositiveButton("SIMPAN STOK") { _, _ ->
+            .setPositiveButton("SIMPAN") { _, _ ->
                 val qtyStr = etQty.text.toString()
-                val costStr = etCost.text.toString()
-
                 if (qtyStr.isNotEmpty()) {
                     val qtyIn = qtyStr.toInt()
-                    val newCost = if (costStr.isNotEmpty()) costStr.toDouble() else product.costPrice
+                    val newCost = etCost.text.toString().toDoubleOrNull() ?: product.costPrice
 
-                    // HITUNG STOK BARU
-                    val newStock = product.stock + qtyIn
+                    // Ambil Nama Supplier
+                    val selectedPos = spnSupplier.selectedItemPosition
+                    val supplierName = if (selectedPos > 0 && supplierList.isNotEmpty()) {
+                        supplierList[selectedPos - 1].name
+                    } else {
+                        product.supplier ?: "-"
+                    }
 
-                    // UPDATE DATABASE
-                    // Kita copy produk lama, tapi ganti stok & modalnya
-                    val updatedProduct = product.copy(
-                        stock = newStock,
-                        costPrice = newCost
+                    // Update Produk
+                    val newProduct = product.copy(stock = product.stock + qtyIn, costPrice = newCost, supplier = supplierName)
+                    viewModel.update(newProduct)
+
+                    // Simpan History
+                    val log = StockLog(
+                        timestamp = System.currentTimeMillis(),
+                        productName = product.name,
+                        supplierName = supplierName,
+                        quantity = qtyIn,
+                        costPrice = newCost,
+                        totalCost = qtyIn * newCost,
+                        type = "IN"
                     )
+                    viewModel.recordPurchase(log)
 
-                    viewModel.update(updatedProduct)
-
-                    Toast.makeText(this, "✅ Stok Bertambah: +$qtyIn", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Jumlah tidak boleh kosong!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Stok Masuk!", Toast.LENGTH_SHORT).show()
                 }
-            }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
-
-    private fun showDeleteDialog(product: Product) {
-        AlertDialog.Builder(this)
-            .setTitle("Hapus Barang?")
-            .setMessage("Yakin ingin menghapus '${product.name}'? Data tidak bisa kembali.")
-            .setPositiveButton("HAPUS") { _, _ ->
-                viewModel.delete(product)
-                Toast.makeText(this, "Barang dihapus.", Toast.LENGTH_SHORT).show()
-                svSearch.setQuery("", false)
             }
             .setNegativeButton("Batal", null)
             .show()

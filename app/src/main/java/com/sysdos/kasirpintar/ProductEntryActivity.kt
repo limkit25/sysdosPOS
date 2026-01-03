@@ -10,7 +10,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
+import android.widget.AutoCompleteTextView // Pastikan Import Ini
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -45,11 +45,11 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etCost: TextInputEditText
     private lateinit var etStock: TextInputEditText
     private lateinit var etBarcode: TextInputEditText
-    private lateinit var etCategory: AutoCompleteTextView
     private lateinit var ivProduct: ImageView
 
-    // 1. TAMBAHKAN VARIABEL UI SUPPLIER DI SINI
-    private lateinit var etSupplier: TextInputEditText // <--- TAMBAHAN BARU
+    // 1. UBAH TIPE JADI AUTOCOMPLETE (Dropdown)
+    private lateinit var etCategory: AutoCompleteTextView
+    private lateinit var etSupplier: AutoCompleteTextView
 
     // --- LAUNCHER KAMERA ---
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -81,10 +81,10 @@ class ProductEntryActivity : AppCompatActivity() {
         etStock = findViewById(R.id.etProductStock)
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
-        etCategory = findViewById(R.id.etProductCategory)
 
-        // 2. HUBUNGKAN ID XML (Pastikan ID di XML Bapak sudah: etProductSupplier)
-        etSupplier = findViewById(R.id.etProductSupplier) // <--- TAMBAHAN BARU
+        // Setup Input Dropdown
+        etCategory = findViewById(R.id.etProductCategory)
+        etSupplier = findViewById(R.id.etProductSupplier) // ID sama, tapi tipe View beda
 
         val btnTakePhoto = findViewById<Button>(R.id.btnTakePhoto)
         val btnSave = findViewById<Button>(R.id.btnSaveProduct)
@@ -93,12 +93,23 @@ class ProductEntryActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { finish() }
 
-        // LOGIKA KATEGORI
+        // 2. ISI DROPDOWN KATEGORI
         viewModel.allCategories.observe(this) { categories ->
             val safeCategories: List<Category> = categories ?: emptyList()
             val categoryNames = safeCategories.map { it.name }
             val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
             etCategory.setAdapter(adapter)
+        }
+
+        // 3. ISI DROPDOWN SUPPLIER (LOGIKA BARU)
+        viewModel.allSuppliers.observe(this) { suppliers ->
+            // Ambil nama supplier saja untuk ditampilkan di dropdown
+            val supplierNames = suppliers.map { it.name }
+            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, supplierNames)
+            etSupplier.setAdapter(adapter)
+
+            // Opsional: Langsung buka dropdown saat diklik
+            etSupplier.setOnClickListener { etSupplier.showDropDown() }
         }
 
         btnAddCategory.setOnClickListener {
@@ -113,11 +124,11 @@ class ProductEntryActivity : AppCompatActivity() {
                 etPrice.setText(it.price.toInt().toString())
                 etCost.setText(it.costPrice.toInt().toString())
                 etStock.setText(it.stock.toString())
-                etCategory.setText(it.category, false)
                 etBarcode.setText(it.barcode)
 
-                // 3. TAMPILKAN SUPPLIER SAAT EDIT
-                etSupplier.setText(it.supplier) // <--- TAMBAHAN BARU
+                // Isi nilai lama (tanpa filter dropdown dulu)
+                etCategory.setText(it.category, false)
+                etSupplier.setText(it.supplier, false)
 
                 currentPhotoPath = it.imagePath
                 if (currentPhotoPath != null) setPic()
@@ -149,9 +160,7 @@ class ProductEntryActivity : AppCompatActivity() {
         val stockStr = etStock.text.toString()
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
-
-        // 4. AMBIL TEKS DARI INPUT SUPPLIER
-        val supplier = etSupplier.text.toString() // <--- TAMBAHAN BARU
+        val supplier = etSupplier.text.toString() // Ambil teks supplier
 
         if (name.isEmpty() || priceStr.isEmpty() || stockStr.isEmpty()) {
             Toast.makeText(this, "Nama, Harga, dan Stok wajib diisi!", Toast.LENGTH_SHORT).show()
@@ -167,7 +176,6 @@ class ProductEntryActivity : AppCompatActivity() {
                 .setTitle("⚠️ Potensi Rugi")
                 .setMessage("Harga Jual (Rp ${price.toInt()}) lebih murah dari Modal (Rp ${cost.toInt()}).\n\nYakin tetap simpan?")
                 .setPositiveButton("Ya, Simpan") { _, _ ->
-                    // KIRIM SUPPLIER KE FUNGSI SIMPAN
                     processSave(name, price, cost, stock, category, barcode, supplier)
                 }
                 .setNegativeButton("Perbaiki Harga", null)
@@ -175,11 +183,9 @@ class ProductEntryActivity : AppCompatActivity() {
             return
         }
 
-        // KIRIM SUPPLIER KE FUNGSI SIMPAN
         processSave(name, price, cost, stock, category, barcode, supplier)
     }
 
-    // 5. TAMBAHKAN PARAMETER 'supplier' DI SINI
     private fun processSave(
         name: String,
         price: Double,
@@ -187,7 +193,7 @@ class ProductEntryActivity : AppCompatActivity() {
         stock: Int,
         category: String,
         barcode: String,
-        supplier: String // <--- TAMBAHAN BARU
+        supplier: String
     ) {
         val newProduct = Product(
             id = productToEdit?.id ?: 0,
@@ -198,9 +204,7 @@ class ProductEntryActivity : AppCompatActivity() {
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
             imagePath = currentPhotoPath,
-
-            // 6. SIMPAN KE DATABASE
-            supplier = supplier.ifEmpty { null } // <--- TAMBAHAN BARU
+            supplier = supplier.ifEmpty { null }
         )
 
         if (productToEdit == null) {
@@ -213,6 +217,7 @@ class ProductEntryActivity : AppCompatActivity() {
         finish()
     }
 
+    // (Bagian Kamera tetap sama)
     private fun checkCameraPermissionAndOpen() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 100)
