@@ -1,7 +1,12 @@
 package com.sysdos.kasirpintar
 
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
@@ -13,17 +18,20 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.ViewModelProvider
+import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.abs
+import java.util.UUID
 
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
-    private var modalHarian: Double = 0.0
+    // Simpan semua transaksi untuk bahan laporan
+    private var allTrx: List<Transaction> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,20 +39,22 @@ class DashboardActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-
         val tvGreeting = findViewById<TextView>(R.id.tvGreeting)
         val tvRole = findViewById<TextView>(R.id.tvRole)
         val tvRevenue = findViewById<TextView>(R.id.tvTodayRevenue)
         val btnLogout = findViewById<ImageView>(R.id.btnLogout)
         val mainGrid = findViewById<GridLayout>(R.id.mainGrid)
 
-        // AMBIL SEMUA KARTU MENU
+        // AMBIL KARTU MENU
         val cardPOS = findViewById<CardView>(R.id.cardPOS)
         val cardProduct = findViewById<CardView>(R.id.cardProduct)
         val cardReport = findViewById<CardView>(R.id.cardReport)
         val cardUser = findViewById<CardView>(R.id.cardUser)
         val cardStore = findViewById<CardView>(R.id.cardStore)
         val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
+        val tvLowStock = findViewById<TextView>(R.id.tvLowStockCount)
+        val cardLowStockInfo = findViewById<CardView>(R.id.cardLowStockInfo)
+        val cardShift = findViewById<CardView>(R.id.cardShift)
 
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "Admin")
@@ -52,48 +62,40 @@ class DashboardActivity : AppCompatActivity() {
 
         tvGreeting.text = "Halo, $username"
         tvRole.text = "Role: ${role?.uppercase()}"
+        if (role == "kasir") {
+            // Jika Kasir, SEMBUNYIKAN Info Stok Menipis
+            cardLowStockInfo.visibility = View.GONE
+        } else {
+            // Jika Admin/Manager, TAMPILKAN
+            cardLowStockInfo.visibility = View.VISIBLE
+        }
 
-        // --- LOGIKA SORTING (REVISI MANAGER) ---
-        // 1. Kosongkan Grid
+        // --- SORTING MENU ---
         mainGrid.removeAllViews()
-
-        // 2. Siapkan List
         val authorizedCards = mutableListOf<View>()
-
-        // POS Selalu Ada untuk Semua Role
         authorizedCards.add(cardPOS)
 
-        // 3. Cek Role
         if (role == "admin") {
-            // ADMIN: Semua Menu Ada
-            authorizedCards.add(cardProduct)
-            authorizedCards.add(cardReport)
-            authorizedCards.add(cardUser)
-            authorizedCards.add(cardStore)
-            authorizedCards.add(cardPrinter)
-        }
-        else if (role == "manager") {
-            // MANAGER: Gudang, Laporan, Toko, Printer (Hanya User yang hilang)
-            authorizedCards.add(cardProduct)
-            authorizedCards.add(cardReport)
-            authorizedCards.add(cardStore)   // [SUDAH DITAMBAHKAN]
-            authorizedCards.add(cardPrinter) // [SUDAH DITAMBAHKAN]
-        }
-        else {
-            // KASIR: Hanya Laporan & Printer
-            authorizedCards.add(cardReport)
-            authorizedCards.add(cardPrinter)
-            // Kasir tidak boleh edit Gudang, User, Setting Toko
+            authorizedCards.add(cardProduct); authorizedCards.add(cardReport); authorizedCards.add(cardShift)
+            authorizedCards.add(cardUser); authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
+        } else if (role == "manager") {
+            authorizedCards.add(cardProduct); authorizedCards.add(cardReport); authorizedCards.add(cardShift)
+            authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
+        } else {
+            authorizedCards.add(cardReport); authorizedCards.add(cardPrinter)
         }
 
-        // 4. Masukkan ke Grid (Otomatis Rapi)
         for (card in authorizedCards) {
             mainGrid.addView(card)
             card.visibility = View.VISIBLE
         }
 
-        // --- LOGIKA LAINNYA TETAP SAMA ---
+        // --- OBSERVE DATA ---
+        // 1. Simpan Transaksi ke Variabel Global (PENTING UNTUK LAPORAN)
         viewModel.allTransactions.observe(this) { transactions ->
+            allTrx = transactions
+
+            // Update UI Omzet Hari Ini
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val todayStr = sdf.format(Date())
             var totalHariIni = 0.0
@@ -104,29 +106,53 @@ class DashboardActivity : AppCompatActivity() {
             tvRevenue.text = formatRupiah(totalHariIni)
         }
 
-        cardPOS.setOnClickListener {
-            checkModalBeforePOS() // <--- Panggil fungsi ini, jangan langsung startActivity
+        // 2. Hitung Stok Menipis (REVISI: LOGIKA WARNA & ICON)
+        val imgAlert = findViewById<ImageView>(R.id.imgAlertStock) // <--- Panggil ID Icon tadi
+
+        viewModel.allProducts.observe(this) { products ->
+            // Hitung barang yang stoknya kurang dari 5
+            val lowStockCount = products.count { it.stock < 5 }
+
+            if (lowStockCount > 0) {
+                // KASUS: ADA BARANG MENIPIS ⚠️
+                tvLowStock.text = "$lowStockCount Item"
+                tvLowStock.setTextColor(android.graphics.Color.RED) // Warna Merah
+
+                // Munculkan Tanda Seru
+                imgAlert.visibility = View.VISIBLE
+                imgAlert.setColorFilter(android.graphics.Color.RED) // Icon jadi Merah
+            } else {
+                // KASUS: SEMUA AMAN ✅
+                tvLowStock.text = "Aman"
+                tvLowStock.setTextColor(android.graphics.Color.parseColor("#2E7D32")) // Warna Hijau
+
+                // Sembunyikan Tanda Seru (Atau ganti jadi Centang)
+                // Opsi A: Sembunyikan total
+                // imgAlert.visibility = View.GONE
+
+                // Opsi B: Ganti jadi Centang Hijau (Lebih Bagus)
+                imgAlert.visibility = View.VISIBLE
+                imgAlert.setImageResource(android.R.drawable.checkbox_on_background)
+                imgAlert.setColorFilter(android.graphics.Color.parseColor("#2E7D32")) // Icon jadi Hijau
+            }
         }
+
+        // --- CLICK LISTENERS ---
+        cardPOS.setOnClickListener { checkModalBeforePOS() }
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
-        cardReport.setOnClickListener { startActivity(Intent(this, ReportActivity::class.java)) }
+        cardReport.setOnClickListener { startActivity(Intent(this, SalesReportActivity::class.java)) }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
+        cardStore.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "STORE") }) }
+        cardPrinter.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "PRINTER") }) }
+        cardShift?.setOnClickListener { startActivity(Intent(this, ShiftHistoryActivity::class.java)) }
+        cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 2) }) }
 
-        cardStore.setOnClickListener {
-            val intent = Intent(this, StoreSettingsActivity::class.java)
-            intent.putExtra("TARGET", "STORE")
-            startActivity(intent)
-        }
-        cardPrinter.setOnClickListener {
-            val intent = Intent(this, StoreSettingsActivity::class.java)
-            intent.putExtra("TARGET", "PRINTER")
-            startActivity(intent)
-        }
-
+        // TOMBOL LOGOUT / TUTUP SHIFT
         btnLogout.setOnClickListener {
             if (role == "kasir") {
-                val options = arrayOf("💰 Tutup Kasir (Setor Harian)", "Log Out Biasa")
+                val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "Log Out Biasa")
                 AlertDialog.Builder(this)
-                    .setTitle("Pilih Aksi Keluar")
+                    .setTitle("Menu Keluar")
                     .setItems(options) { _, which ->
                         when (which) {
                             0 -> showCloseSessionDialog(session)
@@ -138,110 +164,219 @@ class DashboardActivity : AppCompatActivity() {
             } else {
                 AlertDialog.Builder(this)
                     .setTitle("Konfirmasi")
-                    .setMessage("Yakin ingin keluar aplikasi?")
+                    .setMessage("Keluar aplikasi?")
                     .setPositiveButton("Ya") { _, _ -> performLogout(session) }
                     .setNegativeButton("Batal", null)
                     .show()
             }
         }
-        val tvLowStock = findViewById<TextView>(R.id.tvLowStockCount)
-        val cardLowStockInfo = findViewById<CardView>(R.id.cardLowStockInfo)
-
-        // 1. OBSERVE TRANSAKSI (Untuk Omzet - SUDAH ADA)
-        viewModel.allTransactions.observe(this) { transactions ->
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val todayStr = sdf.format(Date())
-            var totalHariIni = 0.0
-            for (trx in transactions) {
-                val trxDateStr = sdf.format(Date(trx.timestamp))
-                if (trxDateStr == todayStr) totalHariIni += trx.totalAmount
-            }
-            tvRevenue.text = formatRupiah(totalHariIni)
-        }
-
-        // 2. OBSERVE PRODUK (UNTUK HITUNG STOK MENIPIS - BARU)
-        viewModel.allProducts.observe(this) { products ->
-            // Hitung barang yang stoknya kurang dari 5 tapi lebih dari 0
-            val lowStockCount = products.count { it.stock < 5 }
-
-            tvLowStock.text = "$lowStockCount Item"
-
-            // Ubah warna teks kalau ada isinya biar eye-catching
-            if (lowStockCount > 0) {
-                tvLowStock.setTextColor(android.graphics.Color.RED)
-            } else {
-                tvLowStock.setTextColor(android.graphics.Color.parseColor("#E65100")) // Orange Tua
-                tvLowStock.text = "Aman"
-            }
-        }
-
-        // KLIK KARTU STOK MENIPIS -> BUKA GUDANG TAB KE-3
-        cardLowStockInfo.setOnClickListener {
-            val intent = Intent(this, ProductListActivity::class.java)
-            // Kirim kode "2" artinya buka Tab index ke-2 (Laporan/Aset)
-            intent.putExtra("OPEN_TAB_INDEX", 2)
-            startActivity(intent)
-        }
     }
-    // --- FUNGSI 1: CEK MODAL SEBELUM MASUK KASIR ---
+
+    // --- FUNGSI BUKA SHIFT ---
     private fun checkModalBeforePOS() {
-        val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
-
-        // Cek Status: Apakah Shift sedang Terbuka?
-        val isShiftOpen = prefs.getBoolean("is_shift_open", false)
-
-        if (!isShiftOpen) {
-            // JIKA TUTUP -> WAJIB INPUT MODAL BARU (Buka Shift Baru)
-            // Walaupun hari yang sama, kalau statusnya tutup, ya harus buka lagi.
+        val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("IS_OPEN", false)) {
             showInputModalDialogForPOS(prefs)
         } else {
-            // JIKA BUKA -> LANJUT JUALAN
-            // Load modal yang sedang aktif biar gak 0
-            modalHarian = prefs.getFloat("modal_awal", 0f).toDouble()
             startActivity(Intent(this, MainActivity::class.java))
         }
     }
 
-    // --- FUNGSI 2: POPUP INPUT MODAL (DENGAN LOG KE DATABASE) ---
     private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences) {
-        val input = android.widget.EditText(this)
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
         input.hint = "Contoh: 200000"
 
-        val todayStr = java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.getDefault()).format(java.util.Date())
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        AlertDialog.Builder(this)
             .setTitle("🏪 Buka Shift Baru")
-            .setMessage("Masukkan Modal Awal untuk shift ini:")
+            .setMessage("Masukkan Modal Awal:")
             .setView(input)
             .setCancelable(false)
-            .setPositiveButton("BUKA SHIFT") { _, _ ->
+            .setPositiveButton("BUKA") { _, _ ->
                 val modalStr = input.text.toString()
                 if (modalStr.isNotEmpty()) {
-                    val modal = modalStr.toFloat()
-
-                    prefs.edit().apply {
-                        putString("last_date", todayStr)
-                        putFloat("modal_awal", modal)
-                        putBoolean("is_shift_open", true) // <--- TANDAI SHIFT DIBUKA
-                        apply()
-                    }
-                    modalHarian = modal.toDouble()
-
-                    // Catat ke Database
+                    val modal = modalStr.toDouble()
                     val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
                     val user = session.getString("username", "Kasir") ?: "Kasir"
-                    viewModel.insertShiftLog("OPEN", user, 0.0, modal.toDouble())
 
-                    android.widget.Toast.makeText(this, "Shift Dibuka!", android.widget.Toast.LENGTH_SHORT).show()
+                    prefs.edit().apply {
+                        putBoolean("IS_OPEN", true)
+                        putFloat("MODAL_AWAL", modal.toFloat())
+                        putFloat("CASH_SALES_TODAY", 0f)
+                        putLong("START_TIME", System.currentTimeMillis())
+                        apply()
+                    }
+                    viewModel.openShift(user, modal)
+                    Toast.makeText(this, "Shift Dibuka!", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, MainActivity::class.java))
-                } else {
-                    android.widget.Toast.makeText(this, "Wajib isi modal!", android.widget.Toast.LENGTH_SHORT).show()
-                    showInputModalDialogForPOS(prefs)
                 }
             }
-            .setNegativeButton("Batal") { dialog, _ -> dialog.dismiss() }
+            .setNegativeButton("Batal", null)
             .show()
+    }
+
+    // --- 🔥 FUNGSI TUTUP SHIFT + HITUNG RINCIAN + PRINT 🔥 ---
+    private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
+        // 1. Ambil Data Shift
+        val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+        val modalAwal = prefs.getFloat("MODAL_AWAL", 0f).toDouble()
+        val startTime = prefs.getLong("START_TIME", 0L)
+
+        // 2. Hitung Rincian Transaksi (Dari List allTrx yang sudah di-load)
+        // Kita filter transaksi yang terjadi SETELAH shift dibuka
+        val currentShiftTrx = allTrx.filter { it.timestamp >= startTime }
+
+        var totalTunai = 0.0
+        var totalQRIS = 0.0
+        var totalTransfer = 0.0
+        var totalDebit = 0.0
+
+        for (trx in currentShiftTrx) {
+            when (trx.paymentMethod) {
+                "Tunai" -> totalTunai += trx.totalAmount // Pakai totalAmount (bukan cashReceived) untuk omzet
+                "QRIS" -> totalQRIS += trx.totalAmount
+                "Transfer" -> totalTransfer += trx.totalAmount
+                "Debit" -> totalDebit += trx.totalAmount
+            }
+        }
+
+        val totalOmzetSistem = totalTunai + totalQRIS + totalTransfer + totalDebit
+        val totalUangDiLaci = modalAwal + totalTunai // Yang harus ada fisiknya
+
+        // 3. Tampilkan Dialog Rincian
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
+        input.hint = "Total uang fisik di laci"
+
+        val msg = """
+            🕒 Mulai Shift: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))}
+            
+            💵 Rincian Pendapatan:
+            • Tunai    : ${formatRupiah(totalTunai)}
+            • QRIS     : ${formatRupiah(totalQRIS)}
+            • Transfer : ${formatRupiah(totalTransfer)}
+            • Debit    : ${formatRupiah(totalDebit)}
+            ------------------------------
+            TOTAL OMZET: ${formatRupiah(totalOmzetSistem)}
+            
+            💰 Uang Fisik Seharusnya:
+            Modal (${formatRupiah(modalAwal)}) + Tunai (${formatRupiah(totalTunai)})
+            = ${formatRupiah(totalUangDiLaci)}
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("🔒 Laporan Tutup Shift")
+            .setMessage(msg)
+            .setView(input)
+            .setCancelable(false)
+            .setPositiveButton("TUTUP & CETAK") { _, _ ->
+                val strFisik = input.text.toString()
+                if (strFisik.isNotEmpty()) {
+                    val uangFisik = strFisik.toDouble()
+                    val user = session.getString("username", "Kasir") ?: "Kasir"
+
+                    // Simpan Log ke DB
+                    viewModel.closeShift(user, totalUangDiLaci, uangFisik)
+
+                    // 🔥 CETAK LAPORAN (PRINT) 🔥
+                    printShiftReport(user, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
+
+                    // Reset Data Shift
+                    prefs.edit().clear().apply()
+
+                    Toast.makeText(this, "Laporan Dicetak & Shift Ditutup.", Toast.LENGTH_LONG).show()
+                    performLogout(session)
+                } else {
+                    Toast.makeText(this, "Wajib isi total uang fisik!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    // --- FUNGSI CETAK LAPORAN SHIFT ---
+    private fun printShiftReport(
+        kasirName: String, startTime: Long, modal: Double,
+        tunai: Double, qris: Double, trf: Double, debit: Double,
+        expected: Double, actual: Double
+    ) {
+        val storePrefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val targetMac = storePrefs.getString("printer_mac", "")
+
+        if (targetMac.isNullOrEmpty()) return
+
+        Thread {
+            try {
+                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
+
+                val device = bluetoothAdapter.getRemoteDevice(targetMac)
+                val socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                socket.connect()
+
+                val os = socket.outputStream
+                val storeName = storePrefs.getString("name", "Toko Saya")
+                val now = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date())
+                val startStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))
+
+                val p = StringBuilder()
+
+                // HEADER
+                p.append("\u001B\u0061\u0001") // Center
+                p.append("\u001B\u0045\u0001$storeName\u001B\u0045\u0000\n")
+                p.append("--------------------------------\n")
+                p.append("LAPORAN TUTUP SHIFT\n")
+                p.append("--------------------------------\n")
+                p.append("\u001B\u0061\u0000") // Left
+                p.append("Kasir  : $kasirName\n")
+                p.append("Waktu  : $now\n")
+                p.append("Shift  : $startStr s/d Sekarang\n")
+                p.append("--------------------------------\n")
+
+                // RINCIAN
+                fun row(label: String, value: Double) {
+                    val vStr = formatRupiah(value).replace("Rp ", "")
+                    val space = 32 - label.length - vStr.length
+                    p.append("$label${" ".repeat(if (space > 0) space else 1)}$vStr\n")
+                }
+
+                p.append("PENJUALAN:\n")
+                row("Tunai", tunai)
+                row("QRIS", qris)
+                row("Transfer", trf)
+                row("Debit", debit)
+                p.append("--------------------------------\n")
+                val totalOmzet = tunai + qris + trf + debit
+                p.append("\u001B\u0045\u0001") // Bold
+                row("TOTAL OMZET", totalOmzet)
+                p.append("\u001B\u0045\u0000") // Normal
+                p.append("--------------------------------\n\n")
+
+                p.append("REKONSILIASI KAS (FISIK):\n")
+                row("Modal Awal", modal)
+                row("Tunai Masuk", tunai)
+                p.append("---------------- --\n")
+                row("Total Hrpn", expected)
+                row("Aktual Laci", actual)
+
+                val selisih = actual - expected
+                p.append("--------------------------------\n")
+                val labelSelisih = if(selisih < 0) "KURANG" else if(selisih > 0) "LEBIH" else "KLOP"
+                row("SELISIH ($labelSelisih)", selisih)
+                p.append("--------------------------------\n")
+
+                p.append("\u001B\u0061\u0001") // Center
+                p.append("\n\n\n")
+
+                os.write(p.toString().toByteArray())
+                os.flush()
+                Thread.sleep(2000)
+                socket.close()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
     }
 
     private fun performLogout(session: android.content.SharedPreferences) {
@@ -252,110 +387,7 @@ class DashboardActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        val input = android.widget.EditText(this)
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        input.hint = "Total uang fisik di laci"
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("🔒 Tutup Shift & Logout")
-            .setMessage("Masukkan total uang tunai yang ada di laci saat ini:")
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton("TUTUP SHIFT") { _, _ ->
-                val strFisik = input.text.toString()
-                if (strFisik.isNotEmpty()) {
-                    val uangFisik = strFisik.toDouble()
-
-                    // Hitung Omzet Sistem (Ambil dari TextView Dashboard)
-                    val tvRev = findViewById<android.widget.TextView>(R.id.tvTodayRevenue)
-                    val cleanString = tvRev.text.toString().replace("[^0-9]".toRegex(), "")
-                    val omzetSistem = if (cleanString.isNotEmpty()) cleanString.toDouble() else 0.0
-
-                    // Total Seharusnya (Modal Shift Ini + Omzet Hari Ini)
-                    val totalHarusAda = modalHarian + omzetSistem
-                    val selisih = uangFisik - totalHarusAda
-
-                    // Catat ke Database
-                    val user = session.getString("username", "Kasir") ?: "Kasir"
-                    viewModel.insertShiftLog("CLOSE", user, totalHarusAda, uangFisik)
-
-                    // [PENTING] Reset Status Shift jadi TUTUP
-                    val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
-                    prefs.edit().apply {
-                        putBoolean("is_shift_open", false) // <--- TANDAI SHIFT DITUTUP
-                        putFloat("modal_awal", 0f) // Reset modal biar aman
-                        apply()
-                    }
-
-                    android.widget.Toast.makeText(this, "Shift Berhasil Ditutup.", android.widget.Toast.LENGTH_LONG).show()
-                    performLogout(session)
-                } else {
-                    android.widget.Toast.makeText(this, "Isi jumlah uang!", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
-
-    private fun checkDailyModal() {
-        val prefs = getSharedPreferences("daily_finance", Context.MODE_PRIVATE)
-        val todayDate = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()).format(Date())
-        val lastSavedDate = prefs.getString("last_date", "")
-
-        if (lastSavedDate != todayDate) {
-            // Cek: Apakah ini akun baru / baru install? (lastSavedDate masih kosong)
-            if (lastSavedDate == "") {
-                // KASUS 1: BARU PERTAMA KALI -> JANGAN GANGGU DENGAN POPUP
-                // Kita set otomatis 0 dulu. Kalau mau isi, bisa lewat menu Laporan nanti.
-                prefs.edit().apply {
-                    putString("last_date", todayDate)
-                    putFloat("modal_awal", 0f)
-                    apply()
-                }
-                modalHarian = 0.0
-            } else {
-                // KASUS 2: SUDAH LAMA TAPI GANTI HARI (BESOKNYA) -> WAJIB INPUT MODAL BARU
-                // Reset data kemarin
-                prefs.edit().clear().apply()
-                // Tampilkan Popup
-                showInputModalDialog(prefs, todayDate)
-            }
-        } else {
-            // HARI YANG SAMA -> AMBIL DATA YG ADA
-            modalHarian = prefs.getFloat("modal_awal", 0f).toDouble()
-        }
-    }
-
-    private fun showInputModalDialog(prefs: android.content.SharedPreferences, todayStr: String) {
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
-        input.hint = "Contoh: 200000"
-
-        AlertDialog.Builder(this)
-            .setTitle("☀️ Buka Toko")
-            .setMessage("Masukkan Modal Awal Hari Ini:")
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton("SIMPAN") { _, _ ->
-                val modalStr = input.text.toString()
-                if (modalStr.isNotEmpty()) {
-                    val modal = modalStr.toFloat()
-                    prefs.edit().apply {
-                        putString("last_date", todayStr)
-                        putFloat("modal_awal", modal)
-                        apply()
-                    }
-                    modalHarian = modal.toDouble()
-                    Toast.makeText(this, "Semangat Berjualan!", Toast.LENGTH_SHORT).show()
-                } else {
-                    showInputModalDialog(prefs, todayStr)
-                }
-            }
-            .show()
-    }
-
     private fun formatRupiah(amount: Double): String {
-        return String.format(Locale("id", "ID"), "%,d", amount.toLong())
+        return String.format(Locale("id", "ID"), "Rp %,d", amount.toLong()).replace(',', '.')
     }
 }

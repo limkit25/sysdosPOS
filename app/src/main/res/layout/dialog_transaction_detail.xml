@@ -185,7 +185,7 @@
                         android:id="@+id/tvDetailMethod"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Metode: Tunai"
+                        android:text="Metode: -"
                         android:gravity="end"
                         android:textSize="12sp"
                         android:textColor="#757575"

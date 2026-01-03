@@ -3,20 +3,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F8FA"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:background="#F5F8FA">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1976D2"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:gravity="center_vertical">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Riwayat Shift (Buka/Tutup)"
+            android:text="Riwayat Setoran (Shift)"
             android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold"/>
     </LinearLayout>
 
@@ -26,4 +27,5 @@
         android:layout_height="match_parent"
         android:padding="8dp"
         android:clipToPadding="false"/>
+
 </LinearLayout>

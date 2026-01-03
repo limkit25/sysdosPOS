@@ -11,25 +11,29 @@ import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.data.model.User
+import com.sysdos.kasirpintar.data.model.ShiftLog // <--- Pastikan Import Ini Ada
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext // <--- PENTING
+import kotlinx.coroutines.withContext
 import java.util.Calendar
-import com.sysdos.kasirpintar.data.model.ShiftLog // <--- INI OBAT ERRORNYA
-
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getDatabase(application)
     private val productDao = database.productDao()
     private val categoryDao = database.categoryDao()
+    private val supplierDao = database.supplierDao()
+    private val stockLogDao = database.stockLogDao()
+    private val shiftDao = database.shiftDao() // <--- DAO untuk Shift
 
     // --- DATA PRODUK & KATEGORI ---
     val allProducts: LiveData<List<Product>> = productDao.getAllProducts().asLiveData()
     val allCategories: LiveData<List<Category>> = categoryDao.getAllCategories().asLiveData()
+    val allSuppliers: LiveData<List<com.sysdos.kasirpintar.data.model.Supplier>> = supplierDao.getAllSuppliers()
 
-    // --- RIWAYAT TRANSAKSI ---
+    // --- RIWAYAT TRANSAKSI & SHIFT ---
     val allTransactions: LiveData<List<Transaction>> = productDao.getAllTransactions().asLiveData()
+    val allShiftLogs: LiveData<List<ShiftLog>> = shiftDao.getAllLogs().asLiveData() // <--- LiveData Shift Log
 
     // --- KERANJANG BELANJA ---
     private val _cart = MutableLiveData<List<Product>>(emptyList())
@@ -38,63 +42,43 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
 
-    // --- MANAJEMEN PRODUK (CRUD) ---
-    fun insert(product: Product) {
-        viewModelScope.launch { productDao.insertProduct(product) }
-    }
-    private val supplierDao = database.supplierDao()
-    val allSuppliers: LiveData<List<com.sysdos.kasirpintar.data.model.Supplier>> = supplierDao.getAllSuppliers()
-
-    fun insertSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
-        viewModelScope.launch { supplierDao.insert(supplier) }
-    }
-
-    fun deleteSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
-        viewModelScope.launch { supplierDao.delete(supplier) }
-    }
-
-    fun update(product: Product) {
-        viewModelScope.launch { productDao.updateProduct(product) }
-    }
-
-    fun delete(product: Product) = viewModelScope.launch(Dispatchers.IO) {
-        productDao.deleteProduct(product)
-    }
-
-    // TAMBAHKAN FUNGSI INI UNTUK UPDATE
-    fun updateSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
-        viewModelScope.launch {
-            supplierDao.update(supplier)
-        }
-    }
-
-    private val stockLogDao = database.stockLogDao()
-
-    // Fungsi Simpan Riwayat Pembelian
-    fun recordPurchase(log: com.sysdos.kasirpintar.data.model.StockLog) {
-        viewModelScope.launch {
-            stockLogDao.insert(log)
-        }
-    }
-
-    // --- MANAJEMEN KATEGORI ---
-    fun addCategory(name: String) {
-        viewModelScope.launch {
-            categoryDao.insertCategory(Category(name = name))
-        }
-    }
-
-    fun deleteCategory(category: Category) {
-        viewModelScope.launch {
-            categoryDao.deleteCategory(category)
-        }
-    }
+    // ==========================================
+    // 1. MANAJEMEN PRODUK (CRUD)
+    // ==========================================
+    fun insert(product: Product) = viewModelScope.launch { productDao.insertProduct(product) }
+    fun update(product: Product) = viewModelScope.launch { productDao.updateProduct(product) }
+    fun delete(product: Product) = viewModelScope.launch(Dispatchers.IO) { productDao.deleteProduct(product) }
 
     fun getProductById(id: Int): LiveData<Product> {
         return productDao.getProductById(id).asLiveData()
     }
 
-    // --- LOGIKA KASIR (SCAN & CART) ---
+    // ==========================================
+    // 2. MANAJEMEN SUPPLIER
+    // ==========================================
+    fun insertSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch { supplierDao.insert(supplier) }
+    }
+    fun updateSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch { supplierDao.update(supplier) }
+    }
+    fun deleteSupplier(supplier: com.sysdos.kasirpintar.data.model.Supplier) {
+        viewModelScope.launch { supplierDao.delete(supplier) }
+    }
+
+    // ==========================================
+    // 3. MANAJEMEN KATEGORI
+    // ==========================================
+    fun addCategory(name: String) = viewModelScope.launch {
+        categoryDao.insertCategory(Category(name = name))
+    }
+    fun deleteCategory(category: Category) = viewModelScope.launch {
+        categoryDao.deleteCategory(category)
+    }
+
+    // ==========================================
+    // 4. LOGIKA KASIR (SCAN & CART)
+    // ==========================================
     fun scanAndAddToCart(barcode: String, onResult: (Product?) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             val productList = allProducts.value ?: emptyList()
@@ -165,6 +149,11 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun clearCart() {
+        _cart.value = emptyList()
+        calculateTotal()
+    }
+
     private fun calculateTotal() {
         val currentCart = _cart.value ?: emptyList()
         var sum = 0.0
@@ -174,7 +163,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         _totalPrice.value = sum
     }
 
-    // --- FUNGSI CHECKOUT (VERSI FIX & LENGKAP) ---
+    // ==========================================
+    // 5. CHECKOUT & TRANSAKSI
+    // ==========================================
     fun checkout(
         subtotal: Double,
         discount: Double,
@@ -187,25 +178,23 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             val currentItems = _cart.value ?: emptyList()
 
-            // 1. Hitung Total Akhir
+            // 1. Total Akhir
             val finalTotal = subtotal - discount + tax
 
-            // 2. Buat Ringkasan Item (Format: Nama|Qty|Harga|Total) dipisah titik koma (;)
-            // Ini supaya printer bisa membaca harga detail per barang
+            // 2. Summary String untuk Database
             val summary = currentItems.joinToString(";") { item ->
                 val totalItem = item.price * item.stock
                 "${item.name}|${item.stock}|${item.price.toInt()}|${totalItem.toInt()}"
             }
 
-            // 3. Hitung Profit (Keuntungan)
+            // 3. Hitung Profit (Laba)
             var totalProfit = 0.0
             for (item in currentItems) {
-                // Profit = (Harga Jual - Harga Modal) * Jumlah
                 val itemProfit = (item.price - item.costPrice) * item.stock
                 totalProfit += itemProfit
             }
 
-            // 4. Buat Objek Transaksi
+            // 4. Create Transaction Object
             val newTrx = Transaction(
                 itemsSummary = summary,
                 totalAmount = finalTotal,
@@ -219,60 +208,35 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 tax = tax
             )
 
-            // 5. Simpan Transaksi ke DB
+            // 5. Simpan ke Database
             val id = productDao.insertTransaction(newTrx)
 
-            // 6. UPDATE STOK BARANG (Menggunakan getProductRaw)
+            // 6. Kurangi Stok
             for (cartItem in currentItems) {
-                // Ambil data asli (bukan LiveData) supaya bisa diedit
                 val originalItem = productDao.getProductRaw(cartItem.id)
-
                 if (originalItem != null) {
-                    val newStock = originalItem.stock - cartItem.stock
-
-                    // Pastikan stok tidak minus
-                    val fixedStock = if (newStock < 0) 0 else newStock
-
-                    // Copy object dengan stok baru
-                    val updatedProduct = originalItem.copy(stock = fixedStock)
-
-                    // Simpan perubahan ke DB
-                    productDao.updateProduct(updatedProduct)
+                    val newStock = (originalItem.stock - cartItem.stock).coerceAtLeast(0)
+                    productDao.updateProduct(originalItem.copy(stock = newStock))
                 }
             }
 
-            // 7. Bersihkan Keranjang & Kembali ke UI
+            // 7. Selesai
             withContext(Dispatchers.Main) {
-                clearCart() // Panggil fungsi reset keranjang
-                onResult(newTrx.copy(id = id.toInt())) // Kirim hasil sukses
+                clearCart()
+                onResult(newTrx.copy(id = id.toInt()))
             }
         }
     }
 
-    // --- FUNGSI BERSIHKAN KERANJANG ---
-    fun clearCart() {
-        _cart.value = emptyList() // Kosongkan List
-        calculateTotal()          // Reset Total Harga jadi 0
-    }
-
-    // --- USER MANAGEMENT ---
+    // ==========================================
+    // 6. USER MANAGEMENT
+    // ==========================================
     val allUsers: LiveData<List<User>> = productDao.getAllUsers().asLiveData()
 
-    fun insertUser(user: User) {
-        viewModelScope.launch { productDao.insertUser(user) }
-    }
-
-    fun resetPassword(userId: Int, newPass: String) {
-        viewModelScope.launch { productDao.updatePassword(userId, newPass) }
-    }
-
-    fun deleteUser(user: User) {
-        viewModelScope.launch { productDao.deleteUser(user) }
-    }
-
-    fun updateUser(user: User) {
-        viewModelScope.launch { productDao.updateUser(user) }
-    }
+    fun insertUser(user: User) = viewModelScope.launch { productDao.insertUser(user) }
+    fun updateUser(user: User) = viewModelScope.launch { productDao.updateUser(user) }
+    fun deleteUser(user: User) = viewModelScope.launch { productDao.deleteUser(user) }
+    fun resetPassword(userId: Int, newPass: String) = viewModelScope.launch { productDao.updatePassword(userId, newPass) }
 
     fun login(username: String, pass: String, onResult: (User?) -> Unit) {
         viewModelScope.launch {
@@ -281,33 +245,45 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- LAPORAN HARIAN ---
-    fun getTodayTransactions(): List<Transaction> {
-        val allTrx = allTransactions.value ?: emptyList()
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        val startOfDay = calendar.timeInMillis
-        return allTrx.filter { it.timestamp >= startOfDay }
+    // ==========================================
+    // 7. MANAJEMEN GUDANG (RESTOCK)
+    // ==========================================
+    fun recordPurchase(log: com.sysdos.kasirpintar.data.model.StockLog) {
+        viewModelScope.launch { stockLogDao.insert(log) }
     }
-    // --- TAMBAHAN UNTUK SHIFT LOG ---
-    private val shiftDao = database.shiftDao() // Inisialisasi DAO baru
-    val allShiftLogs = shiftDao.getAllLogs().asLiveData()
 
-    fun insertShiftLog(type: String, kasir: String, expected: Double, actual: Double) {
-        viewModelScope.launch {
+    // ==========================================
+    // 8. MANAJEMEN SHIFT (OPEN & CLOSE) ✅
+    // ==========================================
+
+    // Fungsi Buka Shift (Simpan Modal Awal)
+    fun openShift(kasirName: String, modalAwal: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val log = ShiftLog(
+                type = "OPEN",
+                timestamp = System.currentTimeMillis(),
+                kasirName = kasirName,
+                expectedAmount = modalAwal,
+                actualAmount = modalAwal,
+                difference = 0.0
+            )
+            shiftDao.insertLog(log)
+        }
+    }
+
+    // Fungsi Tutup Shift (Simpan Setoran Akhir)
+    fun closeShift(kasirName: String, expected: Double, actual: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
             val diff = actual - expected
             val log = ShiftLog(
-                type = type, // "OPEN" atau "CLOSE"
+                type = "CLOSE",
                 timestamp = System.currentTimeMillis(),
-                kasirName = kasir,
+                kasirName = kasirName,
                 expectedAmount = expected,
                 actualAmount = actual,
                 difference = diff
             )
             shiftDao.insertLog(log)
         }
-        val allShiftLogs = shiftDao.getAllLogs().asLiveData()
     }
 }

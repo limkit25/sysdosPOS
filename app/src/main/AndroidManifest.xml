@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -24,7 +25,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KasirPintar"
         tools:targetApi="31">
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -32,53 +32,32 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+                android:resource="@xml/provider_paths" /> </provider>
 
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:theme="@style/Theme.AppCompat.NoActionBar">
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <activity android:name=".LoginActivity" android:exported="false" />
+        <activity android:name=".LoginActivity" android:exported="false"/>
         <activity android:name=".DashboardActivity" />
-        <activity android:name=".MainActivity" android:exported="false" />
 
-        <activity android:name=".ProductEntryActivity"
-            android:label="Tambah Menu"
-            android:parentActivityName=".MainActivity"/>
+        <activity android:name=".MainActivity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name=".ScanActivity" android:exported="false"/>
 
-        <activity android:name=".UserListActivity" android:label="Kelola User" />
-        <activity android:name=".HistoryActivity" android:label="Riwayat Transaksi"/>
-        <activity android:name=".ProductListActivity" android:label="Daftar Produk"/>
-        <activity android:name=".ReportActivity" android:label="Laporan Keuangan"/>
-        <activity android:name=".StoreSettingsActivity" android:label="Pengaturan Toko"/>
-        <activity android:name=".CategoryActivity" android:label="Kelola Kategori"/>
+        <activity android:name=".ProductListActivity" android:exported="false" android:label="Manajemen Gudang"/>
+        <activity android:name=".ProductEntryActivity" android:exported="false" android:label="Input Produk"/>
+        <activity android:name=".CategoryActivity" android:exported="false" android:label="Kelola Kategori"/>
 
-        <activity
-            android:name=".ShiftHistoryActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
-            android:name=".StockReportActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
-            android:name=".ScanActivity"
-            android:screenOrientation="portrait"
-            android:stateNotNeeded="true"
-            android:theme="@style/Theme.AppCompat.NoActionBar"
-            android:windowSoftInputMode="stateAlwaysHidden" />
-
-        <activity android:name=".SupplierActivity" android:label="Kelola Supplier" />
-        <activity android:name=".PurchaseHistoryActivity" android:label="Kelola Riwayat Belanja" />
+        <activity android:name=".SalesReportActivity" android:exported="false" android:label="Laporan Penjualan"/>
+        <activity android:name=".ShiftHistoryActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".UserListActivity" android:exported="false" android:label="Kelola User"/>
+        <activity android:name=".StoreSettingsActivity" android:exported="false" android:label="Pengaturan Toko"/>
 
     </application>
 
