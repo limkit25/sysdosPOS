@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageButton // Import ImageButton
+import android.widget.ImageButton
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -27,7 +27,7 @@ class CategoryActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
         // 1. BIND VIEW
-        val btnBack = findViewById<ImageButton>(R.id.btnBack) // Tombol Header
+        val btnBack = findViewById<ImageButton>(R.id.btnBack)
         etCategory = findViewById(R.id.etNewCategory)
         btnAdd = findViewById(R.id.btnAddCategory)
         lvCategory = findViewById(R.id.lvCategory)
@@ -55,7 +55,11 @@ class CategoryActivity : AppCompatActivity() {
         btnAdd.setOnClickListener {
             val name = etCategory.text.toString().trim()
             if (name.isNotEmpty()) {
-                viewModel.addCategory(etCategoryName.text.toString())
+                // 🔥 PERBAIKAN DISINI 🔥
+                // Panggil 'insertCategory' (bukan addCategory)
+                // Bungkus 'name' ke dalam object Category
+                viewModel.insertCategory(Category(name = name))
+
                 etCategory.setText("")
                 Toast.makeText(this, "Kategori ditambah!", Toast.LENGTH_SHORT).show()
             } else {

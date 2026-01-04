@@ -66,7 +66,7 @@ class LoginActivity : AppCompatActivity() {
             val u = etUser.text.toString()
             val p = etPass.text.toString()
 
-            viewModel.login(u, p) { user ->
+            val login = viewModel.login(u, p) { user ->
                 if (user != null) {
                     saveSession(user)
                     startActivity(Intent(this, DashboardActivity::class.java))

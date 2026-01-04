@@ -45,15 +45,13 @@ interface ProductDao {
     fun getAllSuppliers(): Flow<List<Supplier>>
 
     // --- TRANSAKSI (Tabel: transaction_table) ---
-    // 🔥 PERBAIKAN: Ganti 'transactions' jadi 'transaction_table'
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    @Query("SELECT * FROM transaction_table ORDER BY timestamp DESC") // <--- DISINI PERBAIKANNYA
+    @Query("SELECT * FROM transaction_table ORDER BY timestamp DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
 
     // --- USER (Tabel: user_table) ---
-    // 🔥 PERBAIKAN: Ganti 'users' jadi 'user_table'
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: User)
 
@@ -63,8 +61,15 @@ interface ProductDao {
     @Delete
     suspend fun deleteUser(user: User)
 
-    @Query("SELECT * FROM user_table ORDER BY username ASC") // <--- DISINI PERBAIKANNYA
+    @Query("SELECT * FROM user_table ORDER BY username ASC")
     fun getAllUsers(): Flow<List<User>>
+
+    // 🔥 TAMBAHAN YANG HILANG (Dibutuhkan oleh ProductViewModel) 🔥
+    @Query("UPDATE user_table SET password = :newPass WHERE id = :userId")
+    suspend fun updatePassword(userId: Int, newPass: String)
+
+    @Query("SELECT * FROM user_table WHERE username = :username AND password = :password")
+    suspend fun login(username: String, password: String): User?
 
     // --- LOG STOK (Tabel: stock_logs) ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
