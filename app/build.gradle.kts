@@ -35,6 +35,14 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    // 🔥 LOGIKA GANTI NAMA APK JADI sysdosKasir.apk 🔥
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            // Hasilnya nanti: sysdosKasir.apk
+            output?.outputFileName = "sysdosKasir-V1.apk"
+        }
+    }
 }
 
 dependencies {

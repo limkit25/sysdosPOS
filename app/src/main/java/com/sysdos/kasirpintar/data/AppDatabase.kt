@@ -54,7 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "kasir_pintar_db"
+                    "sysdos_pos_db"
                 )
                     .fallbackToDestructiveMigration() // Reset data lama agar struktur baru masuk
                     .addCallback(DatabaseCallback())

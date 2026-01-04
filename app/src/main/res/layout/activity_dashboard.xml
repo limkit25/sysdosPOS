@@ -60,6 +60,15 @@
                         android:text="Kasir Pintar POS"
                         android:textColor="#E3F2FD"
                         android:textSize="12sp"/>
+                    <TextView
+                        android:id="@+id/tvTrialStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sisa Trial: 7 Hari"
+                        android:textColor="#FFEB3B"
+                        android:textStyle="bold"
+                        android:textSize="12sp"
+                        android:layout_marginTop="2dp"/>
                 </LinearLayout>
 
                 <ImageView

@@ -170,6 +170,40 @@ class DashboardActivity : AppCompatActivity() {
                     .show()
             }
         }
+        // 1. INIT TRIAL VIEW
+        val tvTrial = findViewById<TextView>(R.id.tvTrialStatus)
+
+        // 2. LOGIKA CEK STATUS (Full Version vs Trial)
+        val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+        val isFull = prefs.getBoolean("is_full_version", false) // Cek apakah sudah Premium?
+
+        if (isFull) {
+            // JIKA SUDAH PREMIUM: Sembunyikan tulisan trial
+            tvTrial.visibility = View.GONE
+        } else {
+            // JIKA MASIH TRIAL: Hitung sisa hari
+            val firstRunDate = prefs.getLong("first_install_date", 0L)
+
+            if (firstRunDate != 0L) {
+                val now = System.currentTimeMillis()
+                val diffMillis = now - firstRunDate
+                val daysUsed = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffMillis)
+                val maxTrial = 7 // Wajib sama dengan di SplashActivity
+
+                val daysLeft = maxTrial - daysUsed
+
+                if (daysLeft > 0) {
+                    tvTrial.text = "Sisa Trial: $daysLeft Hari"
+                    tvTrial.visibility = View.VISIBLE
+                } else {
+                    tvTrial.text = "TRIAL HABIS!"
+                    tvTrial.setTextColor(android.graphics.Color.RED)
+                    tvTrial.visibility = View.VISIBLE
+                }
+            } else {
+                tvTrial.visibility = View.GONE
+            }
+        }
     }
 
     // --- FUNGSI BUKA SHIFT ---

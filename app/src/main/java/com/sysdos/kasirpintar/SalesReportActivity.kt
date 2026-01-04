@@ -2,8 +2,9 @@ package com.sysdos.kasirpintar
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothSocket
+import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -11,16 +12,12 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
-import android.widget.ImageButton
-import android.widget.ImageView // Tambahan Import
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,15 +32,10 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import com.sysdos.kasirpintar.viewmodel.TransactionAdapter
+import java.io.File
+import java.io.FileWriter
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.UUID
-import android.content.Intent // <--- Wajib ada
-import androidx.core.content.FileProvider // <--- Wajib ada
-import java.io.File // <--- Wajib ada
-import java.io.FileWriter // <--- Wajib ada
+import java.util.*
 
 class SalesReportActivity : AppCompatActivity() {
 
@@ -62,10 +54,11 @@ class SalesReportActivity : AppCompatActivity() {
     private lateinit var tvRevenue: TextView
     private lateinit var tvProfit: TextView
     private lateinit var cardProfit: CardView
+    private lateinit var btnExport: ImageButton // Tombol Export
 
-    // --- 🔥 VARIABEL SENSOR LABA 🔥 ---
+    // --- VARIABEL SENSOR LABA ---
     private var actualProfitValue: Double = 0.0
-    private var isProfitVisible: Boolean = false // Default Tertutup (Disensor)
+    private var isProfitVisible: Boolean = false
     private lateinit var btnToggleProfit: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,8 +72,8 @@ class SalesReportActivity : AppCompatActivity() {
         tvProfit = findViewById(R.id.tvTotalProfit)
         cardProfit = findViewById(R.id.cardProfit)
         barChart = findViewById(R.id.chartRevenue)
+        btnExport = findViewById(R.id.btnExport) // Init tombol export
 
-        // TOMBOL MATA (SENSOR)
         btnToggleProfit = findViewById(R.id.btnToggleProfit)
 
         btnToday = findViewById(R.id.btnFilterToday)
@@ -90,28 +83,30 @@ class SalesReportActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<ImageButton>(R.id.btnPrintDaily).setOnClickListener { printDailyRecap() }
-        findViewById<ImageButton>(R.id.btnExport).setOnClickListener {
-            exportToCSV()
-        }
 
-        // --- 🔥 LOGIKA KLIK MATA (BUKA/TUTUP SENSOR) 🔥 ---
+        // Listener Export
+        btnExport.setOnClickListener { exportToCSV() }
+
+        // Listener Mata (Sensor Laba)
         btnToggleProfit.setOnClickListener {
-            isProfitVisible = !isProfitVisible // Balik status
-            updateProfitDisplay() // Update tampilan teks
+            isProfitVisible = !isProfitVisible
+            updateProfitDisplay()
         }
 
-        // SETUP CHART
         setupChartConfig()
 
-        // --- CEK ROLE: SEMBUNYIKAN KARTU LABA DARI KASIR ---
+        // --- 🔥 CEK ROLE: SEMBUNYIKAN FITUR SENSITIF DARI KASIR 🔥 ---
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val role = session.getString("role", "kasir")
 
         if (role == "kasir") {
-            cardProfit.visibility = View.GONE
+            cardProfit.visibility = View.GONE  // Sembunyikan Info Laba
+            btnExport.visibility = View.GONE   // Sembunyikan Tombol Export Excel
         } else {
             cardProfit.visibility = View.VISIBLE
+            btnExport.visibility = View.VISIBLE
         }
+        // -------------------------------------------------------------
 
         // SETUP RECYCLERVIEW
         val rvList = findViewById<RecyclerView>(R.id.rvSalesHistory)
@@ -122,7 +117,7 @@ class SalesReportActivity : AppCompatActivity() {
         // OBSERVE DATA
         viewModel.allTransactions.observe(this) { transactions ->
             fullTransactionList = transactions
-            filterList("WEEK") // Default
+            filterList("WEEK")
             updateFilterUI(btnWeek)
         }
 
@@ -150,29 +145,27 @@ class SalesReportActivity : AppCompatActivity() {
         adapter.setOnReprintClickListener { doReprint(it) }
     }
 
-    // --- FUNGSI UPDATE TAMPILAN LABA ---
     private fun updateProfitDisplay() {
         if (isProfitVisible) {
-            // TAMPILKAN ANGKA ASLI
             tvProfit.text = formatRupiah(actualProfitValue)
-            btnToggleProfit.setImageResource(android.R.drawable.ic_menu_view) // Icon Mata Terbuka
+            btnToggleProfit.setImageResource(android.R.drawable.ic_menu_view)
         } else {
-            // SENSOR
             tvProfit.text = "Rp *******"
-            btnToggleProfit.setImageResource(android.R.drawable.ic_secure) // Icon Gembok/Tertutup
+            btnToggleProfit.setImageResource(android.R.drawable.ic_secure)
         }
     }
 
-    // --- SETUP CHART ---
     private fun setupChartConfig() {
         barChart.description.isEnabled = false
         barChart.legend.isEnabled = false
         barChart.axisRight.isEnabled = false
         barChart.xAxis.position = XAxis.XAxisPosition.BOTTOM
         barChart.xAxis.setDrawGridLines(false)
+        barChart.xAxis.textColor = Color.BLACK
         barChart.axisLeft.setDrawGridLines(true)
+        barChart.axisLeft.textColor = Color.BLACK
+        barChart.axisLeft.axisMinimum = 0f
         barChart.setNoDataText("Memuat Data...")
-        barChart.setFitBars(true)
         barChart.animateY(1000)
     }
 
@@ -192,21 +185,24 @@ class SalesReportActivity : AppCompatActivity() {
     }
 
     private fun updateChartData(transactions: List<Transaction>, range: String) {
-        val salesMap = mutableMapOf<String, Double>()
+        val salesMap = LinkedHashMap<String, Double>()
         val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
 
         val daysBack = if (range == "WEEK") 6 else if (range == "MONTH") 29 else 0
-        for (i in daysBack downTo 0) {
-            val cal = Calendar.getInstance()
-            cal.add(Calendar.DAY_OF_YEAR, -i)
-            val key = sdf.format(cal.time)
-            salesMap[key] = 0.0
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, -daysBack)
+
+        for (i in 0..daysBack) {
+            val dateKey = sdf.format(calendar.time)
+            salesMap[dateKey] = 0.0
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
 
         for (trx in transactions) {
-            val key = sdf.format(Date(trx.timestamp))
-            if (salesMap.containsKey(key)) {
-                salesMap[key] = salesMap[key]!! + trx.totalAmount
+            val dateKey = sdf.format(Date(trx.timestamp))
+            if (salesMap.containsKey(dateKey)) {
+                salesMap[dateKey] = salesMap[dateKey]!! + trx.totalAmount
             }
         }
 
@@ -222,15 +218,15 @@ class SalesReportActivity : AppCompatActivity() {
 
         val dataSet = BarDataSet(entries, "Omzet")
         dataSet.color = Color.parseColor("#1976D2")
-        dataSet.valueTextSize = 10f
         dataSet.valueTextColor = Color.BLACK
+        dataSet.valueTextSize = 10f
 
         val data = BarData(dataSet)
         data.barWidth = 0.6f
-
         barChart.data = data
         barChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
-        barChart.xAxis.labelCount = labels.size
+        barChart.xAxis.labelCount = if (labels.size > 7) 7 else labels.size
+        barChart.notifyDataSetChanged()
         barChart.invalidate()
     }
 
@@ -238,12 +234,9 @@ class SalesReportActivity : AppCompatActivity() {
         adapter.submitList(list)
         var totalOmzet = 0.0; var totalLaba = 0.0
         for (trx in list) { totalOmzet += trx.totalAmount; totalLaba += trx.profit }
-
         tvRevenue.text = formatRupiah(totalOmzet)
-
-        // 🔥 UPDATE VARIABEL SENSOR LABA 🔥
         actualProfitValue = totalLaba
-        updateProfitDisplay() // Panggil fungsi update agar status sensor terjaga
+        updateProfitDisplay()
     }
 
     private fun updateFilterUI(activeBtn: Button) {
@@ -256,7 +249,43 @@ class SalesReportActivity : AppCompatActivity() {
         activeBtn.setTextColor(Color.parseColor("#1976D2"))
     }
 
-    // --- DIALOG DETAIL ---
+    // --- EXPORT CSV ---
+    private fun exportToCSV() {
+        val currentList = adapter.currentList
+        if (currentList.isEmpty()) {
+            Toast.makeText(this, "Tidak ada data!", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+            val fileName = "Laporan_$timeStamp.csv"
+            val file = File(cacheDir, fileName)
+            val writer = FileWriter(file)
+
+            writer.append("ID,Tanggal,Jam,Item,Total,Laba,Metode\n")
+            val sdfDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+            for (trx in currentList) {
+                val date = sdfDate.format(Date(trx.timestamp))
+                val time = sdfTime.format(Date(trx.timestamp))
+                val items = trx.itemsSummary.replace(",", ".").replace(";", " + ")
+                writer.append("#${trx.id},$date,$time,\"$items\",${trx.totalAmount},${trx.profit},${trx.paymentMethod}\n")
+            }
+            writer.flush(); writer.close()
+
+            val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", file)
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.type = "text/csv"
+            intent.putExtra(Intent.EXTRA_SUBJECT, "Laporan $timeStamp")
+            intent.putExtra(Intent.EXTRA_STREAM, uri)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(intent, "Kirim Laporan..."))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal Export: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun showDetailDialog(trx: Transaction) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_transaction_detail, null)
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
@@ -266,38 +295,25 @@ class SalesReportActivity : AppCompatActivity() {
         val btnReprint = dialogView.findViewById<Button>(R.id.btnReprint)
         val llItems = dialogView.findViewById<LinearLayout>(R.id.llDetailItems)
 
-        val tvId = dialogView.findViewById<TextView>(R.id.tvDetailId)
-        val tvDate = dialogView.findViewById<TextView>(R.id.tvDetailDate)
-        val tvMethod = dialogView.findViewById<TextView>(R.id.tvDetailMethod)
-        val tvSub = dialogView.findViewById<TextView>(R.id.tvDetailSubtotal)
-        val tvDisc = dialogView.findViewById<TextView>(R.id.tvDetailDisc)
-        val tvTax = dialogView.findViewById<TextView>(R.id.tvDetailTax)
-        val tvTotal = dialogView.findViewById<TextView>(R.id.tvDetailTotal)
+        // Bind views detail (sama seperti sebelumnya)
+        dialogView.findViewById<TextView>(R.id.tvDetailId).text = "#TRX-${trx.id}"
+        dialogView.findViewById<TextView>(R.id.tvDetailDate).text = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
+        dialogView.findViewById<TextView>(R.id.tvDetailTotal).text = formatRupiah(trx.totalAmount)
+        dialogView.findViewById<TextView>(R.id.tvDetailMethod).text = if (trx.paymentMethod == "Tunai") "Tunai (Bayar: ${formatRupiah(trx.cashReceived)})" else "Metode: ${trx.paymentMethod}"
+        dialogView.findViewById<TextView>(R.id.tvDetailSubtotal).text = formatRupiah(trx.subtotal)
+
+        // Pajak & Diskon
         val rowDisc = dialogView.findViewById<View>(R.id.rowDetailDisc)
         val rowTax = dialogView.findViewById<View>(R.id.rowDetailTax)
-
-        tvId.text = "#TRX-${trx.id}"
-        tvDate.text = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
-
-        if (trx.paymentMethod == "Tunai") {
-            tvMethod.text = "Tunai (Bayar: ${formatRupiah(trx.cashReceived)})"
-        } else {
-            tvMethod.text = "Metode: ${trx.paymentMethod}"
-        }
-
-        tvSub.text = formatRupiah(trx.subtotal)
-
         if (trx.discount > 0) {
-            tvDisc.text = "-${formatRupiah(trx.discount)}"
-            rowDisc?.visibility = View.VISIBLE
-        } else { rowDisc?.visibility = View.GONE }
+            dialogView.findViewById<TextView>(R.id.tvDetailDisc).text = "-${formatRupiah(trx.discount)}"
+            rowDisc.visibility = View.VISIBLE
+        } else rowDisc.visibility = View.GONE
 
         if (trx.tax > 0) {
-            tvTax.text = "+${formatRupiah(trx.tax)}"
-            rowTax?.visibility = View.VISIBLE
-        } else { rowTax?.visibility = View.GONE }
-
-        tvTotal.text = formatRupiah(trx.totalAmount)
+            dialogView.findViewById<TextView>(R.id.tvDetailTax).text = "+${formatRupiah(trx.tax)}"
+            rowTax.visibility = View.VISIBLE
+        } else rowTax.visibility = View.GONE
 
         llItems.removeAllViews()
         val rawItems = trx.itemsSummary.split(";")
@@ -313,12 +329,14 @@ class SalesReportActivity : AppCompatActivity() {
             }
             llItems.addView(rowLayout)
         }
+
         btnClose.setOnClickListener { dialog.dismiss() }
         btnReprint.setOnClickListener { doReprint(trx) }
         dialog.show()
     }
 
     private fun printDailyRecap() {
+        // Logic Print (Sama seperti sebelumnya)
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
         val todayTrx = fullTransactionList.filter { it.timestamp >= calendar.timeInMillis }
@@ -336,6 +354,7 @@ class SalesReportActivity : AppCompatActivity() {
 
         Thread {
             try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
                 val socket = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac).createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                 socket.connect()
                 val os = socket.outputStream
@@ -404,69 +423,5 @@ class SalesReportActivity : AppCompatActivity() {
 
     private fun formatRupiah(number: Double): String {
         return String.format(Locale("id", "ID"), "Rp %,d", number.toLong()).replace(',', '.')
-    }
-    // --- 🔥 FUNGSI EXPORT KE EXCEL (CSV) 🔥 ---
-    private fun exportToCSV() {
-        // 1. Ambil data yang sedang tampil (sesuai filter)
-        val currentList = adapter.currentList
-
-        if (currentList.isEmpty()) {
-            Toast.makeText(this, "Tidak ada data untuk diexport!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        try {
-            // 2. Buat Nama File (Laporan_Tgl_Jam.csv)
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
-            val fileName = "Laporan_Transaksi_$timeStamp.csv"
-
-            // 3. Simpan di Cache HP dulu (Folder sementara)
-            val file = File(cacheDir, fileName)
-            val writer = FileWriter(file)
-
-            // 4. Tulis Header Kolom (Judul Atas Excel)
-            writer.append("ID Transaksi,Tanggal,Jam,Item Barang,Total Bayar,Laba,Metode Pembayaran\n")
-
-            // 5. Tulis Isi Data
-            val sdfDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
-
-            for (trx in currentList) {
-                val date = sdfDate.format(Date(trx.timestamp))
-                val time = sdfTime.format(Date(trx.timestamp))
-                // Ganti tanda koma di uang jadi titik agar Excel tidak bingung
-                val items = trx.itemsSummary.replace(",", ".").replace(";", " + ")
-
-                writer.append("#${trx.id},")
-                writer.append("$date,")
-                writer.append("$time,")
-                writer.append("\"$items\",") // Pakai tanda kutip biar aman
-                writer.append("${trx.totalAmount},")
-                writer.append("${trx.profit},")
-                writer.append("${trx.paymentMethod}\n")
-            }
-
-            writer.flush()
-            writer.close()
-
-            // 6. BAGIKAN FILE (Share Intent)
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                this,
-                "${applicationContext.packageName}.provider",
-                file
-            )
-
-            val intent = Intent(Intent.ACTION_SEND)
-            intent.type = "text/csv"
-            intent.putExtra(Intent.EXTRA_SUBJECT, "Laporan Penjualan $timeStamp")
-            intent.putExtra(Intent.EXTRA_STREAM, uri)
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
-            startActivity(Intent.createChooser(intent, "Kirim Laporan Ke..."))
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(this, "Gagal Export: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
     }
 }
