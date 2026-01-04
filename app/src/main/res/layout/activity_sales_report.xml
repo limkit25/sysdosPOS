@@ -14,6 +14,7 @@
         android:padding="16dp"
         android:gravity="center_vertical"
         android:elevation="4dp">
+
         <ImageButton
             android:id="@+id/btnBack"
             android:layout_width="40dp"
@@ -21,26 +22,17 @@
             android:src="@drawable/ic_back_arrow"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="#FFFFFF"/>
+
         <TextView
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Analisa &amp; Laporan"
+            android:text="Analisa Bisnis"
             android:textColor="#FFFFFF"
             android:textSize="20sp"
             android:textStyle="bold"
             android:layout_marginStart="8dp"/>
-        <ImageButton
-            android:id="@+id/btnExport"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_save"
-            android:padding="12dp"
-            android:scaleType="fitCenter"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="#FFFFFF"
-            android:tooltipText="Export ke Excel"
-            android:layout_marginEnd="4dp"/>
+
         <ImageButton
             android:id="@+id/btnPrintDaily"
             android:layout_width="48dp"
@@ -50,7 +42,7 @@
             android:scaleType="fitCenter"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="#FFFFFF"
-            android:contentDescription="Cetak Laporan"/>
+            android:tooltipText="Cetak Rekap Harian"/>
     </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -61,7 +53,8 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
@@ -78,7 +71,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Total Omzet"
+                        android:text="Total Omzet (Semua Waktu)"
                         android:textColor="#757575"
                         android:textSize="12sp"/>
 
@@ -87,18 +80,20 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Rp 0"
-                        android:textSize="24sp"
+                        android:textSize="28sp"
                         android:textStyle="bold"
-                        android:textColor="#1976D2"/>
+                        android:textColor="#1976D2"
+                        android:layout_marginTop="4dp"/>
 
                     <androidx.cardview.widget.CardView
                         android:id="@+id/cardProfit"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="12dp"
                         app:cardBackgroundColor="#E8F5E9"
-                        app:cardCornerRadius="4dp"
-                        app:contentPadding="8dp">
+                        app:cardCornerRadius="8dp"
+                        app:contentPadding="12dp"
+                        app:cardElevation="0dp">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -106,114 +101,91 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
-                            <TextView
+                            <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_weight="1"
-                                android:layout_height="wrap_content"
-                                android:text="Keuntungan Bersih: "
-                                android:textSize="12sp"
-                                android:textColor="#2E7D32"/>
-
-                            <TextView
-                                android:id="@+id/tvTotalProfit"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Rp *******"
-                                android:textStyle="bold"
-                                android:textSize="14sp"
-                                android:textColor="#1B5E20"
-                                android:layout_marginEnd="8dp"/>
+                                android:orientation="vertical"
+                                android:layout_height="wrap_content">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Keuntungan Bersih"
+                                    android:textSize="11sp"
+                                    android:textColor="#2E7D32"/>
+                                <TextView
+                                    android:id="@+id/tvTotalProfit"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Rp *******"
+                                    android:textStyle="bold"
+                                    android:textSize="16sp"
+                                    android:textColor="#1B5E20"/>
+                            </LinearLayout>
 
                             <ImageView
                                 android:id="@+id/btnToggleProfit"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:src="@android:drawable/ic_menu_view"
                                 app:tint="#2E7D32"
                                 android:clickable="true"
                                 android:focusable="true"
-                                android:background="?attr/selectableItemBackgroundBorderless"/>
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:padding="4dp"/>
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#E0E0E0"
+                        android:layout_marginVertical="16dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tren Penjualan (7 Hari)"
+                        android:textStyle="bold"
+                        android:textColor="#333"/>
 
                     <com.github.mikephil.charting.charts.BarChart
                         android:id="@+id/chartRevenue"
                         android:layout_width="match_parent"
-                        android:layout_height="180dp"
-                        android:layout_marginTop="16dp"/>
+                        android:layout_height="200dp"
+                        android:layout_marginTop="8dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp"
-                android:paddingBottom="8dp">
+                android:orientation="vertical"
+                android:layout_marginTop="24dp"
+                android:paddingHorizontal="16dp">
 
                 <Button
-                    android:id="@+id/btnFilterToday"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="Hari Ini"
-                    android:textSize="11sp"
-                    android:layout_marginEnd="4dp"/>
+                    android:id="@+id/btnOpenTopProducts"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:text="🏆 LIHAT PRODUK TERLARIS"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:backgroundTint="#4CAF50"
+                    android:textColor="#FFFFFF"
+                    app:cornerRadius="10dp"
+                    android:layout_marginBottom="12dp"/>
+
                 <Button
-                    android:id="@+id/btnFilterWeek"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="7 Hari"
-                    android:textSize="11sp"
-                    android:layout_marginEnd="4dp"/>
-                <Button
-                    android:id="@+id/btnFilterMonth"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="30 Hari"
-                    android:textSize="11sp"/>
-                <Button
-                    android:id="@+id/btnFilterAll"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="Semua"
-                    android:visibility="gone"
-                    android:textSize="11sp"/>
+                    android:id="@+id/btnOpenHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:text="📝 RIWAYAT TRANSAKSI"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:backgroundTint="#FF9800"
+                    android:textColor="#FFFFFF"
+                    app:cornerRadius="10dp"/>
             </LinearLayout>
-
-            <androidx.appcompat.widget.SearchView
-                android:id="@+id/svSearchHistory"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/bg_rounded_white"
-                app:queryHint="Cari ID Transaksi..."
-                app:iconifiedByDefault="false"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Rincian Transaksi"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp"
-                android:layout_marginBottom="4dp"/>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvSalesHistory"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false"
-                android:paddingHorizontal="16dp"
-                android:paddingBottom="100dp"
-                android:clipToPadding="false"/>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

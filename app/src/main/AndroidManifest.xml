@@ -25,6 +25,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KasirPintar"
         tools:targetApi="31">
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -32,7 +33,8 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/provider_paths" /> </provider>
+                android:resource="@xml/provider_paths" />
+        </provider>
 
         <activity
             android:name=".SplashActivity"
@@ -58,6 +60,24 @@
         <activity android:name=".ShiftHistoryActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".UserListActivity" android:exported="false" android:label="Kelola User"/>
         <activity android:name=".StoreSettingsActivity" android:exported="false" android:label="Pengaturan Toko"/>
+
+        <activity
+            android:name=".PurchaseActivity"
+            android:exported="false"
+            android:label="Pembelian Stok"
+            android:screenOrientation="portrait"/>
+
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:label="Riwayat Transaksi"
+            android:screenOrientation="portrait"/>
+
+        <activity
+            android:name=".TopProductsActivity"
+            android:exported="false"
+            android:label="Produk Terlaris"
+            android:screenOrientation="portrait"/>
 
     </application>
 

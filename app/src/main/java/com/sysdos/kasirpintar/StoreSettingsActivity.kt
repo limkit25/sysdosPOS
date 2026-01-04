@@ -51,11 +51,14 @@ class StoreSettingsActivity : AppCompatActivity() {
     private lateinit var tvLicenseStatus: TextView
     private lateinit var btnActivate: Button
 
+    // 🔥 KARTU-KARTU (Container) 🔥
+    private lateinit var cardSectionStore: CardView
+    private lateinit var cardSectionPrinter: CardView
+    private lateinit var cardSectionLicense: CardView // INI YANG BARU
+
     // UI Umum
     private lateinit var tvTitle: TextView
     private lateinit var btnBack: ImageButton
-    private lateinit var cardSectionStore: CardView
-    private lateinit var cardSectionPrinter: CardView
 
     // Bluetooth Var
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
@@ -76,8 +79,12 @@ class StoreSettingsActivity : AppCompatActivity() {
         // 2. BIND VIEW
         tvTitle = findViewById(R.id.tvSettingsTitle)
         btnBack = findViewById(R.id.btnBack)
+
+        // Kartu Sections
         cardSectionStore = findViewById(R.id.cardSectionStore)
         cardSectionPrinter = findViewById(R.id.cardSectionPrinter)
+        cardSectionLicense = findViewById(R.id.cardSectionLicense) // Bind ID baru
+
         layoutSaveBtn = findViewById(R.id.layoutSaveBtn)
 
         etStoreName = findViewById(R.id.etStoreName)
@@ -105,13 +112,15 @@ class StoreSettingsActivity : AppCompatActivity() {
         // 4. SETUP UI
         listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
-        setupUI(target)
+
+        setupUI(target) // 🔥 DISINI LOGIKA SEMBUNYIKAN KARTU
+
         checkLicenseStatus()
 
         // 5. LISTENERS
         btnBack.setOnClickListener { finish() }
         btnSave.setOnClickListener { saveStoreSettings() }
-        btnActivate.setOnClickListener { showActivationDialog() } // 🔥 TOMBOL AKTIVASI
+        btnActivate.setOnClickListener { showActivationDialog() }
 
         // Bluetooth
         btnScanPrinter.setOnClickListener {
@@ -136,7 +145,38 @@ class StoreSettingsActivity : AppCompatActivity() {
         if (target == "PRINTER" && checkPermission()) showPairedDevices()
     }
 
-    // --- 🔥 FITUR AKTIVASI (DINAMIS / RUMUS) 🔥 ---
+    // --- SETUP TAMPILAN (LOGIKA UTAMA) ---
+    private fun setupUI(target: String?) {
+        if (isInitialSetup) {
+            // SETUP AWAL
+            tvTitle.text = "Setup Profil Toko"
+            btnBack.visibility = View.GONE
+            cardSectionPrinter.visibility = View.GONE
+            cardSectionLicense.visibility = View.GONE // Sembunyikan Lisensi dulu
+
+            btnSave.text = "SIMPAN & MASUK DASHBOARD"
+            btnBackup.visibility = View.GONE
+            btnRestore.visibility = View.VISIBLE
+        }
+        else if (target == "PRINTER") {
+            // MENU PRINTER
+            tvTitle.text = "Koneksi Printer"
+            cardSectionStore.visibility = View.GONE   // Sembunyikan Toko
+            cardSectionLicense.visibility = View.GONE // 🔥 SEMBUNYIKAN LISENSI 🔥
+
+            layoutSaveBtn.visibility = View.GONE
+            btnBackup.visibility = View.GONE
+            btnRestore.visibility = View.GONE
+        }
+        else {
+            // MENU TOKO (DEFAULT)
+            tvTitle.text = "Pengaturan Toko"
+            cardSectionPrinter.visibility = View.GONE // Sembunyikan Printer
+            cardSectionLicense.visibility = View.VISIBLE // TAMPILKAN LISENSI DISINI
+        }
+    }
+
+    // --- LOGIKA LISENSI ---
     private fun checkLicenseStatus() {
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
         val isFull = prefs.getBoolean("is_full_version", false)
@@ -153,24 +193,19 @@ class StoreSettingsActivity : AppCompatActivity() {
     }
 
     private fun showActivationDialog() {
-        // 1. Generate Angka Acak 5 Digit (10000 - 99999)
-        val requestCode = (100000..999999).random()
-
+        val requestCode = (10000..99999).random()
         val input = EditText(this)
         input.hint = "Masukkan Token Jawaban"
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER // Angka saja biar mudah
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
 
         AlertDialog.Builder(this)
             .setTitle("Aktivasi Full Version 🔓")
-            .setMessage("Kode Request HP Ini: $requestCode\n\nSilakan kirim kode di atas ke Admin untuk mendapatkan Token Aktivasi.")
+            .setMessage("Kode Request HP Ini: $requestCode\n\nSilakan kirim kode di atas ke Developer.")
             .setView(input)
             .setPositiveButton("Aktifkan") { _, _ ->
                 val tokenInput = input.text.toString().trim()
-
-                // 🔥 RUMUS RAHASIA BAPAK DISINI 🔥
-                // Contoh: Token = KodeRequest + 11111
-                // Misal Request: 12345 -> Token: 23456
-                val validToken = (requestCode + 290118).toString()
+                // Rumus: Request + 11111
+                val validToken = (requestCode + 11111).toString()
 
                 if (tokenInput == validToken) {
                     val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
@@ -178,7 +213,7 @@ class StoreSettingsActivity : AppCompatActivity() {
                     Toast.makeText(this, "Aktivasi Berhasil! Terima Kasih. 🎉", Toast.LENGTH_LONG).show()
                     checkLicenseStatus()
                 } else {
-                    Toast.makeText(this, "Token Salah! Coba lagi.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Token Salah!", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Batal", null)
@@ -235,26 +270,6 @@ class StoreSettingsActivity : AppCompatActivity() {
 
         btnRestore.setOnClickListener {
             restoreLauncher.launch(arrayOf("application/*", "application/x-sqlite3", "application/octet-stream"))
-        }
-    }
-
-    private fun setupUI(target: String?) {
-        if (isInitialSetup) {
-            tvTitle.text = "Setup Profil Toko"
-            btnBack.visibility = View.GONE
-            cardSectionPrinter.visibility = View.GONE
-            btnSave.text = "SIMPAN & MASUK DASHBOARD"
-            btnBackup.visibility = View.GONE
-            btnRestore.visibility = View.VISIBLE
-        } else if (target == "PRINTER") {
-            tvTitle.text = "Koneksi Printer"
-            cardSectionStore.visibility = View.GONE
-            layoutSaveBtn.visibility = View.GONE
-            btnBackup.visibility = View.GONE
-            btnRestore.visibility = View.GONE
-        } else {
-            tvTitle.text = "Pengaturan Toko"
-            cardSectionPrinter.visibility = View.GONE
         }
     }
 

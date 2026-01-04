@@ -6,13 +6,13 @@ import android.view.View
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager // <--- IMPORT INI
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.viewmodel.ProductAdapter
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import androidx.appcompat.app.AlertDialog // Pastikan Import
+import androidx.appcompat.app.AlertDialog
 
 class ProductFragment : Fragment(R.layout.fragment_tab_product) {
     private lateinit var viewModel: ProductViewModel
@@ -20,17 +20,21 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
     private var fullList: List<Product> = listOf()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState) // Tambahkan super call biar aman
+
         viewModel = ViewModelProvider(requireActivity())[ProductViewModel::class.java]
 
-        val rv = view.findViewById<RecyclerView>(R.id.rvProductList)
+        val rv = view.findViewById<RecyclerView>(R.id.rvProductList) // Pastikan ID ini sama dengan di XML
         val fab = view.findViewById<FloatingActionButton>(R.id.btnAddProduct)
         val sv = view.findViewById<SearchView>(R.id.svProduct)
 
         adapter = ProductAdapter(
-            onItemClick = { showMenuDialog(it) }, // Panggil fungsi lokal
+            onItemClick = { showMenuDialog(it) },
             onItemLongClick = {}
         )
-        rv.layoutManager = GridLayoutManager(context, 2)
+
+        // 🔥 UBAH DARI GRID KE LINEAR (LIST) 🔥
+        rv.layoutManager = LinearLayoutManager(context)
         rv.adapter = adapter
 
         viewModel.allProducts.observe(viewLifecycleOwner) {
@@ -52,9 +56,7 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
         })
     }
 
-    // Copy logika Dialog Menu dari activity sebelumnya ke sini
     private fun showMenuDialog(product: Product) {
-        // Tambahkan Opsi ke-3: Hapus
         val options = arrayOf("✏️ Edit Barang", "🚛 Restock (Barang Masuk)", "🗑️ Hapus Barang")
 
         AlertDialog.Builder(requireContext())
@@ -69,7 +71,7 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
                     1 -> { // RESTOCK
                         (activity as? ProductListActivity)?.showRestockDialog(product)
                     }
-                    2 -> { // HAPUS (LOGIKA BARU)
+                    2 -> { // HAPUS
                         confirmDeleteProduct(product)
                     }
                 }
@@ -77,13 +79,12 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
             .show()
     }
 
-    // Fungsi Konfirmasi Hapus
     private fun confirmDeleteProduct(product: Product) {
         AlertDialog.Builder(requireContext())
             .setTitle("Hapus ${product.name}?")
             .setMessage("Data yang dihapus tidak bisa dikembalikan.")
             .setPositiveButton("HAPUS") { _, _ ->
-                viewModel.delete(product) // Pastikan di ViewModel ada fungsi delete(product)
+                viewModel.delete(product)
                 android.widget.Toast.makeText(context, "Produk Dihapus", android.widget.Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Batal", null)

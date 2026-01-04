@@ -22,7 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager // <--- IMPORT INI
 import androidx.recyclerview.widget.RecyclerView
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
@@ -102,7 +102,9 @@ class MainActivity : AppCompatActivity() {
             },
             onItemLongClick = { product -> showCartActionDialog(product) }
         )
-        rvProducts.layoutManager = GridLayoutManager(this, 2)
+
+        // 🔥 UBAH DARI GRID KE LINEAR (LIST) AGAR RAPI 🔥
+        rvProducts.layoutManager = LinearLayoutManager(this)
         rvProducts.adapter = productAdapter
 
         // 4. OBSERVE DATA
@@ -160,12 +162,12 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 8. CEK STATUS SHIFT SAAT PERTAMA BUKA (PENTING!)
+        // 8. CEK STATUS SHIFT SAAT PERTAMA BUKA
         checkShiftStatus()
     }
 
     // ==========================================
-    // 🔥 LOGIKA SHIFT SYSTEM (BUKA/TUTUP) 🔥
+    // 🔥 LOGIKA SHIFT SYSTEM (BUKA/TUTUP)
     // ==========================================
 
     private fun checkShiftStatus() {
@@ -216,68 +218,6 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Keluar App") { _, _ -> finish() }
             .show()
     }
-
-    private fun showExitOptionsDialog() {
-        val options = arrayOf("🔒 Tutup Shift (Setoran)", "🚪 Logout Akun", "❌ Keluar Aplikasi")
-        AlertDialog.Builder(this)
-            .setTitle("Menu Kasir")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showCloseShiftDialog()
-                    1 -> {
-                        session.edit().clear().apply()
-                        startActivity(Intent(this, LoginActivity::class.java))
-                        finish()
-                    }
-                    2 -> finish()
-                }
-            }
-            .show()
-    }
-
-    private fun showCloseShiftDialog() {
-        val modalAwal = shiftPrefs.getFloat("MODAL_AWAL", 0f).toDouble()
-        val salesToday = shiftPrefs.getFloat("CASH_SALES_TODAY", 0f).toDouble()
-        val expected = modalAwal + salesToday
-
-        val layout = LinearLayout(this)
-        layout.orientation = LinearLayout.VERTICAL
-        layout.setPadding(64, 40, 64, 10)
-
-        val tvInfo = TextView(this)
-        tvInfo.text = "Modal: ${formatRupiah(modalAwal)}\nPenjualan Tunai: ${formatRupiah(salesToday)}\n----------------\nSeharusnya Ada: ${formatRupiah(expected)}"
-        tvInfo.setTextColor(Color.DKGRAY)
-
-        val etActual = EditText(this)
-        etActual.hint = "Total Uang Fisik (Rp)"
-        etActual.inputType = InputType.TYPE_CLASS_NUMBER
-
-        layout.addView(tvInfo)
-        layout.addView(etActual)
-
-        AlertDialog.Builder(this)
-            .setTitle("🌙 Tutup Shift (Closing)")
-            .setView(layout)
-            .setPositiveButton("TUTUP & SETOR") { _, _ ->
-                val actualStr = etActual.text.toString()
-                val actual = if (actualStr.isNotEmpty()) actualStr.toDouble() else 0.0
-                val kasirName = session.getString("username", "Kasir") ?: "Kasir"
-
-                // Simpan Log
-                viewModel.closeShift(kasirName, expected, actual)
-
-                // Reset Shift
-                shiftPrefs.edit().clear().apply()
-                Toast.makeText(this, "Laporan Disimpan!", Toast.LENGTH_SHORT).show()
-
-                // Kembali ke Login
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
-
 
     // ==========================================
     // 💰 PEMBAYARAN & CHECKOUT

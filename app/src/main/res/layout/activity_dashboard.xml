@@ -187,7 +187,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:columnCount="2"
-            android:rowCount="3"
+            android:rowCount="4"
             android:padding="12dp"
             android:alignmentMode="alignMargins">
 
@@ -252,6 +252,37 @@
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView
+                android:id="@+id/cardPurchase"
+                android:layout_width="0dp"
+                android:layout_height="120dp"
+                android:layout_columnWeight="1"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp"
+                android:layout_margin="6dp"
+                android:clickable="true"
+                android:foreground="?android:attr/selectableItemBackground">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:src="@android:drawable/ic_menu_add"
+                        app:tint="#1976D2"
+                        android:layout_marginBottom="8dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="BELANJA"
+                        android:textStyle="bold"
+                        android:textColor="#333"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
                 android:id="@+id/cardReport"
                 android:layout_width="0dp"
                 android:layout_height="120dp"
@@ -310,6 +341,7 @@
                         android:textColor="#333"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
+
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardShift"
                 android:layout_width="0dp"
@@ -320,25 +352,22 @@
                 android:layout_margin="6dp"
                 android:clickable="true"
                 android:foreground="?android:attr/selectableItemBackground">
-
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:padding="16dp">
-
                     <ImageView
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:src="@drawable/icon_menu_shift"
                         app:tint="#1976D2" />
-
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Riwayat Shift"
+                        android:text="SHIFT"
                         android:textStyle="bold"
                         android:textColor="#333333"/>
                 </LinearLayout>

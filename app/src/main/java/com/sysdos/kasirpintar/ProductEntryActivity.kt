@@ -10,7 +10,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView // Pastikan Import Ini
+import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -43,11 +43,11 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etName: TextInputEditText
     private lateinit var etPrice: TextInputEditText
     private lateinit var etCost: TextInputEditText
-    private lateinit var etStock: TextInputEditText
+    // private lateinit var etStock: TextInputEditText <-- SUDAH DIHAPUS
     private lateinit var etBarcode: TextInputEditText
     private lateinit var ivProduct: ImageView
 
-    // 1. UBAH TIPE JADI AUTOCOMPLETE (Dropdown)
+    // Dropdown
     private lateinit var etCategory: AutoCompleteTextView
     private lateinit var etSupplier: AutoCompleteTextView
 
@@ -78,13 +78,13 @@ class ProductEntryActivity : AppCompatActivity() {
         etName = findViewById(R.id.etProductName)
         etPrice = findViewById(R.id.etProductPrice)
         etCost = findViewById(R.id.etProductCost)
-        etStock = findViewById(R.id.etProductStock)
+        // etStock = findViewById(R.id.etProductStock) <-- SUDAH DIHAPUS
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
 
         // Setup Input Dropdown
         etCategory = findViewById(R.id.etProductCategory)
-        etSupplier = findViewById(R.id.etProductSupplier) // ID sama, tapi tipe View beda
+        etSupplier = findViewById(R.id.etProductSupplier)
 
         val btnTakePhoto = findViewById<Button>(R.id.btnTakePhoto)
         val btnSave = findViewById<Button>(R.id.btnSaveProduct)
@@ -101,14 +101,11 @@ class ProductEntryActivity : AppCompatActivity() {
             etCategory.setAdapter(adapter)
         }
 
-        // 3. ISI DROPDOWN SUPPLIER (LOGIKA BARU)
+        // 3. ISI DROPDOWN SUPPLIER
         viewModel.allSuppliers.observe(this) { suppliers ->
-            // Ambil nama supplier saja untuk ditampilkan di dropdown
             val supplierNames = suppliers.map { it.name }
             val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, supplierNames)
             etSupplier.setAdapter(adapter)
-
-            // Opsional: Langsung buka dropdown saat diklik
             etSupplier.setOnClickListener { etSupplier.showDropDown() }
         }
 
@@ -123,10 +120,9 @@ class ProductEntryActivity : AppCompatActivity() {
                 etName.setText(it.name)
                 etPrice.setText(it.price.toInt().toString())
                 etCost.setText(it.costPrice.toInt().toString())
-                etStock.setText(it.stock.toString())
+                // etStock.setText(it.stock.toString()) <-- SUDAH DIHAPUS (Stok lama disimpan di variabel productToEdit)
                 etBarcode.setText(it.barcode)
 
-                // Isi nilai lama (tanpa filter dropdown dulu)
                 etCategory.setText(it.category, false)
                 etSupplier.setText(it.supplier, false)
 
@@ -157,19 +153,24 @@ class ProductEntryActivity : AppCompatActivity() {
         val name = etName.text.toString()
         val priceStr = etPrice.text.toString()
         val costStr = etCost.text.toString()
-        val stockStr = etStock.text.toString()
+        // val stockStr = etStock.text.toString() <-- SUDAH DIHAPUS
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
-        val supplier = etSupplier.text.toString() // Ambil teks supplier
+        val supplier = etSupplier.text.toString()
 
-        if (name.isEmpty() || priceStr.isEmpty() || stockStr.isEmpty()) {
-            Toast.makeText(this, "Nama, Harga, dan Stok wajib diisi!", Toast.LENGTH_SHORT).show()
+        // Validasi tanpa stok
+        if (name.isEmpty() || priceStr.isEmpty()) {
+            Toast.makeText(this, "Nama dan Harga wajib diisi!", Toast.LENGTH_SHORT).show()
             return
         }
 
         val price = priceStr.toDouble()
         val cost = if (costStr.isNotEmpty()) costStr.toDouble() else 0.0
-        val stock = stockStr.toInt()
+
+        // 🔥 LOGIKA STOK BARU 🔥
+        // Jika Edit -> Ambil stok lama
+        // Jika Baru -> Set 0
+        val stock = productToEdit?.stock ?: 0
 
         if (price < cost) {
             AlertDialog.Builder(this)
@@ -200,7 +201,7 @@ class ProductEntryActivity : AppCompatActivity() {
             name = name,
             price = price,
             costPrice = cost,
-            stock = stock,
+            stock = stock, // Stok otomatis masuk sini
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
             imagePath = currentPhotoPath,
@@ -209,7 +210,7 @@ class ProductEntryActivity : AppCompatActivity() {
 
         if (productToEdit == null) {
             viewModel.insert(newProduct)
-            Toast.makeText(this, "✅ Produk Disimpan!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "✅ Produk Disimpan! (Stok: 0)", Toast.LENGTH_SHORT).show()
         } else {
             viewModel.update(newProduct)
             Toast.makeText(this, "✅ Produk Diupdate!", Toast.LENGTH_SHORT).show()

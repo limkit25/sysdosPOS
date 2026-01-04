@@ -67,4 +67,8 @@ interface ProductDao {
     // Login
     @Query("SELECT * FROM user_table WHERE username = :username AND password = :password")
     suspend fun login(username: String, password: String): User?
+
+    // 🔥 TAMBAHKAN INI 🔥
+    @Query("SELECT * FROM stock_logs ORDER BY timestamp DESC")
+    fun getAllStockLogs(): kotlinx.coroutines.flow.Flow<List<com.sysdos.kasirpintar.data.model.StockLog>>
 }

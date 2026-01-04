@@ -30,7 +30,6 @@ import java.util.UUID
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
-    // Simpan semua transaksi untuk bahan laporan
     private var allTrx: List<Transaction> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,13 +47,15 @@ class DashboardActivity : AppCompatActivity() {
         // AMBIL KARTU MENU
         val cardPOS = findViewById<CardView>(R.id.cardPOS)
         val cardProduct = findViewById<CardView>(R.id.cardProduct)
+        val cardPurchase = findViewById<CardView>(R.id.cardPurchase) // 🔥 MENU BARU
         val cardReport = findViewById<CardView>(R.id.cardReport)
         val cardUser = findViewById<CardView>(R.id.cardUser)
         val cardStore = findViewById<CardView>(R.id.cardStore)
         val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
+        val cardShift = findViewById<CardView>(R.id.cardShift)
+
         val tvLowStock = findViewById<TextView>(R.id.tvLowStockCount)
         val cardLowStockInfo = findViewById<CardView>(R.id.cardLowStockInfo)
-        val cardShift = findViewById<CardView>(R.id.cardShift)
 
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "Admin")
@@ -62,27 +63,40 @@ class DashboardActivity : AppCompatActivity() {
 
         tvGreeting.text = "Halo, $username"
         tvRole.text = "Role: ${role?.uppercase()}"
+
         if (role == "kasir") {
-            // Jika Kasir, SEMBUNYIKAN Info Stok Menipis
             cardLowStockInfo.visibility = View.GONE
         } else {
-            // Jika Admin/Manager, TAMPILKAN
             cardLowStockInfo.visibility = View.VISIBLE
         }
 
-        // --- SORTING MENU ---
+        // --- SORTING MENU BERDASARKAN ROLE ---
         mainGrid.removeAllViews()
         val authorizedCards = mutableListOf<View>()
+
+        // SEMUA BISA AKSES KASIR
         authorizedCards.add(cardPOS)
 
         if (role == "admin") {
-            authorizedCards.add(cardProduct); authorizedCards.add(cardReport); authorizedCards.add(cardShift)
-            authorizedCards.add(cardUser); authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
+            // ADMIN: AKSES SEMUA
+            authorizedCards.add(cardProduct)
+            authorizedCards.add(cardPurchase) // 🔥 TAMBAH MENU BELANJA
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardUser)
+            authorizedCards.add(cardShift)
+            authorizedCards.add(cardStore)
+            authorizedCards.add(cardPrinter)
         } else if (role == "manager") {
-            authorizedCards.add(cardProduct); authorizedCards.add(cardReport); authorizedCards.add(cardShift)
-            authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
+            // MANAGER: TANPA USER & SETTING TOKO
+            authorizedCards.add(cardProduct)
+            authorizedCards.add(cardPurchase) // 🔥 TAMBAH MENU BELANJA
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardShift)
+            authorizedCards.add(cardPrinter)
         } else {
-            authorizedCards.add(cardReport); authorizedCards.add(cardPrinter)
+            // KASIR: HANYA LAPORAN & PRINTER (SIMPLE)
+            authorizedCards.add(cardReport)
+            authorizedCards.add(cardPrinter)
         }
 
         for (card in authorizedCards) {
@@ -91,11 +105,8 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         // --- OBSERVE DATA ---
-        // 1. Simpan Transaksi ke Variabel Global (PENTING UNTUK LAPORAN)
         viewModel.allTransactions.observe(this) { transactions ->
             allTrx = transactions
-
-            // Update UI Omzet Hari Ini
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val todayStr = sdf.format(Date())
             var totalHariIni = 0.0
@@ -106,40 +117,27 @@ class DashboardActivity : AppCompatActivity() {
             tvRevenue.text = formatRupiah(totalHariIni)
         }
 
-        // 2. Hitung Stok Menipis (REVISI: LOGIKA WARNA & ICON)
-        val imgAlert = findViewById<ImageView>(R.id.imgAlertStock) // <--- Panggil ID Icon tadi
-
+        val imgAlert = findViewById<ImageView>(R.id.imgAlertStock)
         viewModel.allProducts.observe(this) { products ->
-            // Hitung barang yang stoknya kurang dari 5
             val lowStockCount = products.count { it.stock < 5 }
-
             if (lowStockCount > 0) {
-                // KASUS: ADA BARANG MENIPIS ⚠️
                 tvLowStock.text = "$lowStockCount Item"
-                tvLowStock.setTextColor(android.graphics.Color.RED) // Warna Merah
-
-                // Munculkan Tanda Seru
+                tvLowStock.setTextColor(android.graphics.Color.RED)
                 imgAlert.visibility = View.VISIBLE
-                imgAlert.setColorFilter(android.graphics.Color.RED) // Icon jadi Merah
+                imgAlert.setColorFilter(android.graphics.Color.RED)
             } else {
-                // KASUS: SEMUA AMAN ✅
                 tvLowStock.text = "Aman"
-                tvLowStock.setTextColor(android.graphics.Color.parseColor("#2E7D32")) // Warna Hijau
-
-                // Sembunyikan Tanda Seru (Atau ganti jadi Centang)
-                // Opsi A: Sembunyikan total
-                // imgAlert.visibility = View.GONE
-
-                // Opsi B: Ganti jadi Centang Hijau (Lebih Bagus)
+                tvLowStock.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
                 imgAlert.visibility = View.VISIBLE
                 imgAlert.setImageResource(android.R.drawable.checkbox_on_background)
-                imgAlert.setColorFilter(android.graphics.Color.parseColor("#2E7D32")) // Icon jadi Hijau
+                imgAlert.setColorFilter(android.graphics.Color.parseColor("#2E7D32"))
             }
         }
 
         // --- CLICK LISTENERS ---
         cardPOS.setOnClickListener { checkModalBeforePOS() }
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
+        cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) } // 🔥 KLIK MENU BELANJA
         cardReport.setOnClickListener { startActivity(Intent(this, SalesReportActivity::class.java)) }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
         cardStore.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "STORE") }) }
@@ -147,7 +145,6 @@ class DashboardActivity : AppCompatActivity() {
         cardShift?.setOnClickListener { startActivity(Intent(this, ShiftHistoryActivity::class.java)) }
         cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 2) }) }
 
-        // TOMBOL LOGOUT / TUTUP SHIFT
         btnLogout.setOnClickListener {
             if (role == "kasir") {
                 val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "Log Out Biasa")
@@ -170,28 +167,22 @@ class DashboardActivity : AppCompatActivity() {
                     .show()
             }
         }
-        // 1. INIT TRIAL VIEW
-        val tvTrial = findViewById<TextView>(R.id.tvTrialStatus)
 
-        // 2. LOGIKA CEK STATUS (Full Version vs Trial)
+        // TRIAL CHECK
+        val tvTrial = findViewById<TextView>(R.id.tvTrialStatus)
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
-        val isFull = prefs.getBoolean("is_full_version", false) // Cek apakah sudah Premium?
+        val isFull = prefs.getBoolean("is_full_version", false)
 
         if (isFull) {
-            // JIKA SUDAH PREMIUM: Sembunyikan tulisan trial
             tvTrial.visibility = View.GONE
         } else {
-            // JIKA MASIH TRIAL: Hitung sisa hari
             val firstRunDate = prefs.getLong("first_install_date", 0L)
-
             if (firstRunDate != 0L) {
                 val now = System.currentTimeMillis()
                 val diffMillis = now - firstRunDate
                 val daysUsed = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffMillis)
-                val maxTrial = 7 // Wajib sama dengan di SplashActivity
-
+                val maxTrial = 7
                 val daysLeft = maxTrial - daysUsed
-
                 if (daysLeft > 0) {
                     tvTrial.text = "Sisa Trial: $daysLeft Hari"
                     tvTrial.visibility = View.VISIBLE
@@ -249,15 +240,12 @@ class DashboardActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- 🔥 FUNGSI TUTUP SHIFT + HITUNG RINCIAN + PRINT 🔥 ---
+    // --- FUNGSI TUTUP SHIFT ---
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        // 1. Ambil Data Shift
         val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
         val modalAwal = prefs.getFloat("MODAL_AWAL", 0f).toDouble()
         val startTime = prefs.getLong("START_TIME", 0L)
 
-        // 2. Hitung Rincian Transaksi (Dari List allTrx yang sudah di-load)
-        // Kita filter transaksi yang terjadi SETELAH shift dibuka
         val currentShiftTrx = allTrx.filter { it.timestamp >= startTime }
 
         var totalTunai = 0.0
@@ -267,7 +255,7 @@ class DashboardActivity : AppCompatActivity() {
 
         for (trx in currentShiftTrx) {
             when (trx.paymentMethod) {
-                "Tunai" -> totalTunai += trx.totalAmount // Pakai totalAmount (bukan cashReceived) untuk omzet
+                "Tunai" -> totalTunai += trx.totalAmount
                 "QRIS" -> totalQRIS += trx.totalAmount
                 "Transfer" -> totalTransfer += trx.totalAmount
                 "Debit" -> totalDebit += trx.totalAmount
@@ -275,9 +263,8 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         val totalOmzetSistem = totalTunai + totalQRIS + totalTransfer + totalDebit
-        val totalUangDiLaci = modalAwal + totalTunai // Yang harus ada fisiknya
+        val totalUangDiLaci = modalAwal + totalTunai
 
-        // 3. Tampilkan Dialog Rincian
         val input = EditText(this)
         input.inputType = InputType.TYPE_CLASS_NUMBER
         input.hint = "Total uang fisik di laci"
@@ -309,15 +296,10 @@ class DashboardActivity : AppCompatActivity() {
                     val uangFisik = strFisik.toDouble()
                     val user = session.getString("username", "Kasir") ?: "Kasir"
 
-                    // Simpan Log ke DB
                     viewModel.closeShift(user, totalUangDiLaci, uangFisik)
-
-                    // 🔥 CETAK LAPORAN (PRINT) 🔥
                     printShiftReport(user, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
 
-                    // Reset Data Shift
                     prefs.edit().clear().apply()
-
                     Toast.makeText(this, "Laporan Dicetak & Shift Ditutup.", Toast.LENGTH_LONG).show()
                     performLogout(session)
                 } else {
@@ -328,7 +310,6 @@ class DashboardActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- FUNGSI CETAK LAPORAN SHIFT ---
     private fun printShiftReport(
         kasirName: String, startTime: Long, modal: Double,
         tunai: Double, qris: Double, trf: Double, debit: Double,
@@ -354,20 +335,17 @@ class DashboardActivity : AppCompatActivity() {
                 val startStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))
 
                 val p = StringBuilder()
-
-                // HEADER
-                p.append("\u001B\u0061\u0001") // Center
+                p.append("\u001B\u0061\u0001")
                 p.append("\u001B\u0045\u0001$storeName\u001B\u0045\u0000\n")
                 p.append("--------------------------------\n")
                 p.append("LAPORAN TUTUP SHIFT\n")
                 p.append("--------------------------------\n")
-                p.append("\u001B\u0061\u0000") // Left
+                p.append("\u001B\u0061\u0000")
                 p.append("Kasir  : $kasirName\n")
                 p.append("Waktu  : $now\n")
                 p.append("Shift  : $startStr s/d Sekarang\n")
                 p.append("--------------------------------\n")
 
-                // RINCIAN
                 fun row(label: String, value: Double) {
                     val vStr = formatRupiah(value).replace("Rp ", "")
                     val space = 32 - label.length - vStr.length
@@ -381,9 +359,9 @@ class DashboardActivity : AppCompatActivity() {
                 row("Debit", debit)
                 p.append("--------------------------------\n")
                 val totalOmzet = tunai + qris + trf + debit
-                p.append("\u001B\u0045\u0001") // Bold
+                p.append("\u001B\u0045\u0001")
                 row("TOTAL OMZET", totalOmzet)
-                p.append("\u001B\u0045\u0000") // Normal
+                p.append("\u001B\u0045\u0000")
                 p.append("--------------------------------\n\n")
 
                 p.append("REKONSILIASI KAS (FISIK):\n")
@@ -398,8 +376,7 @@ class DashboardActivity : AppCompatActivity() {
                 val labelSelisih = if(selisih < 0) "KURANG" else if(selisih > 0) "LEBIH" else "KLOP"
                 row("SELISIH ($labelSelisih)", selisih)
                 p.append("--------------------------------\n")
-
-                p.append("\u001B\u0061\u0001") // Center
+                p.append("\u001B\u0061\u0001")
                 p.append("\n\n\n")
 
                 os.write(p.toString().toByteArray())
