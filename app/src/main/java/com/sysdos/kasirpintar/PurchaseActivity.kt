@@ -19,7 +19,6 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import com.sysdos.kasirpintar.data.model.Product
-import com.sysdos.kasirpintar.data.model.StockLog
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import java.text.SimpleDateFormat
 import java.util.*

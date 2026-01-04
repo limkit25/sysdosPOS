@@ -8,12 +8,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.sysdos.kasirpintar.data.dao.CategoryDao
 import com.sysdos.kasirpintar.data.dao.ProductDao
 import com.sysdos.kasirpintar.data.dao.ShiftDao
-import com.sysdos.kasirpintar.data.dao.StockLogDao // <--- IMPORT INI
+import com.sysdos.kasirpintar.data.dao.StockLogDao
+import com.sysdos.kasirpintar.data.model.StockLog
 import com.sysdos.kasirpintar.data.dao.SupplierDao
 import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.ShiftLog
-import com.sysdos.kasirpintar.data.model.StockLog // <--- IMPORT INI
 import com.sysdos.kasirpintar.data.model.Supplier
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.data.model.User

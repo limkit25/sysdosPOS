@@ -2,10 +2,7 @@ package com.sysdos.kasirpintar
 
 import android.os.Bundle
 import android.text.InputType
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.LinearLayout
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -16,9 +13,8 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.StockLog
+import com.sysdos.kasirpintar.data.model.Supplier
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import android.widget.Spinner
-import android.widget.ArrayAdapter
 
 class ProductListActivity : AppCompatActivity() {
 
@@ -26,25 +22,24 @@ class ProductListActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_product_list) // Pastikan XML-nya sudah yang versi TAB
+        setContentView(R.layout.activity_product_list)
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // Tombol Kembali
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
 
         val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
         val viewPager = findViewById<ViewPager2>(R.id.viewPager)
 
-        // KONFIGURASI ADAPTER TAB (JADI 4 TAB)
+        // ADAPTER 4 TAB
         viewPager.adapter = object : FragmentStateAdapter(this) {
-            override fun getItemCount(): Int = 4 // <--- Ubah jadi 4
+            override fun getItemCount(): Int = 4
             override fun createFragment(position: Int): Fragment {
                 return when (position) {
-                    0 -> ProductFragment()   // 1. Produk
-                    1 -> SupplierFragment()  // 2. Supplier
-                    2 -> ReportFragment()    // 3. LAPORAN STOK (BARU)
-                    3 -> HistoryFragment()   // 4. Riwayat
+                    0 -> ProductFragment()
+                    1 -> SupplierFragment()
+                    2 -> ReportFragment()
+                    3 -> HistoryFragment()
                     else -> ProductFragment()
                 }
             }
@@ -55,19 +50,20 @@ class ProductListActivity : AppCompatActivity() {
             tab.text = when (position) {
                 0 -> "PRODUK"
                 1 -> "SUPPLIER"
-                2 -> "ASET/STOK" // Nama Tab Pendek agar muat
+                2 -> "ASET/STOK"
                 3 -> "RIWAYAT"
                 else -> ""
             }
         }.attach()
+
+        // BUKA TAB SPESIFIK (JIKA ADA REQUEST DARI DASHBOARD)
         val targetTab = intent.getIntExtra("OPEN_TAB_INDEX", -1)
         if (targetTab != -1) {
-            // Geser ViewPager ke tab yang diminta (Index 2 = Laporan)
             viewPager.setCurrentItem(targetTab, false)
         }
     }
 
-    // FUNGSI RESTOCK (Dipanggil dari Tab Product)
+    // --- FUNGSI RESTOCK (Dipanggil dari ProductFragment) ---
     fun showRestockDialog(product: Product) {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
@@ -75,12 +71,13 @@ class ProductListActivity : AppCompatActivity() {
 
         // 1. SPINNER SUPPLIER
         val spnSupplier = Spinner(this)
-        var supplierList: List<com.sysdos.kasirpintar.data.model.Supplier> = emptyList()
+        var supplierList: List<Supplier> = emptyList()
 
+        // Load Supplier dari Database
         viewModel.allSuppliers.observe(this) { suppliers ->
             supplierList = suppliers
             val names = suppliers.map { it.name }.toMutableList()
-            names.add(0, "-- Pilih Supplier --")
+            names.add(0, "-- Pilih Supplier --") // Opsi Default
             val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
             spnSupplier.adapter = adapter
         }
@@ -94,8 +91,11 @@ class ProductListActivity : AppCompatActivity() {
             setText(product.costPrice.toInt().toString())
         }
 
+        layout.addView(TextView(this).apply { text = "Supplier:"; textSize = 12f })
         layout.addView(spnSupplier)
+        layout.addView(TextView(this).apply { text = "Jumlah:"; textSize = 12f; setPadding(0,20,0,0) })
         layout.addView(etQty)
+        layout.addView(TextView(this).apply { text = "Harga Modal (Update):"; textSize = 12f; setPadding(0,20,0,0) })
         layout.addView(etCost)
 
         AlertDialog.Builder(this)
@@ -107,19 +107,23 @@ class ProductListActivity : AppCompatActivity() {
                     val qtyIn = qtyStr.toInt()
                     val newCost = etCost.text.toString().toDoubleOrNull() ?: product.costPrice
 
-                    // Ambil Nama Supplier
+                    // Ambil Nama Supplier (Safety Check)
                     val selectedPos = spnSupplier.selectedItemPosition
-                    val supplierName = if (selectedPos > 0 && supplierList.isNotEmpty()) {
+                    val supplierName = if (selectedPos > 0 && selectedPos - 1 < supplierList.size) {
                         supplierList[selectedPos - 1].name
                     } else {
-                        product.supplier ?: "-"
+                        product.supplier ?: "Umum"
                     }
 
-                    // Update Produk
-                    val newProduct = product.copy(stock = product.stock + qtyIn, costPrice = newCost, supplier = supplierName)
+                    // 1. Update Produk (Stok Nambah, Harga Beli Update)
+                    val newProduct = product.copy(
+                        stock = product.stock + qtyIn,
+                        costPrice = newCost,
+                        supplier = supplierName
+                    )
                     viewModel.update(newProduct)
 
-                    // Simpan History
+                    // 2. Simpan ke Log History (Wajib ada Import StockLog)
                     val log = StockLog(
                         timestamp = System.currentTimeMillis(),
                         productName = product.name,
@@ -131,7 +135,9 @@ class ProductListActivity : AppCompatActivity() {
                     )
                     viewModel.recordPurchase(log)
 
-                    Toast.makeText(this, "Stok Masuk!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Stok Berhasil Ditambah! 📦", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Jumlah wajib diisi!", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Batal", null)

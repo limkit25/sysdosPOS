@@ -55,7 +55,7 @@ class CategoryActivity : AppCompatActivity() {
         btnAdd.setOnClickListener {
             val name = etCategory.text.toString().trim()
             if (name.isNotEmpty()) {
-                viewModel.addCategory(name)
+                viewModel.addCategory(etCategoryName.text.toString())
                 etCategory.setText("")
                 Toast.makeText(this, "Kategori ditambah!", Toast.LENGTH_SHORT).show()
             } else {
