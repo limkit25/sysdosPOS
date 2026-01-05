@@ -82,12 +82,34 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun showExpiredDialog() {
+        val input = android.widget.EditText(this)
+        input.hint = "Masukkan Kode Token"
+
         val dialog = AlertDialog.Builder(this)
             .setTitle("Masa Percobaan Habis 🔒")
-            .setMessage("Masa trial $TRIAL_DAYS hari telah berakhir.\n\nSilakan hubungi Admin untuk membeli token aktivasi.")
+            .setMessage("Trial 7 hari berakhir. Masukkan kode aktivasi untuk lanjut atau Hubungi Admin.")
+            .setView(input) // Menambahkan kolom input di dialog
             .setCancelable(false)
-            .setPositiveButton("Keluar") { _, _ ->
-                finishAffinity()
+            .setPositiveButton("AKTIVASI") { _, _ ->
+                val token = input.text.toString().trim()
+                // Ganti "KASIRSUKSES" dengan kode rahasia Anda
+                if (token == "KASIRSUKSES") {
+                    // Simpan status Full Version
+                    getSharedPreferences("app_license", Context.MODE_PRIVATE)
+                        .edit().putBoolean("is_full_version", true).apply()
+
+                    Toast.makeText(this, "Aktivasi Berhasil! Terima kasih.", Toast.LENGTH_LONG).show()
+
+                    // Lanjut masuk aplikasi
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                } else {
+                    Toast.makeText(this, "Kode Salah!", Toast.LENGTH_SHORT).show()
+                    showExpiredDialog() // Munculkan lagi kalau salah
+                }
+            }
+            .setNegativeButton("KELUAR") { _, _ ->
+                finishAffinity() // Tutup aplikasi
             }
             .create()
         dialog.show()

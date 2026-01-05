@@ -35,8 +35,13 @@ interface ProductDao {
     fun getAllCategories(): Flow<List<Category>>
 
     // --- SUPPLIER (Tabel: suppliers) ---
+    // --- SUPPLIER (Tabel: suppliers) ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSupplier(supplier: Supplier)
+
+    // 🔥 TAMBAHKAN INI 🔥
+    @Update
+    suspend fun updateSupplier(supplier: Supplier)
 
     @Delete
     suspend fun deleteSupplier(supplier: Supplier)
@@ -77,4 +82,6 @@ interface ProductDao {
 
     @Query("SELECT * FROM stock_logs ORDER BY timestamp DESC")
     fun getAllStockLogs(): Flow<List<StockLog>>
+
+
 }

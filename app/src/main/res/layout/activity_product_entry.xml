@@ -79,7 +79,7 @@
                         android:id="@+id/btnTakePhoto"
                         android:layout_width="wrap_content"
                         android:layout_height="40dp"
-                        android:text="📷 Ganti Foto"
+                        android:text="📷 Ambil Foto"
                         android:textSize="12sp"
                         android:backgroundTint="#E3F2FD"
                         android:textColor="#1976D2"
@@ -152,21 +152,6 @@
                             app:tint="#1976D2"
                             android:layout_marginStart="4dp"/>
                     </LinearLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Pilih Supplier"
-                        android:layout_marginBottom="16dp"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
-
-                        <AutoCompleteTextView
-                            android:id="@+id/etProductSupplier"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="text"
-                            android:padding="16dp" />
-                    </com.google.android.material.textfield.TextInputLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"

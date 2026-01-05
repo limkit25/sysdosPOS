@@ -43,22 +43,18 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etName: TextInputEditText
     private lateinit var etPrice: TextInputEditText
     private lateinit var etCost: TextInputEditText
-    // private lateinit var etStock: TextInputEditText <-- SUDAH DIHAPUS
     private lateinit var etBarcode: TextInputEditText
     private lateinit var ivProduct: ImageView
-
-    // Dropdown
     private lateinit var etCategory: AutoCompleteTextView
-    private lateinit var etSupplier: AutoCompleteTextView
 
-    // --- LAUNCHER KAMERA ---
+    // LAUNCHER KAMERA
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             setPic()
         }
     }
 
-    // --- LAUNCHER SCANNER ---
+    // LAUNCHER SCANNER
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
             etBarcode.setText(result.contents)
@@ -78,13 +74,9 @@ class ProductEntryActivity : AppCompatActivity() {
         etName = findViewById(R.id.etProductName)
         etPrice = findViewById(R.id.etProductPrice)
         etCost = findViewById(R.id.etProductCost)
-        // etStock = findViewById(R.id.etProductStock) <-- SUDAH DIHAPUS
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
-
-        // Setup Input Dropdown
         etCategory = findViewById(R.id.etProductCategory)
-        etSupplier = findViewById(R.id.etProductSupplier)
 
         val btnTakePhoto = findViewById<Button>(R.id.btnTakePhoto)
         val btnSave = findViewById<Button>(R.id.btnSaveProduct)
@@ -93,20 +85,13 @@ class ProductEntryActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { finish() }
 
-        // 2. ISI DROPDOWN KATEGORI
+        // ISI DROPDOWN KATEGORI
         viewModel.allCategories.observe(this) { categories ->
             val safeCategories: List<Category> = categories ?: emptyList()
             val categoryNames = safeCategories.map { it.name }
             val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
             etCategory.setAdapter(adapter)
-        }
-
-        // 3. ISI DROPDOWN SUPPLIER
-        viewModel.allSuppliers.observe(this) { suppliers ->
-            val supplierNames = suppliers.map { it.name }
-            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, supplierNames)
-            etSupplier.setAdapter(adapter)
-            etSupplier.setOnClickListener { etSupplier.showDropDown() }
+            etCategory.setOnClickListener { etCategory.showDropDown() }
         }
 
         btnAddCategory.setOnClickListener {
@@ -120,12 +105,10 @@ class ProductEntryActivity : AppCompatActivity() {
                 etName.setText(it.name)
                 etPrice.setText(it.price.toInt().toString())
                 etCost.setText(it.costPrice.toInt().toString())
-                // etStock.setText(it.stock.toString()) <-- SUDAH DIHAPUS (Stok lama disimpan di variabel productToEdit)
                 etBarcode.setText(it.barcode)
-
                 etCategory.setText(it.category, false)
-                etSupplier.setText(it.supplier, false)
 
+                // Load Foto
                 currentPhotoPath = it.imagePath
                 if (currentPhotoPath != null) setPic()
 
@@ -153,12 +136,10 @@ class ProductEntryActivity : AppCompatActivity() {
         val name = etName.text.toString()
         val priceStr = etPrice.text.toString()
         val costStr = etCost.text.toString()
-        // val stockStr = etStock.text.toString() <-- SUDAH DIHAPUS
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
-        val supplier = etSupplier.text.toString()
 
-        // Validasi tanpa stok
+        // Validasi
         if (name.isEmpty() || priceStr.isEmpty()) {
             Toast.makeText(this, "Nama dan Harga wajib diisi!", Toast.LENGTH_SHORT).show()
             return
@@ -166,51 +147,42 @@ class ProductEntryActivity : AppCompatActivity() {
 
         val price = priceStr.toDouble()
         val cost = if (costStr.isNotEmpty()) costStr.toDouble() else 0.0
-
-        // 🔥 LOGIKA STOK BARU 🔥
-        // Jika Edit -> Ambil stok lama
-        // Jika Baru -> Set 0
-        val stock = productToEdit?.stock ?: 0
+        val stock = productToEdit?.stock ?: 0 // Stok tidak diubah disini
 
         if (price < cost) {
             AlertDialog.Builder(this)
                 .setTitle("⚠️ Potensi Rugi")
                 .setMessage("Harga Jual (Rp ${price.toInt()}) lebih murah dari Modal (Rp ${cost.toInt()}).\n\nYakin tetap simpan?")
                 .setPositiveButton("Ya, Simpan") { _, _ ->
-                    processSave(name, price, cost, stock, category, barcode, supplier)
+                    processSave(name, price, cost, stock, category, barcode)
                 }
                 .setNegativeButton("Perbaiki Harga", null)
                 .show()
             return
         }
 
-        processSave(name, price, cost, stock, category, barcode, supplier)
+        processSave(name, price, cost, stock, category, barcode)
     }
 
     private fun processSave(
-        name: String,
-        price: Double,
-        cost: Double,
-        stock: Int,
-        category: String,
-        barcode: String,
-        supplier: String
+        name: String, price: Double, cost: Double, stock: Int,
+        category: String, barcode: String
     ) {
         val newProduct = Product(
             id = productToEdit?.id ?: 0,
             name = name,
             price = price,
             costPrice = cost,
-            stock = stock, // Stok otomatis masuk sini
+            stock = stock,
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
-            imagePath = currentPhotoPath,
-            supplier = supplier.ifEmpty { null }
+            imagePath = currentPhotoPath, // Foto tetap tersimpan
+            supplier = "-" // Supplier di-set otomatis "-" (dikelola via Restock)
         )
 
         if (productToEdit == null) {
             viewModel.insert(newProduct)
-            Toast.makeText(this, "✅ Produk Disimpan! (Stok: 0)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "✅ Produk Disimpan!", Toast.LENGTH_SHORT).show()
         } else {
             viewModel.update(newProduct)
             Toast.makeText(this, "✅ Produk Diupdate!", Toast.LENGTH_SHORT).show()
@@ -218,7 +190,7 @@ class ProductEntryActivity : AppCompatActivity() {
         finish()
     }
 
-    // (Bagian Kamera tetap sama)
+    // --- LOGIKA KAMERA ---
     private fun checkCameraPermissionAndOpen() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 100)

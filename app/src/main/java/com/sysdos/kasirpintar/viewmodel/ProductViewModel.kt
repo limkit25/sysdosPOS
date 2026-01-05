@@ -11,27 +11,33 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     private val repository: ProductRepository
 
-    // LIVE DATA
+    // --- LIVE DATA ---
     val allProducts: LiveData<List<Product>>
     val allCategories: LiveData<List<Category>>
     val allSuppliers: LiveData<List<Supplier>>
     val allTransactions: LiveData<List<Transaction>>
     val allUsers: LiveData<List<User>>
 
-    // 🔥 DATA LOG YANG DIBUTUHKAN PURCHASE ACTIVITY 🔥
+    // Log Data & Shift
     val stockLogs: LiveData<List<StockLog>>
+    val allShiftLogs: LiveData<List<ShiftLog>>
 
-    // Keranjang Belanja
+    // 🔥 BARU: Riwayat Pembelian (Grouped)
+    val purchaseHistory: LiveData<List<StockLog>>
+
+    // Keranjang Belanja (Penjualan)
     private val _cart = MutableLiveData<List<Product>>(emptyList())
     val cart: LiveData<List<Product>> = _cart
-
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
 
     init {
         val database = AppDatabase.getDatabase(application)
         val dao = database.productDao()
-        repository = ProductRepository(dao)
+        val shiftDao = database.shiftDao()
+        val stockDao = database.stockLogDao() // Tambahan akses DAO jika perlu
+
+        repository = ProductRepository(dao, shiftDao, stockDao) // Sesuaikan constructor Repo Anda
 
         allProducts = repository.allProducts.asLiveData()
         allCategories = repository.allCategories.asLiveData()
@@ -39,42 +45,54 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         allTransactions = repository.allTransactions.asLiveData()
         allUsers = repository.allUsers.asLiveData()
 
-        // Inisialisasi LiveData Log
         stockLogs = repository.allStockLogs.asLiveData()
+        allShiftLogs = repository.allShiftLogs.asLiveData()
+
+        // 🔥 Inisialisasi Riwayat Pembelian
+        purchaseHistory = repository.purchaseHistory.asLiveData()
     }
 
-    // --- FUNGSI DATABASE UTAMA ---
+    // --- FUNGSI UTAMA ---
     fun insert(product: Product) = viewModelScope.launch { repository.insert(product) }
     fun update(product: Product) = viewModelScope.launch { repository.update(product) }
     fun delete(product: Product) = viewModelScope.launch { repository.delete(product) }
 
-    // Fungsi Kategori
     fun insertCategory(category: Category) = viewModelScope.launch { repository.insertCategory(category) }
     fun deleteCategory(category: Category) = viewModelScope.launch { repository.deleteCategory(category) }
 
-    // Fungsi Supplier
     fun insertSupplier(supplier: Supplier) = viewModelScope.launch { repository.insertSupplier(supplier) }
     fun deleteSupplier(supplier: Supplier) = viewModelScope.launch { repository.deleteSupplier(supplier) }
+    fun updateSupplier(supplier: Supplier) = viewModelScope.launch { repository.updateSupplier(supplier) }
 
-    // Fungsi User
     fun insertUser(user: User) = viewModelScope.launch { repository.insertUser(user) }
     fun updateUser(user: User) = viewModelScope.launch { repository.updateUser(user) }
     fun deleteUser(user: User) = viewModelScope.launch { repository.deleteUser(user) }
 
-    // 🔥 TAMBAHKAN FUNGSI INI DI VIEWMODEL 🔥
+    fun login(u: String, p: String, onResult: (User?) -> Unit) = viewModelScope.launch {
+        val user = repository.login(u, p)
+        onResult(user)
+    }
+
+    // --- FUNGSI PEMBELIAN / STOK ---
     fun recordPurchase(log: StockLog) = viewModelScope.launch {
         repository.recordPurchase(log)
     }
 
-    // --- FUNGSI KERANJANG KASIR ---
+    // 🔥 BARU: Ambil Detail Pembelian
+    fun getPurchaseDetails(purchaseId: Long, onResult: (List<StockLog>) -> Unit) = viewModelScope.launch {
+        val details = repository.getPurchaseDetails(purchaseId)
+        onResult(details)
+    }
+
+    // --- KERANJANG PENJUALAN (POS) ---
     fun addToCart(product: Product, onResult: (String) -> Unit) {
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
-        val existingItem = currentList.find { it.id == product.id }
+        val index = currentList.indexOfFirst { it.id == product.id }
 
-        if (existingItem != null) {
-            // Cek stok master sebelum tambah
+        if (index != -1) {
+            val existingItem = currentList[index]
             if (existingItem.stock + 1 <= product.stock) {
-                existingItem.stock += 1
+                currentList[index] = existingItem.copy(stock = existingItem.stock + 1)
                 onResult("Qty ditambah")
             } else {
                 onResult("Stok habis!")
@@ -82,8 +100,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             }
         } else {
             if (product.stock > 0) {
-                val item = product.copy(stock = 1)
-                currentList.add(item)
+                currentList.add(product.copy(stock = 1))
                 onResult("Masuk keranjang")
             } else {
                 onResult("Stok habis!")
@@ -96,13 +113,14 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     fun decreaseCartItem(product: Product) {
         val currentList = _cart.value?.toMutableList() ?: return
-        val existingItem = currentList.find { it.id == product.id }
+        val index = currentList.indexOfFirst { it.id == product.id }
 
-        if (existingItem != null) {
+        if (index != -1) {
+            val existingItem = currentList[index]
             if (existingItem.stock > 1) {
-                existingItem.stock -= 1
+                currentList[index] = existingItem.copy(stock = existingItem.stock - 1)
             } else {
-                currentList.remove(existingItem)
+                currentList.removeAt(index)
             }
             _cart.value = currentList
             calculateTotal()
@@ -128,10 +146,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateCartCounts(cartItems: List<Product>) {
-        // Opsional: untuk sinkronisasi UI jika diperlukan
-    }
-
     private fun calculateTotal() {
         var total = 0.0
         _cart.value?.forEach { total += it.price * it.stock }
@@ -139,34 +153,22 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun checkout(
-        subtotal: Double,
-        discount: Double,
-        tax: Double,
-        paymentMethod: String,
-        cashReceived: Double,
-        changeAmount: Double,
-        onResult: (Transaction?) -> Unit
+        subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
+        cashReceived: Double, changeAmount: Double, onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
-
         val cartItems = _cart.value ?: emptyList()
-        if (cartItems.isEmpty()) {
-            onResult(null)
-            return@launch
-        }
+        if (cartItems.isEmpty()) { onResult(null); return@launch }
 
-        // 1. Ringkasan Item
         val itemsSummary = cartItems.joinToString(";") {
             "${it.name}|${it.stock}|${it.price}|${it.price * it.stock}"
         }
 
-        // 2. Hitung Profit
         var totalProfit = 0.0
         cartItems.forEach { item ->
             val profitPerItem = item.price - item.costPrice
             totalProfit += (profitPerItem * item.stock)
         }
 
-        // 3. Simpan Transaksi
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
             itemsSummary = itemsSummary,
@@ -182,29 +184,34 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
         val trxId = repository.insertTransaction(trx)
 
-        // 4. Update Stok
         cartItems.forEach { cartItem ->
             val masterItem = allProducts.value?.find { it.id == cartItem.id }
             if (masterItem != null) {
                 val newStock = masterItem.stock - cartItem.stock
-                val updatedProduct = masterItem.copy(stock = newStock)
-                repository.update(updatedProduct)
+                repository.update(masterItem.copy(stock = newStock))
             }
         }
 
-        // 5. Bersihkan Keranjang
         _cart.value = emptyList()
         _totalPrice.value = 0.0
-
         onResult(trx.copy(id = trxId.toInt()))
     }
 
     // --- SHIFT ---
     fun openShift(user: String, modal: Double) = viewModelScope.launch {
-        // Implementasi log shift jika diperlukan
+        val log = ShiftLog(
+            timestamp = System.currentTimeMillis(), type = "OPEN", kasirName = user,
+            expectedAmount = 0.0, actualAmount = modal, difference = 0.0
+        )
+        repository.insertShiftLog(log)
     }
 
     fun closeShift(user: String, expected: Double, actual: Double) = viewModelScope.launch {
-        // Implementasi log tutup shift jika diperlukan
+        val diff = actual - expected
+        val log = ShiftLog(
+            timestamp = System.currentTimeMillis(), type = "CLOSE", kasirName = user,
+            expectedAmount = expected, actualAmount = actual, difference = diff
+        )
+        repository.insertShiftLog(log)
     }
 }

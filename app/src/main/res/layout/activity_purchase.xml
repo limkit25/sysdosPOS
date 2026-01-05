@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="#F5F8FA">
 
     <LinearLayout
@@ -95,12 +96,29 @@
                         android:layout_marginBottom="4dp"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"/>
-                    <Spinner
-                        android:id="@+id/spSupplier"
+
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:background="@drawable/bg_rounded_white"
-                        android:layout_marginBottom="12dp"/>
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+
+                        <Spinner
+                            android:id="@+id/spSupplier"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="48dp"
+                            android:background="@drawable/bg_rounded_white"/>
+
+                        <ImageButton
+                            android:id="@+id/btnAddSupplier"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@android:drawable/ic_input_add"
+                            android:background="@drawable/bg_rounded_green"
+                            app:tint="#FFFFFF"
+                            android:layout_marginStart="8dp"/>
+                    </LinearLayout>
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

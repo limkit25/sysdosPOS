@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
         Supplier::class,
         StockLog::class // <--- WAJIB ADA (Agar tabel dibuat)
     ],
-    version = 4, // <--- Naikkan ke 4
+    version = 5, // <--- Naikkan ke 4
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

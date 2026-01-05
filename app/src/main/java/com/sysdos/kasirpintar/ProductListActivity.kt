@@ -31,39 +31,37 @@ class ProductListActivity : AppCompatActivity() {
         val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
         val viewPager = findViewById<ViewPager2>(R.id.viewPager)
 
-        // ADAPTER 4 TAB
+        // --- ADAPTER TAB (Sekarang hanya 2 Tab: Produk & Aset) ---
         viewPager.adapter = object : FragmentStateAdapter(this) {
-            override fun getItemCount(): Int = 4
+            override fun getItemCount(): Int = 2 // 🔥 UBAH JADI 2
             override fun createFragment(position: Int): Fragment {
                 return when (position) {
                     0 -> ProductFragment()
-                    1 -> SupplierFragment()
-                    2 -> ReportFragment()
-                    3 -> HistoryFragment()
+                    1 -> ReportFragment() // 🔥 SEKARANG POSISI 1 ADALAH LAPORAN ASET
+                    // Tab Supplier & History SUDAH DIHAPUS
                     else -> ProductFragment()
                 }
             }
         }
 
-        // JUDUL TAB
+        // --- JUDUL TAB ---
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> "PRODUK"
-                1 -> "SUPPLIER"
-                2 -> "ASET/STOK"
-                3 -> "RIWAYAT"
+                1 -> "ASET/STOK" // 🔥 JUDUL DISESUAIKAN
                 else -> ""
             }
         }.attach()
 
         // BUKA TAB SPESIFIK (JIKA ADA REQUEST DARI DASHBOARD)
         val targetTab = intent.getIntExtra("OPEN_TAB_INDEX", -1)
-        if (targetTab != -1) {
+        if (targetTab != -1 && targetTab < 2) {
             viewPager.setCurrentItem(targetTab, false)
         }
     }
 
-    // --- FUNGSI RESTOCK (Dipanggil dari ProductFragment) ---
+    // --- FUNGSI RESTOCK MANUAL (Masih Bisa Digunakan) ---
+    // Walaupun tab supplier hilang, kita masih butuh logic ini jika user ingin restock cepat dari list produk
     fun showRestockDialog(product: Product) {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
@@ -73,7 +71,7 @@ class ProductListActivity : AppCompatActivity() {
         val spnSupplier = Spinner(this)
         var supplierList: List<Supplier> = emptyList()
 
-        // Load Supplier dari Database
+        // Load Supplier dari Database (Masih tetap bisa ambil data walau tab-nya hilang)
         viewModel.allSuppliers.observe(this) { suppliers ->
             supplierList = suppliers
             val names = suppliers.map { it.name }.toMutableList()
@@ -107,7 +105,7 @@ class ProductListActivity : AppCompatActivity() {
                     val qtyIn = qtyStr.toInt()
                     val newCost = etCost.text.toString().toDoubleOrNull() ?: product.costPrice
 
-                    // Ambil Nama Supplier (Safety Check)
+                    // Ambil Nama Supplier
                     val selectedPos = spnSupplier.selectedItemPosition
                     val supplierName = if (selectedPos > 0 && selectedPos - 1 < supplierList.size) {
                         supplierList[selectedPos - 1].name
@@ -115,7 +113,7 @@ class ProductListActivity : AppCompatActivity() {
                         product.supplier ?: "Umum"
                     }
 
-                    // 1. Update Produk (Stok Nambah, Harga Beli Update)
+                    // 1. Update Produk
                     val newProduct = product.copy(
                         stock = product.stock + qtyIn,
                         costPrice = newCost,
@@ -123,9 +121,11 @@ class ProductListActivity : AppCompatActivity() {
                     )
                     viewModel.update(newProduct)
 
-                    // 2. Simpan ke Log History (Wajib ada Import StockLog)
+                    // 2. Simpan ke Log History
+                    val generatedPurchaseId = System.currentTimeMillis()
                     val log = StockLog(
-                        timestamp = System.currentTimeMillis(),
+                        purchaseId = generatedPurchaseId,
+                        timestamp = generatedPurchaseId,
                         productName = product.name,
                         supplierName = supplierName,
                         quantity = qtyIn,

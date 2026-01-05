@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import com.sysdos.kasirpintar.viewmodel.ShiftAdapter
+import com.sysdos.kasirpintar.data.model.ShiftLog
 
 class ShiftHistoryActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
