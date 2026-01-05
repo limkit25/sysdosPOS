@@ -59,9 +59,11 @@ class ProductAdapter(
             tvStock.text = "Stok: $currentStock"
 
             if (currentStock <= 0) {
-                tvStock.setBackgroundColor(android.graphics.Color.RED)
+                tvStock.setTextColor(android.graphics.Color.RED)
+                tvStock.text = "Habis!"
             } else {
-                tvStock.setBackgroundColor(0x80000000.toInt())
+                // Warna normal (misal Biru sesuai XML tadi)
+                tvStock.setTextColor(android.graphics.Color.parseColor("#1976D2"))
             }
 
             // --- LOGIKA BADGE (LINGKARAN MERAH) ---

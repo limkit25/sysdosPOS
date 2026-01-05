@@ -3,16 +3,16 @@ package com.sysdos.kasirpintar
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager // <--- IMPORT INI
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.viewmodel.ProductAdapter
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import androidx.appcompat.app.AlertDialog
 
 class ProductFragment : Fragment(R.layout.fragment_tab_product) {
     private lateinit var viewModel: ProductViewModel
@@ -20,20 +20,21 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
     private var fullList: List<Product> = listOf()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState) // Tambahkan super call biar aman
+        super.onViewCreated(view, savedInstanceState)
 
         viewModel = ViewModelProvider(requireActivity())[ProductViewModel::class.java]
 
-        val rv = view.findViewById<RecyclerView>(R.id.rvProductList) // Pastikan ID ini sama dengan di XML
+        val rv = view.findViewById<RecyclerView>(R.id.rvProductList)
         val fab = view.findViewById<FloatingActionButton>(R.id.btnAddProduct)
         val sv = view.findViewById<SearchView>(R.id.svProduct)
 
+        // Adapter simpel, hanya butuh logika klik item & long click (opsional)
         adapter = ProductAdapter(
             onItemClick = { showMenuDialog(it) },
-            onItemLongClick = {}
+            onItemLongClick = { showMenuDialog(it) }
         )
 
-        // 🔥 UBAH DARI GRID KE LINEAR (LIST) 🔥
+        // Menggunakan Linear Layout (List ke bawah)
         rv.layoutManager = LinearLayoutManager(context)
         rv.adapter = adapter
 
@@ -56,8 +57,10 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
         })
     }
 
+    // 🔥 MENU DIALOG (RESTOCK SUDAH DIHAPUS) 🔥
     private fun showMenuDialog(product: Product) {
-        val options = arrayOf("✏️ Edit Barang", "🚛 Restock (Barang Masuk)", "🗑️ Hapus Barang")
+        // Opsi tinggal 2: Edit & Hapus
+        val options = arrayOf("✏️ Edit Barang", "🗑️ Hapus Barang")
 
         AlertDialog.Builder(requireContext())
             .setTitle(product.name)
@@ -68,10 +71,7 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
                         intent.putExtra("PRODUCT_TO_EDIT", product)
                         startActivity(intent)
                     }
-                    1 -> { // RESTOCK
-                        (activity as? ProductListActivity)?.showRestockDialog(product)
-                    }
-                    2 -> { // HAPUS
+                    1 -> { // HAPUS (Index geser jadi 1)
                         confirmDeleteProduct(product)
                     }
                 }
