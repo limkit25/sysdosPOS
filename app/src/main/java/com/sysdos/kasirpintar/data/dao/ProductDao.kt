@@ -88,5 +88,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE name = :productName LIMIT 1")
     suspend fun getProductByName(productName: String): Product?
 
+    // 🔥 TAMBAHKAN INI: Fungsi untuk menghapus semua kategori 🔥
+    @Query("DELETE FROM categories")
+    suspend fun deleteAllCategories()
+
 
 }

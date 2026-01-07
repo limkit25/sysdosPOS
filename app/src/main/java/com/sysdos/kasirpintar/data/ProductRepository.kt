@@ -1,22 +1,24 @@
 package com.sysdos.kasirpintar.data
 
+import android.content.Context
 import android.util.Log
 import com.sysdos.kasirpintar.data.dao.ProductDao
 import com.sysdos.kasirpintar.data.dao.ShiftDao
 import com.sysdos.kasirpintar.data.dao.StockLogDao
 import com.sysdos.kasirpintar.data.model.*
 
-// --- PENTING: Import untuk Fitur Koneksi Server ---
-// Pastikan package ini sesuai dengan lokasi file ApiClient.kt Anda
+// --- PENTING: Import Fitur Koneksi & Session ---
 import com.sysdos.kasirpintar.api.ApiClient
 import com.sysdos.kasirpintar.api.ProductResponse
-// -------------------------------------------------
+import com.sysdos.kasirpintar.utils.SessionManager
+// -----------------------------------------------
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 class ProductRepository(
+    private val context: Context, // <--- TAMBAHAN WAJIB (Biar bisa baca IP)
     private val productDao: ProductDao,
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao
@@ -26,7 +28,6 @@ class ProductRepository(
     // 📦 1. PRODUK (LOKAL & SERVER)
     // =================================================================
 
-    // Live Data / Flow untuk ditampilkan di RecyclerView
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
 
     suspend fun insert(product: Product) = productDao.insert(product)
@@ -34,55 +35,87 @@ class ProductRepository(
     suspend fun delete(product: Product) = productDao.delete(product)
 
     /**
-     * 🔥 FUNGSI BARU: Tarik data barang dari Server Go (Laptop)
-     * Dipanggil lewat ViewModel saat tombol sync ditekan atau saat aplikasi mulai.
+     * 🔥 FUNGSI SYNC: Tarik data barang + GAMBAR + MODAL + KATEGORI dari Server
      */
-    // ... di dalam class ProductRepository ...
-
     suspend fun refreshProductsFromApi() {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosRepo", "Mulai mengambil data dari server...")
-                val response = ApiClient.instance.getProducts().execute()
+                Log.d("SysdosRepo", "🔄 Mulai Sinkronisasi...")
 
-                if (response.isSuccessful) {
-                    val serverProducts = response.body()
+                // SIAPKAN API DENGAN CONTEXT (Supaya IP Dinamis)
+                val api = ApiClient.getInstance(context)
 
+                // SIAPKAN SESSION MANAGER (Untuk URL Gambar)
+                val session = SessionManager(context)
+                val dynamicBaseUrl = session.getServerUrl() // Ambil IP dari Settingan Login
+
+                // ==========================================
+                // 1. AMBIL PRODUK (Barang)
+                // ==========================================
+                val responseProd = api.getProducts().execute() // <--- Pake variabel 'api'
+
+                if (responseProd.isSuccessful) {
+                    val serverProducts = responseProd.body()
                     if (serverProducts != null) {
                         serverProducts.forEach { apiItem ->
 
-                            // 1. CEK DULU: Apakah barang ini sudah ada di HP?
-                            val existingProduct = productDao.getProductByName(apiItem.name)
-
-                            if (existingProduct != null) {
-                                // === SKENARIO A: BARANG SUDAH ADA (UPDATE) ===
-                                // Kita update harga & stoknya mengikuti server, TAPI ID TETAP SAMA
-                                val updatedProduct = existingProduct.copy(
-                                    price = apiItem.price.toDouble(),
-                                    stock = apiItem.stock // Atau apiItem.stock + existingProduct.stock (tergantung kebijakan)
-                                )
-                                productDao.update(updatedProduct)
-                                Log.d("SysdosRepo", "Update barang: ${apiItem.name}")
-
+                            // 🔥 GUNAKAN URL DINAMIS UNTUK GAMBAR 🔥
+                            val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) {
+                                dynamicBaseUrl + apiItem.image_path
                             } else {
-                                // === SKENARIO B: BARANG BELUM ADA (INSERT BARU) ===
-                                val newProduct = Product(
+                                null
+                            }
+
+                            val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
+
+                            val existingProduct = productDao.getProductByName(apiItem.name)
+                            if (existingProduct != null) {
+                                val updated = existingProduct.copy(
+                                    price = apiItem.price.toDouble(),
+                                    costPrice = apiItem.cost_price.toDouble(),
+                                    stock = apiItem.stock,
+                                    category = serverCategory,
+                                    imagePath = fullImagePath
+                                )
+                                productDao.update(updated)
+                            } else {
+                                val newProd = Product(
                                     name = apiItem.name,
                                     price = apiItem.price.toDouble(),
+                                    costPrice = apiItem.cost_price.toDouble(),
                                     stock = apiItem.stock,
-                                    category = "Umum",
+                                    category = serverCategory,
                                     barcode = "",
-                                    imagePath = ""
+                                    imagePath = fullImagePath
                                 )
-                                productDao.insert(newProduct)
-                                Log.d("SysdosRepo", "Insert barang baru: ${apiItem.name}")
+                                productDao.insert(newProd)
                             }
                         }
-                        Log.d("SysdosRepo", "Sinkronisasi Selesai!")
                     }
-                } else {
-                    Log.e("SysdosRepo", "Gagal ambil data. Kode: ${response.code()}")
                 }
+
+                // ==========================================
+                // 2. AMBIL DAFTAR KATEGORI (HAPUS LAMA, ISI BARU)
+                // ==========================================
+                Log.d("SysdosRepo", "Mengambil daftar kategori...")
+                val responseCat = api.getCategories().execute() // <--- Pake variabel 'api'
+
+                if (responseCat.isSuccessful) {
+                    val serverCats = responseCat.body()
+
+                    if (serverCats != null) {
+                        productDao.deleteAllCategories() // Kosongkan tabel lokal
+
+                        serverCats.forEach { catRes ->
+                            val newCat = Category(id = catRes.id, name = catRes.name)
+                            productDao.insertCategory(newCat)
+                        }
+                        Log.d("SysdosRepo", "✅ Sukses refresh kategori: ${serverCats.size} item")
+                    }
+                }
+
+                Log.d("SysdosRepo", "Sinkronisasi Selesai Total!")
+
             } catch (e: Exception) {
                 Log.e("SysdosRepo", "Error Koneksi: ${e.message}")
             }
@@ -90,66 +123,34 @@ class ProductRepository(
     }
 
     // =================================================================
-    // 📂 2. KATEGORI
+    // 📂 2. KATEGORI, SUPPLIER, USER, DLL
     // =================================================================
-    // Sesuaikan tipe List<Category> atau List<String> dengan DAO Anda
     val allCategories: Flow<List<Category>> = productDao.getAllCategories()
-
     suspend fun insertCategory(category: Category) = productDao.insertCategory(category)
     suspend fun deleteCategory(category: Category) = productDao.deleteCategory(category)
 
-    // =================================================================
-    // 🚚 3. SUPPLIER
-    // =================================================================
     val allSuppliers: Flow<List<Supplier>> = productDao.getAllSuppliers()
-
     suspend fun insertSupplier(supplier: Supplier) = productDao.insertSupplier(supplier)
     suspend fun deleteSupplier(supplier: Supplier) = productDao.deleteSupplier(supplier)
     suspend fun updateSupplier(supplier: Supplier) = productDao.updateSupplier(supplier)
 
-    // =================================================================
-    // 🧾 4. TRANSAKSI
-    // =================================================================
     val allTransactions: Flow<List<Transaction>> = productDao.getAllTransactions()
-
     suspend fun insertTransaction(transaction: Transaction): Long = productDao.insertTransaction(transaction)
 
-    // =================================================================
-    // 👤 5. USER / KASIR (LOGIN)
-    // =================================================================
     val allUsers: Flow<List<User>> = productDao.getAllUsers()
-
     suspend fun insertUser(user: User) = productDao.insertUser(user)
     suspend fun updateUser(user: User) = productDao.updateUser(user)
     suspend fun deleteUser(user: User) = productDao.deleteUser(user)
-
-    // Fungsi Login Database Lokal
     suspend fun login(u: String, p: String): User? = productDao.login(u, p)
 
-    // =================================================================
-    // 📊 6. LOG STOK & PEMBELIAN
-    // =================================================================
     val allStockLogs: Flow<List<StockLog>> = productDao.getAllStockLogs()
-
-    // History pembelian (Grouping) dari DAO StockLog
     val purchaseHistory: Flow<List<StockLog>> = stockLogDao.getPurchaseHistoryGroups()
+    suspend fun recordPurchase(log: StockLog) { stockLogDao.insertLog(log) }
+    suspend fun getPurchaseDetails(pId: Long): List<StockLog> { return stockLogDao.getPurchaseDetails(pId) }
 
-    suspend fun recordPurchase(log: StockLog) {
-        stockLogDao.insertLog(log)
-    }
-
-    suspend fun getPurchaseDetails(pId: Long): List<StockLog> {
-        return stockLogDao.getPurchaseDetails(pId)
-    }
-
-    // =================================================================
-    // ⏱️ 7. SHIFT
-    // =================================================================
     val allShiftLogs: Flow<List<ShiftLog>> = shiftDao.getAllLogs()
+    suspend fun insertShiftLog(log: ShiftLog) { shiftDao.insertLog(log) }
 
-    suspend fun insertShiftLog(log: ShiftLog) {
-        shiftDao.insertLog(log)
-    }
     // =================================================================
     // 🚀 FITUR UPLOAD TRANSAKSI KE SERVER
     // =================================================================
@@ -158,23 +159,22 @@ class ProductRepository(
             try {
                 Log.d("SysdosPOS", "Mengupload transaksi lengkap...")
 
-                // 1. Ubah List Product Menjadi List Request Server
                 val itemList = cartItems.map { product ->
                     com.sysdos.kasirpintar.api.TransactionItemRequest(
-                        product_id = product.id, // ID ini akan dipakai Server untuk potong stok
-                        quantity = product.stock     // Perhatikan: di Keranjang, field 'stock' kita pakai utk simpan Qty Belanja
+                        product_id = product.id,
+                        quantity = product.stock
                     )
                 }
 
-                // 2. Siapkan Data Paket Lengkap
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
                     total_amount = trx.totalAmount,
                     items_summary = trx.itemsSummary,
-                    items = itemList // Data untuk potong stok
+                    items = itemList
                 )
 
-                // 3. Kirim!
-                val response = ApiClient.instance.uploadTransaction(requestData).execute()
+                // 🔥 PAKE INSTANCE DINAMIS
+                val api = ApiClient.getInstance(context)
+                val response = api.uploadTransaction(requestData).execute()
 
                 if (response.isSuccessful) {
                     Log.d("SysdosPOS", "✅ Laporan Terkirim & Stok Server Terpotong!")
@@ -184,6 +184,37 @@ class ProductRepository(
 
             } catch (e: Exception) {
                 Log.e("SysdosPOS", "⚠️ Gagal Upload: ${e.message}")
+            }
+        }
+    }
+
+    // =================================================================
+    // 🔄 REVERSE SYNC: UPDATE DARI HP KE SERVER
+    // =================================================================
+    suspend fun updateProductToServer(product: Product) {
+        withContext(Dispatchers.IO) {
+            try {
+                val dataKirim = ProductResponse(
+                    id = product.id,
+                    name = product.name,
+                    category = product.category,
+                    price = product.price.toInt(),
+                    cost_price = product.costPrice.toInt(),
+                    stock = product.stock,
+                    image_path = null
+                )
+
+                // 🔥 PAKE INSTANCE DINAMIS
+                val api = ApiClient.getInstance(context)
+                val response = api.updateProduct(dataKirim).execute()
+
+                if (response.isSuccessful) {
+                    Log.d("SysdosPOS", "✅ Sukses Update Data ke Server!")
+                } else {
+                    Log.e("SysdosPOS", "❌ Gagal Update: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosPOS", "Error Update: ${e.message}")
             }
         }
     }

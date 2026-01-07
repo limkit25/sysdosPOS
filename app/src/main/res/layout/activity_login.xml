@@ -1,134 +1,188 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:background="#F5F8FA"
-    android:fitsSystemWindows="true"
-    android:padding="24dp">
+    android:background="#F5F8FA">
 
-    <ImageView
-        android:layout_width="190dp"
-        android:layout_height="190dp"
-        android:src="@drawable/logo_toko"
-        android:layout_marginBottom="24dp"/>
-
-    <TextView
-        android:id="@+id/tvSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Silakan Login untuk melanjutkan"
-        android:textColor="#757575"
-        android:layout_marginBottom="32dp"/>
-
-    <androidx.cardview.widget.CardView
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="4dp"
-        app:cardBackgroundColor="#FFFFFF">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
+            android:gravity="center"
             android:padding="24dp">
 
-            <LinearLayout
-                android:id="@+id/layoutLogin"
+            <ImageView
+                android:layout_width="160dp"
+                android:layout_height="160dp"
+                android:src="@drawable/logo_toko"
+                android:layout_marginBottom="16dp"/>
+
+
+            <TextView
+                android:id="@+id/tvSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Silakan Login untuk melanjutkan"
+                android:textColor="#757575"
+                android:layout_marginBottom="32dp"/>
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="visible">
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#FFFFFF">
 
-                <EditText
-                    android:id="@+id/etUsername"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:hint="Username"
-                    android:background="@drawable/bg_rounded_white"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="12dp"
-                    android:inputType="text"  android:maxLines="1" android:imeOptions="actionNext"/>
-
-                <EditText
-                    android:id="@+id/etPassword"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:hint="Password"
-                    android:inputType="textPassword"
-                    android:background="@drawable/bg_rounded_white"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="24dp"
-                    android:imeOptions="actionDone"/>
-
-                <Button
-                    android:id="@+id/btnLogin"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:text="MASUK"
-                    android:textStyle="bold"
-                    android:backgroundTint="#1976D2"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/layoutRegister"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="👋 Selamat Datang!\nSilakan buat akun ADMIN (Pemilik) untuk memulai."
-                    android:gravity="center"
-                    android:textColor="#4CAF50"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="16dp"/>
+                    android:orientation="vertical"
+                    android:padding="24dp">
 
-                <EditText
-                    android:id="@+id/etRegUsername"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:hint="Buat Username Admin"
-                    android:background="@drawable/bg_rounded_white"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="12dp"
-                    android:inputType="text"
-                    android:maxLines="1"
-                    android:imeOptions="actionNext"/>
+                    <LinearLayout
+                        android:id="@+id/layoutLogin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="visible">
 
-                <EditText
-                    android:id="@+id/etRegPassword"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:hint="Buat Password"
-                    android:inputType="textPassword"
-                    android:background="@drawable/bg_rounded_white"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="24dp"
-                    android:imeOptions="actionDone"/>
+                        <EditText
+                            android:id="@+id/etUsername"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:hint="Username"
+                            android:background="@android:drawable/edit_text"
+                            android:paddingHorizontal="12dp"
+                            android:layout_marginBottom="12dp"
 
-                <Button
-                    android:id="@+id/btnRegister"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:text="DAFTAR &amp; SETUP TOKO"
-                    android:textStyle="bold"
-                    android:backgroundTint="#4CAF50"/>
-            </LinearLayout>
+                            android:inputType="text"
+                            android:maxLines="1"
+                            android:imeOptions="actionNext"
+                            />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="24dp"
+                            app:passwordToggleEnabled="true"
+                            app:hintEnabled="false">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etPassword"
+                                android:layout_width="match_parent"
+                                android:layout_height="50dp"
+                                android:hint="Password"
+                                android:background="@android:drawable/edit_text"
+                                android:paddingHorizontal="12dp"
+
+                                android:inputType="textPassword"
+                                android:maxLines="1"
+                                android:imeOptions="actionDone"
+                                />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <Button
+                            android:id="@+id/btnLogin"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:text="MASUK"
+                            android:textStyle="bold"
+                            android:backgroundTint="#1976D2"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutRegister"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="👋 Setup Admin Awal"
+                            android:gravity="center"
+                            android:textColor="#4CAF50"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="16dp"/>
+
+                        <EditText
+                            android:id="@+id/etRegUsername"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:hint="Username Admin Baru"
+                            android:background="@android:drawable/edit_text"
+                            android:paddingHorizontal="12dp"
+                            android:layout_marginBottom="12dp"
+
+                            android:inputType="text"
+                            android:maxLines="1"
+                            android:imeOptions="actionNext"
+                            />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="24dp"
+                            app:passwordToggleEnabled="true"
+                            app:hintEnabled="false">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etRegPassword"
+                                android:layout_width="match_parent"
+                                android:layout_height="50dp"
+                                android:hint="Password Baru"
+                                android:background="@android:drawable/edit_text"
+                                android:paddingHorizontal="12dp"
+
+                                android:inputType="textPassword"
+                                android:maxLines="1"
+                                android:imeOptions="actionDone"
+                                />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <Button
+                            android:id="@+id/btnRegister"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:text="DAFTAR ADMIN"
+                            android:textStyle="bold"
+                            android:backgroundTint="#4CAF50"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <TextView
+                android:id="@+id/tvAppVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ver 1.0"
+                android:textSize="12sp"
+                android:textColor="#BDBDBD"
+                android:layout_marginTop="24dp"/>
 
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+    </ScrollView>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <ImageButton
+        android:id="@+id/btnServerSetting"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="end|top"
+        android:layout_margin="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:elevation="10dp"
+        android:clickable="true"
+        android:focusable="true"
+        app:tint="#757575"
+        android:contentDescription="Setting Server" />
 
-        android:textColor="#BDBDBD"
-        android:layout_marginTop="32dp"/>
-
-</LinearLayout>
+</FrameLayout>

@@ -172,36 +172,26 @@ class MainActivity : AppCompatActivity() {
         // 8. CEK STATUS SHIFT SAAT PERTAMA BUKA
         checkShiftStatus()
         // ============================================================
-        // 9. TES KONEKSI SERVER (Paste Kode Ini Di Sini)
+        // 9. TES KONEKSI SERVER
         // ============================================================
         android.util.Log.d("Sysdos", "Mencoba menghubungi server...")
 
-        // Pastikan import ApiClient & ProductResponse sudah benar
-        com.sysdos.kasirpintar.api.ApiClient.instance.getProducts().enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
+        // 🔥 PERBAIKAN DI SINI: Gunakan .getInstance(this) 🔥
+        com.sysdos.kasirpintar.api.ApiClient.getInstance(this).getProducts().enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
             override fun onResponse(
                 call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>,
                 response: retrofit2.Response<List<com.sysdos.kasirpintar.api.ProductResponse>>
             ) {
                 if (response.isSuccessful) {
                     val dataBarang = response.body()
-                    android.util.Log.d("Sysdos", "Sukses! Ditemukan ${dataBarang?.size} barang dari Server Go")
-
-                    // Tampilkan pesan sukses di layar
-                    android.widget.Toast.makeText(this@MainActivity, "Koneksi Server OK! Data: ${dataBarang?.size} item", android.widget.Toast.LENGTH_LONG).show()
-
-                    // Cek isi data di Logcat
-                    dataBarang?.forEach {
-                        android.util.Log.d("Sysdos", "Barang: ${it.name} - Rp${it.price}")
-                    }
+                    android.widget.Toast.makeText(this@MainActivity, "Koneksi OK! Data: ${dataBarang?.size}", android.widget.Toast.LENGTH_LONG).show()
                 } else {
-                    android.util.Log.e("Sysdos", "Gagal: Kode ${response.code()}")
                     android.widget.Toast.makeText(this@MainActivity, "Server Error: ${response.code()}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
 
             override fun onFailure(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, t: Throwable) {
-                android.util.Log.e("Sysdos", "Error Koneksi: ${t.message}")
-                android.widget.Toast.makeText(this@MainActivity, "Gagal Konek ke Laptop. Cek IP!", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(this@MainActivity, "Gagal Konek. Cek IP di Login!", android.widget.Toast.LENGTH_LONG).show()
             }
         })
         // ============================================================

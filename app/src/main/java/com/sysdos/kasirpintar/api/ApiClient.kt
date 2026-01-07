@@ -1,21 +1,28 @@
 package com.sysdos.kasirpintar.api
 
+import android.content.Context
+import com.sysdos.kasirpintar.utils.SessionManager
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    // PENTING: IP ini adalah alamat laptop Anda.
-    // Jangan lupa tanda garis miring (slash) di belakang port!
-    private const val BASE_URL = "http://192.168.1.15:3000/"
+    // Variabel Retrofit yang bisa berubah
+    private var retrofit: Retrofit? = null
 
-    // Inisialisasi Retrofit (Singleton Pattern)
-    val instance: ApiService by lazy {
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
+    // Fungsi untuk mendapatkan Instance API
+    // Sekarang butuh Context untuk membaca SessionManager
+    fun getInstance(context: Context): ApiService {
+        val session = SessionManager(context)
+        val dynamicUrl = session.getServerUrl()
 
-        retrofit.create(ApiService::class.java)
+        // Jika retrofit belum ada atau URL berubah, bikin baru
+        if (retrofit == null || retrofit?.baseUrl().toString() != dynamicUrl) {
+            retrofit = Retrofit.Builder()
+                .baseUrl(dynamicUrl) // <--- Pake URL dari Simpanan
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+        }
+        return retrofit!!.create(ApiService::class.java)
     }
 }

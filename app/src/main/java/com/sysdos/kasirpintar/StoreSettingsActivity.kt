@@ -182,13 +182,25 @@ class StoreSettingsActivity : AppCompatActivity() {
         val isFull = prefs.getBoolean("is_full_version", false)
 
         if (isFull) {
+            // === JIKA FULL VERSION (PREMIUM) ===
             tvLicenseStatus.text = "Status: FULL VERSION (Premium) ✅"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
             btnActivate.visibility = View.GONE
+
+            // 🔥 AKTIFKAN FITUR BACKUP 🔥
+            btnBackup.isEnabled = true
+            btnBackup.alpha = 1.0f // Warna tombol normal (terang)
+            btnBackup.text = "BACKUP DATABASE" // Reset teks normal
         } else {
+            // === JIKA MASIH TRIAL ===
             tvLicenseStatus.text = "Status: TRIAL (Terbatas) ⏳"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#E65100"))
             btnActivate.visibility = View.VISIBLE
+
+            // 🔥 MATIKAN FITUR BACKUP 🔥
+            btnBackup.isEnabled = false // Tombol tidak bisa diklik
+            btnBackup.alpha = 0.5f      // Tombol jadi transparan/abu-abu
+            btnBackup.text = "BACKUP 🔒 (Premium Only)" // Info ke user
         }
     }
 

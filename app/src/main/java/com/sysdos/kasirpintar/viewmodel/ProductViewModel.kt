@@ -1,6 +1,7 @@
 package com.sysdos.kasirpintar.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.*
 import com.sysdos.kasirpintar.data.AppDatabase
 import com.sysdos.kasirpintar.data.ProductRepository
@@ -11,7 +12,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     private val repository: ProductRepository
 
-    // --- LIVE DATA ---
+    // --- LIVE DATA (Untuk UI) ---
     val allProducts: LiveData<List<Product>>
     val allCategories: LiveData<List<Category>>
     val allSuppliers: LiveData<List<Supplier>>
@@ -21,46 +22,63 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     // Log Data & Shift
     val stockLogs: LiveData<List<StockLog>>
     val allShiftLogs: LiveData<List<ShiftLog>>
-
-    // 🔥 BARU: Riwayat Pembelian (Grouped)
     val purchaseHistory: LiveData<List<StockLog>>
 
-    // Keranjang Belanja (Penjualan)
+    // Keranjang Belanja (State Sementara)
     private val _cart = MutableLiveData<List<Product>>(emptyList())
     val cart: LiveData<List<Product>> = _cart
+
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
 
+    // --- INIT (Jalan Pertama Kali Aplikasi Dibuka) ---
     init {
         val database = AppDatabase.getDatabase(application)
-        val dao = database.productDao()
+        val productDao = database.productDao()
         val shiftDao = database.shiftDao()
-        val stockDao = database.stockLogDao() // Tambahan akses DAO jika perlu
+        val stockLogDao = database.stockLogDao()
 
-        repository = ProductRepository(dao, shiftDao, stockDao) // Sesuaikan constructor Repo Anda
+        // 🔥 PERBAIKAN DI SINI: Tambahkan 'application' di depan 🔥
+        repository = ProductRepository(application, productDao, shiftDao, stockLogDao)
 
+        // Hubungkan LiveData
         allProducts = repository.allProducts.asLiveData()
         allCategories = repository.allCategories.asLiveData()
         allSuppliers = repository.allSuppliers.asLiveData()
         allTransactions = repository.allTransactions.asLiveData()
         allUsers = repository.allUsers.asLiveData()
-
         stockLogs = repository.allStockLogs.asLiveData()
         allShiftLogs = repository.allShiftLogs.asLiveData()
-
-        // 🔥 Inisialisasi Riwayat Pembelian
         purchaseHistory = repository.purchaseHistory.asLiveData()
-        // ============================================================
-        // 🔥 TAMBAHKAN DI SINI (PALING BAWAH INIT) 🔥
-        // ============================================================
+
+        // 🔥 FITUR 1: AUTO SYNC SAAT BUKA APLIKASI
         syncData()
     }
 
-    // --- FUNGSI UTAMA ---
+    // =================================================================
+    // 🛠️ CRUD DATA MASTER
+    // =================================================================
+
     fun insert(product: Product) = viewModelScope.launch { repository.insert(product) }
-    fun update(product: Product) = viewModelScope.launch { repository.update(product) }
+
+    // 🔥 FITUR 2: UPDATE BARANG (LOKAL + SERVER)
+    // Dipanggil saat Anda edit harga/nama barang di HP
+    fun update(product: Product) = viewModelScope.launch {
+        // 1. Update Database HP (Instan)
+        repository.update(product)
+
+        // 2. Coba Update ke Server (Background)
+        // Agar perubahan harga di HP juga tersimpan di Server
+        try {
+            repository.updateProductToServer(product)
+        } catch (e: Exception) {
+            Log.e("SysdosVM", "Gagal update ke server (Mungkin Offline): ${e.message}")
+        }
+    }
+
     fun delete(product: Product) = viewModelScope.launch { repository.delete(product) }
 
+    // --- Kategori, Supplier, User ---
     fun insertCategory(category: Category) = viewModelScope.launch { repository.insertCategory(category) }
     fun deleteCategory(category: Category) = viewModelScope.launch { repository.deleteCategory(category) }
 
@@ -77,24 +95,17 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         onResult(user)
     }
 
-    // --- FUNGSI PEMBELIAN / STOK ---
-    fun recordPurchase(log: StockLog) = viewModelScope.launch {
-        repository.recordPurchase(log)
-    }
+    // =================================================================
+    // 🛒 LOGIKA KERANJANG (CART)
+    // =================================================================
 
-    // 🔥 BARU: Ambil Detail Pembelian
-    fun getPurchaseDetails(purchaseId: Long, onResult: (List<StockLog>) -> Unit) = viewModelScope.launch {
-        val details = repository.getPurchaseDetails(purchaseId)
-        onResult(details)
-    }
-
-    // --- KERANJANG PENJUALAN (POS) ---
     fun addToCart(product: Product, onResult: (String) -> Unit) {
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
         val index = currentList.indexOfFirst { it.id == product.id }
 
         if (index != -1) {
             val existingItem = currentList[index]
+            // Cek stok (gunakan stok asli produk, bukan stok di item keranjang)
             if (existingItem.stock + 1 <= product.stock) {
                 currentList[index] = existingItem.copy(stock = existingItem.stock + 1)
                 onResult("Qty ditambah")
@@ -104,6 +115,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             }
         } else {
             if (product.stock > 0) {
+                // Saat masuk keranjang, field 'stock' kita bajak jadi 'qty beli'
                 currentList.add(product.copy(stock = 1))
                 onResult("Masuk keranjang")
             } else {
@@ -156,25 +168,31 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         _totalPrice.value = total
     }
 
+    // =================================================================
+    // 💰 FITUR 3: CHECKOUT (BAYAR) + UPLOAD SERVER
+    // =================================================================
     fun checkout(
         subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
         cashReceived: Double, changeAmount: Double, onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
 
-        val cartItems = _cart.value ?: emptyList() // 1. Ambil keranjang
+        val cartItems = _cart.value ?: emptyList()
         if (cartItems.isEmpty()) { onResult(null); return@launch }
 
-        // Simpan salinan item untuk dikirim ke server nanti (karena _cart akan dihapus)
+        // PENTING: Simpan salinan barang belanjaan untuk dikirim ke server nanti
+        // (karena variabel _cart akan kita kosongkan sebentar lagi)
         val itemsForUpload = ArrayList(cartItems)
 
         val itemsSummary = cartItems.joinToString(", ") { "${it.name} (${it.stock})" }
 
+        // Hitung Profit (Opsional)
         var totalProfit = 0.0
         cartItems.forEach { item ->
             val profitPerItem = item.price - item.costPrice
             totalProfit += (profitPerItem * item.stock)
         }
 
+        // 1. Buat Objek Transaksi
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
             itemsSummary = itemsSummary,
@@ -188,8 +206,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             changeAmount = changeAmount
         )
 
+        // 2. Simpan Transaksi ke Database HP
         val trxId = repository.insertTransaction(trx)
 
+        // 3. Kurangi Stok di Database HP
         cartItems.forEach { cartItem ->
             val masterItem = allProducts.value?.find { it.id == cartItem.id }
             if (masterItem != null) {
@@ -198,19 +218,28 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-        // Bersihkan UI
+        // 4. Bersihkan UI (Reset Keranjang)
         _cart.value = emptyList()
         _totalPrice.value = 0.0
+
+        // Kembalikan hasil (struk) ke Activity
         val finalTrx = trx.copy(id = trxId.toInt())
         onResult(finalTrx)
 
-        // 🔥 UPLOAD KE SERVER (BESERTA DETAIL ITEM) 🔥
+        // 5. 🔥 UPLOAD KE SERVER BOSS (BACKGROUND PROCESS) 🔥
+        // Kirim data transaksi + Detail Barang agar Stok Server terpotong
         viewModelScope.launch {
-            repository.uploadTransactionToServer(finalTrx, itemsForUpload)
+            try {
+                repository.uploadTransactionToServer(finalTrx, itemsForUpload)
+            } catch (e: Exception) {
+                Log.e("SysdosVM", "Checkout Offline? Gagal lapor server: ${e.message}")
+            }
         }
     }
 
-    // --- SHIFT ---
+    // =================================================================
+    // ⏱️ SHIFT & LOGS
+    // =================================================================
     fun openShift(user: String, modal: Double) = viewModelScope.launch {
         val log = ShiftLog(
             timestamp = System.currentTimeMillis(), type = "OPEN", kasirName = user,
@@ -227,8 +256,22 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         )
         repository.insertShiftLog(log)
     }
+
+    fun recordPurchase(log: StockLog) = viewModelScope.launch {
+        repository.recordPurchase(log)
+    }
+
+    fun getPurchaseDetails(purchaseId: Long, onResult: (List<StockLog>) -> Unit) = viewModelScope.launch {
+        val details = repository.getPurchaseDetails(purchaseId)
+        onResult(details)
+    }
+
+    // =================================================================
+    // 🔄 FUNGSI SYNC MANUAL
+    // =================================================================
     fun syncData() {
         viewModelScope.launch {
+            // Memanggil Repository untuk tarik data terbaru (termasuk Gambar)
             repository.refreshProductsFromApi()
         }
     }

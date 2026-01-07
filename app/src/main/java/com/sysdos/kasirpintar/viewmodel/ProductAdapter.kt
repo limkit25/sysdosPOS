@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide // <--- PENTING: Jangan lupa Import Glide
 import com.sysdos.kasirpintar.R
 import com.sysdos.kasirpintar.data.model.Product
 import java.util.Locale
@@ -25,9 +26,7 @@ class ProductAdapter(
         notifyDataSetChanged()
     }
 
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProductViewHolder {
-        // Pastikan layout yang dipanggil benar: item_product
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_product, parent, false)
         return ProductViewHolder(view)
     }
@@ -41,9 +40,10 @@ class ProductAdapter(
         private val tvName: TextView = itemView.findViewById(R.id.tvProductName)
         private val tvPrice: TextView = itemView.findViewById(R.id.tvProductPrice)
         private val tvStock: TextView = itemView.findViewById(R.id.tvStock)
+
+        // Pastikan di item_product.xml ID-nya benar: imgProduct
         private val imgProduct: ImageView = itemView.findViewById(R.id.imgProduct)
 
-        // Tambahkan ini (Badge)
         private val tvBadge: TextView = itemView.findViewById(R.id.tvCartBadge)
 
         fun bind(product: Product) {
@@ -51,10 +51,7 @@ class ProductAdapter(
             tvPrice.text = String.format(Locale("id", "ID"), "Rp %,d", product.price.toLong())
 
             // --- LOGIKA STOK SISA ---
-            // Ambil jumlah yg sudah ada di keranjang
             val qtyInCart = cartCounts[product.id] ?: 0
-
-            // Stok Tampil = Stok Asli - Yang ada di keranjang
             val currentStock = product.stock - qtyInCart
             tvStock.text = "Stok: $currentStock"
 
@@ -62,29 +59,32 @@ class ProductAdapter(
                 tvStock.setTextColor(android.graphics.Color.RED)
                 tvStock.text = "Habis!"
             } else {
-                // Warna normal (misal Biru sesuai XML tadi)
                 tvStock.setTextColor(android.graphics.Color.parseColor("#1976D2"))
             }
 
-            // --- LOGIKA BADGE (LINGKARAN MERAH) ---
+            // --- LOGIKA BADGE ---
             if (qtyInCart > 0) {
-                tvBadge.visibility = View.VISIBLE // Munculkan
-                tvBadge.text = qtyInCart.toString() // Isi angkanya (misal: 2)
+                tvBadge.visibility = View.VISIBLE
+                tvBadge.text = qtyInCart.toString()
             } else {
-                tvBadge.visibility = View.GONE // Sembunyikan kalau 0
+                tvBadge.visibility = View.GONE
             }
 
-            // --- LOAD GAMBAR ---
-            try {
-                if (product.imagePath != null && product.imagePath.isNotEmpty()) {
-                    val uri = android.net.Uri.parse(product.imagePath)
-                    imgProduct.setImageURI(uri)
-                } else {
-                    imgProduct.setImageResource(R.mipmap.ic_launcher)
-                }
-            } catch (e: Exception) {
+            // ============================================================
+            // 🔥 PERBAIKAN: GUNAKAN GLIDE UNTUK MUAT GAMBAR 🔥
+            // ============================================================
+            if (!product.imagePath.isNullOrEmpty()) {
+                Glide.with(itemView.context)
+                    .load(product.imagePath) // URL HTTP dari database
+                    .placeholder(R.mipmap.ic_launcher) // Gambar loading
+                    .error(R.mipmap.ic_launcher) // Gambar kalau error/gagal
+                    .centerCrop() // Agar gambar pas di kotak
+                    .into(imgProduct)
+            } else {
+                // Kalau tidak ada gambar, pakai icon default
                 imgProduct.setImageResource(R.mipmap.ic_launcher)
             }
+            // ============================================================
 
             // KLIK ITEM
             itemView.setOnClickListener { onItemClick(product) }
