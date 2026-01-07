@@ -24,7 +24,8 @@
         android:roundIcon="@mipmap/sysdos_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.KasirPintar"
-        tools:targetApi="31">
+        tools:targetApi="31"
+        android:usesCleartextTraffic="true">
 
         <provider
             android:name="androidx.core.content.FileProvider"

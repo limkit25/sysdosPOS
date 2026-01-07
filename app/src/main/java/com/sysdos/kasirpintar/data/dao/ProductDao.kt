@@ -83,5 +83,10 @@ interface ProductDao {
     @Query("SELECT * FROM stock_logs ORDER BY timestamp DESC")
     fun getAllStockLogs(): Flow<List<StockLog>>
 
+    // 🔥 TAMBAHKAN INI 🔥
+    // Cari barang berdasarkan nama (limit 1 saja biar cepat)
+    @Query("SELECT * FROM products WHERE name = :productName LIMIT 1")
+    suspend fun getProductByName(productName: String): Product?
+
 
 }

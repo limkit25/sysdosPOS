@@ -50,6 +50,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
         // 🔥 Inisialisasi Riwayat Pembelian
         purchaseHistory = repository.purchaseHistory.asLiveData()
+        // ============================================================
+        // 🔥 TAMBAHKAN DI SINI (PALING BAWAH INIT) 🔥
+        // ============================================================
+        syncData()
     }
 
     // --- FUNGSI UTAMA ---
@@ -156,12 +160,14 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
         cashReceived: Double, changeAmount: Double, onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
-        val cartItems = _cart.value ?: emptyList()
+
+        val cartItems = _cart.value ?: emptyList() // 1. Ambil keranjang
         if (cartItems.isEmpty()) { onResult(null); return@launch }
 
-        val itemsSummary = cartItems.joinToString(";") {
-            "${it.name}|${it.stock}|${it.price}|${it.price * it.stock}"
-        }
+        // Simpan salinan item untuk dikirim ke server nanti (karena _cart akan dihapus)
+        val itemsForUpload = ArrayList(cartItems)
+
+        val itemsSummary = cartItems.joinToString(", ") { "${it.name} (${it.stock})" }
 
         var totalProfit = 0.0
         cartItems.forEach { item ->
@@ -192,9 +198,16 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+        // Bersihkan UI
         _cart.value = emptyList()
         _totalPrice.value = 0.0
-        onResult(trx.copy(id = trxId.toInt()))
+        val finalTrx = trx.copy(id = trxId.toInt())
+        onResult(finalTrx)
+
+        // 🔥 UPLOAD KE SERVER (BESERTA DETAIL ITEM) 🔥
+        viewModelScope.launch {
+            repository.uploadTransactionToServer(finalTrx, itemsForUpload)
+        }
     }
 
     // --- SHIFT ---
@@ -213,5 +226,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             expectedAmount = expected, actualAmount = actual, difference = diff
         )
         repository.insertShiftLog(log)
+    }
+    fun syncData() {
+        viewModelScope.launch {
+            repository.refreshProductsFromApi()
+        }
     }
 }
