@@ -130,6 +130,24 @@ class MainActivity : AppCompatActivity() {
         viewModel.totalPrice.observe(this) {
             tvCartTotal.text = formatRupiah(it)
         }
+        // BIND VIEW BARU
+        val cardStatus = findViewById<androidx.cardview.widget.CardView>(R.id.cardStatusServer)
+        val tvStatus = findViewById<TextView>(R.id.tvStatusServer)
+        val dotStatus = findViewById<View>(R.id.viewStatusDot)
+
+        // 🔥 OBSERVE STATUS KONEKSI 🔥
+        viewModel.isOnline.observe(this) { connected ->
+            if (connected) {
+                // TAMPILAN ONLINE (HIJAU)
+                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#4CAF50")) // Hijau
+                tvStatus.text = "ONLINE"
+                // dotStatus.setBackgroundResource(R.drawable.bg_circle_white) // Jika mau ganti warna titik
+            } else {
+                // TAMPILAN OFFLINE (MERAH)
+                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#FF5252")) // Merah
+                tvStatus.text = "OFFLINE"
+            }
+        }
 
         // 5. SEARCH LISTENER
         svSearch.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {

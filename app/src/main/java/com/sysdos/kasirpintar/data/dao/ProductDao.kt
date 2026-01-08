@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.Flow
 interface ProductDao {
 
     // --- PRODUK (Tabel: products) ---
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insert(product: Product)
+    // Pastikan insert pakai strategy REPLACE agar ID bisa ditimpa
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(product: Product): Long
 
     @Update
     suspend fun update(product: Product)
@@ -91,6 +92,19 @@ interface ProductDao {
     // 🔥 TAMBAHKAN INI: Fungsi untuk menghapus semua kategori 🔥
     @Query("DELETE FROM categories")
     suspend fun deleteAllCategories()
+
+    // 🔥 TAMBAHKAN INI 🔥
+    @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
+    suspend fun getProductById(id: Int): Product?
+    // 🔥 TAMBAHKAN INI UNTUK SCANNER 🔥
+    @Query("SELECT * FROM products WHERE barcode = :barcode LIMIT 1")
+    suspend fun getProductByBarcode(barcode: String): Product?
+
+    // 🔥 TAMBAHAN BARU: HAPUS SEMUA BARANG
+    @Query("DELETE FROM products")
+    suspend fun deleteAllProducts()
+
+
 
 
 }

@@ -43,6 +43,7 @@ class TopProductsActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
         // Observe Data
+
         viewModel.allTransactions.observe(this) { transactions ->
             fullTransactionList = transactions
             // Default: Tampilkan Hari Ini

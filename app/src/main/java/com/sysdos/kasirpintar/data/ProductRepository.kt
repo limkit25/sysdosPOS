@@ -35,31 +35,30 @@ class ProductRepository(
     suspend fun delete(product: Product) = productDao.delete(product)
 
     /**
-     * 🔥 FUNGSI SYNC: Tarik data barang + GAMBAR + MODAL + KATEGORI dari Server
+     * 🔥 FUNGSI SYNC BARU: RESET TOTAL & PAKSA ID SAMA DENGAN SERVER
      */
     suspend fun refreshProductsFromApi() {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosRepo", "🔄 Mulai Sinkronisasi...")
+                Log.d("SysdosRepo", "🔄 Mulai Sinkronisasi Total...")
 
-                // SIAPKAN API DENGAN CONTEXT (Supaya IP Dinamis)
                 val api = ApiClient.getInstance(context)
-
-                // SIAPKAN SESSION MANAGER (Untuk URL Gambar)
                 val session = SessionManager(context)
-                val dynamicBaseUrl = session.getServerUrl() // Ambil IP dari Settingan Login
+                val dynamicBaseUrl = session.getServerUrl()
 
-                // ==========================================
-                // 1. AMBIL PRODUK (Barang)
-                // ==========================================
-                val responseProd = api.getProducts().execute() // <--- Pake variabel 'api'
+                // 1. AMBIL PRODUK DARI SERVER
+                val responseProd = api.getProducts().execute()
 
                 if (responseProd.isSuccessful) {
                     val serverProducts = responseProd.body()
                     if (serverProducts != null) {
+
+                        // 🔥 LANGKAH KRUSIAL: HAPUS DATA LAMA BIAR BERSIH
+                        // Ini mencegah duplikat barang (ID 1 vs ID 5)
+                        productDao.deleteAllProducts()
+
                         serverProducts.forEach { apiItem ->
 
-                            // 🔥 GUNAKAN URL DINAMIS UNTUK GAMBAR 🔥
                             val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) {
                                 dynamicBaseUrl + apiItem.image_path
                             } else {
@@ -68,53 +67,35 @@ class ProductRepository(
 
                             val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
 
-                            val existingProduct = productDao.getProductByName(apiItem.name)
-                            if (existingProduct != null) {
-                                val updated = existingProduct.copy(
-                                    price = apiItem.price.toDouble(),
-                                    costPrice = apiItem.cost_price.toDouble(),
-                                    stock = apiItem.stock,
-                                    category = serverCategory,
-                                    imagePath = fullImagePath
-                                )
-                                productDao.update(updated)
-                            } else {
-                                val newProd = Product(
-                                    name = apiItem.name,
-                                    price = apiItem.price.toDouble(),
-                                    costPrice = apiItem.cost_price.toDouble(),
-                                    stock = apiItem.stock,
-                                    category = serverCategory,
-                                    barcode = "",
-                                    imagePath = fullImagePath
-                                )
-                                productDao.insert(newProd)
-                            }
+                            // 🔥 INSERT DENGAN MEMAKSA ID DARI SERVER (apiItem.id)
+                            val newProd = Product(
+                                id = apiItem.id, // <--- KUNCINYA DISINI! JANGAN BIARKAN AUTO-GENERATE
+                                name = apiItem.name,
+                                price = apiItem.price.toDouble(),
+                                costPrice = apiItem.cost_price.toDouble(),
+                                stock = apiItem.stock,
+                                category = serverCategory,
+                                barcode = "", // Atau apiItem.barcode jika ada
+                                imagePath = fullImagePath
+                            )
+                            productDao.insert(newProd)
                         }
+                        Log.d("SysdosRepo", "✅ Sukses Refresh: ID HP sekarang sama dengan Server!")
                     }
                 }
 
-                // ==========================================
-                // 2. AMBIL DAFTAR KATEGORI (HAPUS LAMA, ISI BARU)
-                // ==========================================
-                Log.d("SysdosRepo", "Mengambil daftar kategori...")
-                val responseCat = api.getCategories().execute() // <--- Pake variabel 'api'
-
+                // 2. AMBIL KATEGORI (SAMA SEPERTI SEBELUMNYA)
+                val responseCat = api.getCategories().execute()
                 if (responseCat.isSuccessful) {
                     val serverCats = responseCat.body()
-
                     if (serverCats != null) {
-                        productDao.deleteAllCategories() // Kosongkan tabel lokal
-
+                        productDao.deleteAllCategories()
                         serverCats.forEach { catRes ->
                             val newCat = Category(id = catRes.id, name = catRes.name)
                             productDao.insertCategory(newCat)
                         }
-                        Log.d("SysdosRepo", "✅ Sukses refresh kategori: ${serverCats.size} item")
                     }
                 }
-
-                Log.d("SysdosRepo", "Sinkronisasi Selesai Total!")
 
             } catch (e: Exception) {
                 Log.e("SysdosRepo", "Error Koneksi: ${e.message}")
@@ -150,6 +131,15 @@ class ProductRepository(
 
     val allShiftLogs: Flow<List<ShiftLog>> = shiftDao.getAllLogs()
     suspend fun insertShiftLog(log: ShiftLog) { shiftDao.insertLog(log) }
+
+    // 🔥 TAMBAHKAN FUNGSI INI 🔥
+    suspend fun getProductById(id: Int): Product? {
+        return productDao.getProductById(id)
+    }
+    // 🔥 TAMBAHKAN INI 🔥
+    suspend fun getProductByBarcode(barcode: String): Product? {
+        return productDao.getProductByBarcode(barcode)
+    }
 
     // =================================================================
     // 🚀 FITUR UPLOAD TRANSAKSI KE SERVER

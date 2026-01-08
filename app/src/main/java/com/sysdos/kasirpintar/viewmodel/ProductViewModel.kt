@@ -2,6 +2,7 @@ package com.sysdos.kasirpintar.viewmodel
 
 import android.app.Application
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.*
 import com.sysdos.kasirpintar.data.AppDatabase
 import com.sysdos.kasirpintar.data.ProductRepository
@@ -24,21 +25,21 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     val allShiftLogs: LiveData<List<ShiftLog>>
     val purchaseHistory: LiveData<List<StockLog>>
 
-    // Keranjang Belanja (State Sementara)
+    // Keranjang Belanja
     private val _cart = MutableLiveData<List<Product>>(emptyList())
     val cart: LiveData<List<Product>> = _cart
 
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
-
-    // --- INIT (Jalan Pertama Kali Aplikasi Dibuka) ---
+    private val _isOnline = MutableLiveData<Boolean>(false)
+    val isOnline: LiveData<Boolean> = _isOnline
+    // --- INIT ---
     init {
         val database = AppDatabase.getDatabase(application)
         val productDao = database.productDao()
         val shiftDao = database.shiftDao()
         val stockLogDao = database.stockLogDao()
 
-        // 🔥 PERBAIKAN DI SINI: Tambahkan 'application' di depan 🔥
         repository = ProductRepository(application, productDao, shiftDao, stockLogDao)
 
         // Hubungkan LiveData
@@ -51,8 +52,32 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         allShiftLogs = repository.allShiftLogs.asLiveData()
         purchaseHistory = repository.purchaseHistory.asLiveData()
 
-        // 🔥 FITUR 1: AUTO SYNC SAAT BUKA APLIKASI
-        syncData()
+        // ⚠️ PENTING: Sync Otomatis bisa menimpa data lokal jika internet lambat.
+        // Jika stok sering "muncul lagi", matikan baris ini dan gunakan tombol refresh manual.
+//        syncData()
+        startServerHealthCheck()
+    }
+    // 🔥 PERBAIKAN: Tambahkan (Dispatchers.IO) agar jalan di background
+    private fun startServerHealthCheck() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            while (true) {
+                try {
+                    val api = com.sysdos.kasirpintar.api.ApiClient.getInstance(getApplication())
+                    val response = api.getCategories().execute()
+
+                    if (response.isSuccessful) {
+                        _isOnline.postValue(true) // KONEK (Hijau)
+                    } else {
+                        _isOnline.postValue(false) // GAGAL (Merah)
+                    }
+                } catch (e: Exception) {
+                    _isOnline.postValue(false) // ERROR (Merah)
+                    // Log.e("Ping", "Server putus: ${e.message}")
+                }
+
+                kotlinx.coroutines.delay(5000) // Cek lagi setiap 5 detik
+            }
+        }
     }
 
     // =================================================================
@@ -61,18 +86,12 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     fun insert(product: Product) = viewModelScope.launch { repository.insert(product) }
 
-    // 🔥 FITUR 2: UPDATE BARANG (LOKAL + SERVER)
-    // Dipanggil saat Anda edit harga/nama barang di HP
     fun update(product: Product) = viewModelScope.launch {
-        // 1. Update Database HP (Instan)
         repository.update(product)
-
-        // 2. Coba Update ke Server (Background)
-        // Agar perubahan harga di HP juga tersimpan di Server
         try {
             repository.updateProductToServer(product)
         } catch (e: Exception) {
-            Log.e("SysdosVM", "Gagal update ke server (Mungkin Offline): ${e.message}")
+            Log.e("SysdosVM", "Gagal update ke server: ${e.message}")
         }
     }
 
@@ -96,30 +115,35 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // =================================================================
-    // 🛒 LOGIKA KERANJANG (CART)
+    // 🛡️ SATPAM KERANJANG (ANTI STOK MINUS)
     // =================================================================
 
     fun addToCart(product: Product, onResult: (String) -> Unit) {
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
         val index = currentList.indexOfFirst { it.id == product.id }
 
+        // Cek Stok Asli (Dari Database Master)
+        val stokGudang = product.stock
+
         if (index != -1) {
             val existingItem = currentList[index]
-            // Cek stok (gunakan stok asli produk, bukan stok di item keranjang)
-            if (existingItem.stock + 1 <= product.stock) {
-                currentList[index] = existingItem.copy(stock = existingItem.stock + 1)
-                onResult("Qty ditambah")
-            } else {
-                onResult("Stok habis!")
+            val qtyBaru = existingItem.stock + 1
+
+            // 🔥 PENJAGA: Cek apakah melebihi stok?
+            if (qtyBaru > stokGudang) {
+                onResult("❌ Stok Habis! Sisa: $stokGudang") // Tolak
                 return
             }
+
+            currentList[index] = existingItem.copy(stock = qtyBaru)
+            onResult("Qty ditambah")
         } else {
-            if (product.stock > 0) {
-                // Saat masuk keranjang, field 'stock' kita bajak jadi 'qty beli'
+            // 🔥 PENJAGA: Cek apakah stok kosong?
+            if (stokGudang > 0) {
                 currentList.add(product.copy(stock = 1))
                 onResult("Masuk keranjang")
             } else {
-                onResult("Stok habis!")
+                onResult("❌ Stok Kosong!") // Tolak
                 return
             }
         }
@@ -155,7 +179,12 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val product = list.find { it.barcode == barcode }
 
         if (product != null) {
-            addToCart(product) { msg -> onError(msg) }
+            // Panggil fungsi addToCart yg sudah ada SATPAM-nya
+            addToCart(product) { msg ->
+                if (msg.contains("Habis") || msg.contains("Kosong")) {
+                    onError(msg)
+                }
+            }
             onResult(product)
         } else {
             onResult(null)
@@ -169,7 +198,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // =================================================================
-    // 💰 FITUR 3: CHECKOUT (BAYAR) + UPLOAD SERVER
+    // 💰 CHECKOUT (BAYAR) + LAPOR SERVER
     // =================================================================
     fun checkout(
         subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
@@ -179,23 +208,27 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val cartItems = _cart.value ?: emptyList()
         if (cartItems.isEmpty()) { onResult(null); return@launch }
 
-        // PENTING: Simpan salinan barang belanjaan untuk dikirim ke server nanti
-        // (karena variabel _cart akan kita kosongkan sebentar lagi)
+        // Simpan data untuk upload
         val itemsForUpload = ArrayList(cartItems)
 
-        val itemsSummary = cartItems.joinToString(", ") { "${it.name} (${it.stock})" }
-
-        // Hitung Profit (Opsional)
+        // Generate Rincian (Format: Nama|Qty|Harga|Total;)
+        val summaryBuilder = StringBuilder()
         var totalProfit = 0.0
-        cartItems.forEach { item ->
+
+        for (item in cartItems) {
+            val totalItemPrice = item.price * item.stock
+            summaryBuilder.append("${item.name}|${item.stock}|${item.price.toLong()}|${totalItemPrice.toLong()};")
+
+            // Hitung Profit
             val profitPerItem = item.price - item.costPrice
             totalProfit += (profitPerItem * item.stock)
         }
+        val itemsSummary = summaryBuilder.toString().removeSuffix(";")
 
         // 1. Buat Objek Transaksi
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
-            itemsSummary = itemsSummary,
+            itemsSummary = itemsSummary, // Format String yg benar
             totalAmount = subtotal + tax - discount,
             subtotal = subtotal,
             discount = discount,
@@ -209,30 +242,37 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         // 2. Simpan Transaksi ke Database HP
         val trxId = repository.insertTransaction(trx)
 
-        // 3. Kurangi Stok di Database HP
+        // 3. Kurangi Stok di Database HP (Lokal)
         cartItems.forEach { cartItem ->
-            val masterItem = allProducts.value?.find { it.id == cartItem.id }
-            if (masterItem != null) {
-                val newStock = masterItem.stock - cartItem.stock
-                repository.update(masterItem.copy(stock = newStock))
-            }
+            // Gunakan getProductById agar aman (pastikan repo punya fungsi ini)
+            // Jika error merah disini, tambahkan fungsi getProductById di Repo seperti panduan sebelumnya
+            try {
+                val masterItem = allProducts.value?.find { it.id == cartItem.id }
+                if (masterItem != null) {
+                    val newStock = masterItem.stock - cartItem.stock
+                    repository.update(masterItem.copy(stock = newStock))
+                }
+            } catch (e: Exception) { Log.e("CheckOut", "Error potong stok lokal: ${e.message}") }
         }
 
-        // 4. Bersihkan UI (Reset Keranjang)
+        // 4. Bersihkan UI
         _cart.value = emptyList()
         _totalPrice.value = 0.0
 
-        // Kembalikan hasil (struk) ke Activity
         val finalTrx = trx.copy(id = trxId.toInt())
         onResult(finalTrx)
 
-        // 5. 🔥 UPLOAD KE SERVER BOSS (BACKGROUND PROCESS) 🔥
-        // Kirim data transaksi + Detail Barang agar Stok Server terpotong
+        // 5. 🔥 UPLOAD KE SERVER (DENGAN PENANGANAN ERROR) 🔥
         viewModelScope.launch {
             try {
                 repository.uploadTransactionToServer(finalTrx, itemsForUpload)
+                // Jika sukses, biarkan data server update sendiri.
+                // JANGAN langsung syncData() disini karena bisa jadi server butuh waktu.
+                Log.d("SysdosVM", "✅ Upload Sukses. Stok Server aman.")
             } catch (e: Exception) {
-                Log.e("SysdosVM", "Checkout Offline? Gagal lapor server: ${e.message}")
+                // Beritahu user jika internet mati
+                Log.e("SysdosVM", "⚠️ Gagal Upload: ${e.message}")
+                Toast.makeText(getApplication(), "⚠️ Offline: Transaksi tersimpan di HP, tapi stok Web belum berkurang.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -267,12 +307,15 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // =================================================================
-    // 🔄 FUNGSI SYNC MANUAL
+    // 🔄 SYNC DATA
     // =================================================================
     fun syncData() {
         viewModelScope.launch {
-            // Memanggil Repository untuk tarik data terbaru (termasuk Gambar)
-            repository.refreshProductsFromApi()
+            try {
+                repository.refreshProductsFromApi()
+            } catch (e: Exception) {
+                Log.e("Sync", "Gagal Sync: ${e.message}")
+            }
         }
     }
 }
