@@ -158,6 +158,7 @@ class ProductRepository(
 
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
                     total_amount = trx.totalAmount,
+                    profit = trx.profit, // <--- KIRIM PROFIT DISINI
                     items_summary = trx.itemsSummary,
                     items = itemList
                 )

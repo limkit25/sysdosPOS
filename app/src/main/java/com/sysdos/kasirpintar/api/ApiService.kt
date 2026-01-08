@@ -40,6 +40,7 @@ data class ProductResponse(
 
 data class TransactionUploadRequest(
     val total_amount: Double,
+    val profit: Double,
     val items_summary: String,
     val items: List<TransactionItemRequest>
 )
