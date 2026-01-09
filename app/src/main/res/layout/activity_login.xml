@@ -1,188 +1,189 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F8FA">
+    android:background="@color/white"
+    android:fillViewport="true">
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:layout_marginTop="40dp"
+            android:src="@drawable/logo_toko" />
+
+
+
+        <TextView
+            android:id="@+id/tvSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Masuk untuk mengelola tokomu"
+            android:textColor="@color/gray_600"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/layoutLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:orientation="vertical">
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Username / Email">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etUsername"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Password"
+                app:endIconMode="password_toggle">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="@color/purple_700"
+                android:text="MASUK SEKARANG"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="24dp">
+            android:layout_marginTop="24dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <ImageView
-                android:layout_width="160dp"
-                android:layout_height="160dp"
-                android:src="@drawable/logo_toko"
-                android:layout_marginBottom="16dp"/>
-
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0" />
 
             <TextView
-                android:id="@+id/tvSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Silakan Login untuk melanjutkan"
-                android:textColor="#757575"
-                android:layout_marginBottom="32dp"/>
+                android:layout_marginHorizontal="12dp"
+                android:text="ATAU"
+                android:textColor="#9E9E9E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0" />
+        </LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnGoogleLogin"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="24dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardCornerRadius="4dp"
+            app:cardElevation="2dp"
+            app:strokeColor="#E0E0E0"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="#FFFFFF">
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="horizontal">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_google"
+                    app:tint="@null" />
+
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="24dp">
+                    android:layout_marginStart="12dp"
+                    android:text="Masuk dengan Google"
+                    android:textColor="#424242"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-                    <LinearLayout
-                        android:id="@+id/layoutLogin"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:visibility="visible">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:orientation="horizontal">
 
-                        <EditText
-                            android:id="@+id/etUsername"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:hint="Username"
-                            android:background="@android:drawable/edit_text"
-                            android:paddingHorizontal="12dp"
-                            android:layout_marginBottom="12dp"
+<!--            <TextView-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="Belum punya akun? "-->
+<!--                android:textColor="@color/gray_600" />-->
 
-                            android:inputType="text"
-                            android:maxLines="1"
-                            android:imeOptions="actionNext"
-                            />
+<!--            <TextView-->
+<!--                android:id="@+id/btnRegisterLink"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="Daftar Disini"-->
+<!--                android:textColor="@color/primary"-->
+<!--                android:textStyle="bold" />-->
+        </LinearLayout>
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="24dp"
-                            app:passwordToggleEnabled="true"
-                            app:hintEnabled="false">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etPassword"
-                                android:layout_width="match_parent"
-                                android:layout_height="50dp"
-                                android:hint="Password"
-                                android:background="@android:drawable/edit_text"
-                                android:paddingHorizontal="12dp"
-
-                                android:inputType="textPassword"
-                                android:maxLines="1"
-                                android:imeOptions="actionDone"
-                                />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <Button
-                            android:id="@+id/btnLogin"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:text="MASUK"
-                            android:textStyle="bold"
-                            android:backgroundTint="#1976D2"/>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/layoutRegister"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="👋 Setup Admin Awal"
-                            android:gravity="center"
-                            android:textColor="#4CAF50"
-                            android:textStyle="bold"
-                            android:layout_marginBottom="16dp"/>
-
-                        <EditText
-                            android:id="@+id/etRegUsername"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:hint="Username Admin Baru"
-                            android:background="@android:drawable/edit_text"
-                            android:paddingHorizontal="12dp"
-                            android:layout_marginBottom="12dp"
-
-                            android:inputType="text"
-                            android:maxLines="1"
-                            android:imeOptions="actionNext"
-                            />
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="24dp"
-                            app:passwordToggleEnabled="true"
-                            app:hintEnabled="false">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etRegPassword"
-                                android:layout_width="match_parent"
-                                android:layout_height="50dp"
-                                android:hint="Password Baru"
-                                android:background="@android:drawable/edit_text"
-                                android:paddingHorizontal="12dp"
-
-                                android:inputType="textPassword"
-                                android:maxLines="1"
-                                android:imeOptions="actionDone"
-                                />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <Button
-                            android:id="@+id/btnRegister"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:text="DAFTAR ADMIN"
-                            android:textStyle="bold"
-                            android:backgroundTint="#4CAF50"/>
-                    </LinearLayout>
-
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp">
 
             <TextView
                 android:id="@+id/tvAppVersion"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_centerHorizontal="true"
                 android:text="Ver 1.0"
-                android:textSize="12sp"
                 android:textColor="#BDBDBD"
-                android:layout_marginTop="24dp"/>
+                android:textSize="12sp" />
 
-        </LinearLayout>
-    </ScrollView>
+            <ImageButton
+                android:id="@+id/btnServerSetting"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_alignParentEnd="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_preferences"
+                app:tint="#BDBDBD"/>
+        </RelativeLayout>
 
-    <ImageButton
-        android:id="@+id/btnServerSetting"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="end|top"
-        android:layout_margin="16dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@android:drawable/ic_menu_preferences"
-        android:elevation="10dp"
-        android:clickable="true"
-        android:focusable="true"
-        app:tint="#757575"
-        android:contentDescription="Setting Server" />
-
-</FrameLayout>
+    </LinearLayout>
+</ScrollView>

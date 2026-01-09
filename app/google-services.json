@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "811447278966",
+    "project_id": "sysdos-8a5d2",
+    "storage_bucket": "sysdos-8a5d2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:811447278966:android:03cc4a994bffc3d53cae57",
+        "android_client_info": {
+          "package_name": "com.sysdos.kasirpintar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUt98QyOELDkZ6aJFTGD3cnhynOqLNtp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

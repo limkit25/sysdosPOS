@@ -13,6 +13,7 @@
         android:orientation="horizontal"
         android:padding="16dp"
         android:gravity="center_vertical">
+
         <ImageButton
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
@@ -20,14 +21,26 @@
             android:src="@drawable/ic_back_arrow"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="#FFFFFF"/>
+
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Manajemen Gudang"
             android:textColor="#FFFFFF"
             android:textSize="20sp"
             android:textStyle="bold"
             android:layout_marginStart="16dp"/>
+
+        <ImageButton
+            android:id="@+id/btnImportCsv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_menu_upload"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#FFFFFF"
+            android:contentDescription="Import CSV"/>
+
     </LinearLayout>
 
     <com.google.android.material.tabs.TabLayout
@@ -38,6 +51,7 @@
         app:tabTextColor="#BBDEFB"
         app:tabSelectedTextColor="#FFFFFF"
         app:tabIndicatorColor="#FFFFFF"/>
+
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"

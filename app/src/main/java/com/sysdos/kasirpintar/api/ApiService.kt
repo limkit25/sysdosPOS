@@ -6,6 +6,9 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT  // <--- INI YANG TADI KURANG
 import retrofit2.http.Body
+import okhttp3.MultipartBody
+import retrofit2.http.Multipart
+import retrofit2.http.Part
 
 interface ApiService {
 
@@ -24,6 +27,11 @@ interface ApiService {
     // 🔥 TAMBAHKAN INI (Untuk ambil daftar kategori) 🔥
     @GET("api/categories")
     fun getCategories(): Call<List<CategoryResponse>>
+
+    // 🔥 IMPORT CSV
+    @Multipart
+    @POST("api/products/import")
+    fun importCsv(@Part file: MultipartBody.Part): Call<Void>
 }
 
 // --- MODEL DATA ---

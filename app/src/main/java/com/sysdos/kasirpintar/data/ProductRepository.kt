@@ -17,6 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+
 class ProductRepository(
     private val context: Context, // <--- TAMBAHAN WAJIB (Biar bisa baca IP)
     private val productDao: ProductDao,
@@ -37,6 +42,29 @@ class ProductRepository(
     /**
      * 🔥 FUNGSI SYNC BARU: RESET TOTAL & PAKSA ID SAMA DENGAN SERVER
      */
+    suspend fun uploadCsvFile(file: File) {
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d("SysdosPOS", "Mulai Upload CSV: ${file.name}")
+
+                val requestFile = file.asRequestBody("text/csv".toMediaTypeOrNull())
+                val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+
+                val api = ApiClient.getInstance(context)
+                val response = api.importCsv(body).execute()
+
+                if (response.isSuccessful) {
+                    Log.d("SysdosPOS", "✅ Sukses Import CSV!")
+                    // Refresh data agar muncul di list
+                    refreshProductsFromApi()
+                } else {
+                    Log.e("SysdosPOS", "❌ Gagal Import: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosPOS", "Error Upload: ${e.message}")
+            }
+        }
+    }
     suspend fun refreshProductsFromApi() {
         withContext(Dispatchers.IO) {
             try {

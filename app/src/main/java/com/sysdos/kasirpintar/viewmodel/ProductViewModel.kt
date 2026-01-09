@@ -54,7 +54,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
         // ⚠️ PENTING: Sync Otomatis bisa menimpa data lokal jika internet lambat.
         // Jika stok sering "muncul lagi", matikan baris ini dan gunakan tombol refresh manual.
-//        syncData()
+        syncData()
         startServerHealthCheck()
     }
     // 🔥 PERBAIKAN: Tambahkan (Dispatchers.IO) agar jalan di background
@@ -195,6 +195,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         var total = 0.0
         _cart.value?.forEach { total += it.price * it.stock }
         _totalPrice.value = total
+    }
+    fun importCsv(file: java.io.File) = viewModelScope.launch {
+        repository.uploadCsvFile(file)
     }
 
     // =================================================================
