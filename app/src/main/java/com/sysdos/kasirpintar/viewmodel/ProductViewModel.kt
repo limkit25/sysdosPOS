@@ -199,6 +199,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     fun importCsv(file: java.io.File) = viewModelScope.launch {
         repository.uploadCsvFile(file)
     }
+    fun syncUser(user: User) = viewModelScope.launch {
+        repository.syncUserToServer(user)
+    }
 
     // =================================================================
     // 💰 CHECKOUT (BAYAR) + LAPOR SERVER

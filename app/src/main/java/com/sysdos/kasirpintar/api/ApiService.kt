@@ -7,6 +7,7 @@ import retrofit2.http.POST
 import retrofit2.http.PUT  // <--- INI YANG TADI KURANG
 import retrofit2.http.Body
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.http.Multipart
 import retrofit2.http.Part
 
@@ -32,7 +33,12 @@ interface ApiService {
     @Multipart
     @POST("api/products/import")
     fun importCsv(@Part file: MultipartBody.Part): Call<Void>
+
+    // 🔥 KIRIM DATA USER KE SERVER
+    @POST("api/users/register")
+    fun registerUser(@Body user: com.sysdos.kasirpintar.data.model.User): retrofit2.Call<ResponseBody>
 }
+
 
 // --- MODEL DATA ---
 

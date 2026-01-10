@@ -35,18 +35,20 @@ class SplashActivity : AppCompatActivity() {
         }
         // ---------------------------
 
-        // Lanjut Loading Biasa
         Handler(Looper.getMainLooper()).postDelayed({
+            // Cek apakah user sudah login sebelumnya?
             val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
             val isLoggedIn = session.getBoolean("is_logged_in", false)
 
             if (isLoggedIn) {
+                // Jika sudah login -> Langsung Dashboard
                 startActivity(Intent(this, DashboardActivity::class.java))
             } else {
-                startActivity(Intent(this, LoginActivity::class.java))
+                // Jika BELUM login -> Ke Welcome Screen (Bukan LoginActivity lagi)
+                startActivity(Intent(this, WelcomeActivity::class.java))
             }
             finish()
-        }, 2000)
+        }, 2000) // 2 detik
     }
 
     private fun checkTrialExpired(): Boolean {

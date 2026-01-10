@@ -26,6 +26,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 class DashboardActivity : AppCompatActivity() {
 
@@ -391,11 +393,21 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun performLogout(session: android.content.SharedPreferences) {
+        // 1. Hapus Sesi Lokal (Shared Preferences)
         session.edit().clear().apply()
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+
+        // 2. Cek apakah ada sesi Google yang aktif? Jika ya, Sign Out.
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        // Kita coba sign out Google (walaupun user login manual, ini aman dijalankan)
+        googleSignInClient.signOut().addOnCompleteListener {
+            // Setelah sukses logout Google (atau jika tidak ada sesi), pindah ke Login
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 
     private fun formatRupiah(amount: Double): String {

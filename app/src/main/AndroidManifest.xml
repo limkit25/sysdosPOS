@@ -79,6 +79,10 @@
             android:exported="false"
             android:label="Produk Terlaris"
             android:screenOrientation="portrait"/>
+        <activity
+            android:name=".WelcomeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
     </application>
 

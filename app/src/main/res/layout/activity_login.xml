@@ -71,7 +71,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
                 android:layout_marginTop="24dp"
-                android:backgroundTint="@color/purple_700"
+                android:backgroundTint="#1976D2"
                 android:text="MASUK SEKARANG"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -146,19 +146,19 @@
             android:layout_marginTop="32dp"
             android:orientation="horizontal">
 
-<!--            <TextView-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="Belum punya akun? "-->
-<!--                android:textColor="@color/gray_600" />-->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Belum punya akun? "
+                android:textColor="@color/gray_600" />
 
-<!--            <TextView-->
-<!--                android:id="@+id/btnRegisterLink"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="Daftar Disini"-->
-<!--                android:textColor="@color/primary"-->
-<!--                android:textStyle="bold" />-->
+            <TextView
+                android:id="@+id/btnRegisterLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Daftar Disini"
+                android:textColor="#1976D2"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <RelativeLayout

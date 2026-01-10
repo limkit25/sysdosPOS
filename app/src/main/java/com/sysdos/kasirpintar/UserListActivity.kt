@@ -42,8 +42,9 @@ class UserListActivity : AppCompatActivity() {
             },
             onLongClick = { user ->
                 // HAPUS USER
-                if (user.id == 1) { // Asumsi ID 1 adalah Super Admin awal
-                    Toast.makeText(this, "Admin Utama tidak bisa dihapus!", Toast.LENGTH_SHORT).show()
+                if (user.id == 1 || user.role == "admin") {
+                    // Proteksi sederhana: Admin tidak bisa dihapus sembarangan (opsional)
+                    confirmDelete(user)
                 } else {
                     confirmDelete(user)
                 }
@@ -53,6 +54,7 @@ class UserListActivity : AppCompatActivity() {
         rvUsers.layoutManager = LinearLayoutManager(this)
         rvUsers.adapter = adapter
 
+        // Load data user real-time
         viewModel.allUsers.observe(this) { users ->
             adapter.submitList(users)
         }
@@ -63,74 +65,99 @@ class UserListActivity : AppCompatActivity() {
         }
     }
 
-    // Fungsi Dialog yang bisa untuk Edit maupun Tambah
     private fun showUserDialog(userToEdit: User?) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_user_entry, null)
-        val etUser = view.findViewById<EditText>(R.id.etDialogUser)
-        val etPass = view.findViewById<EditText>(R.id.etDialogPass)
-        val spnRole = view.findViewById<Spinner>(R.id.spnRole)
 
-        // 1. Setup Spinner Role (Admin / Kasir)
-        val roles = arrayOf("kasir", "manager", "admin")
-        val adapterSpinner = ArrayAdapter(this, android.R.layout.simple_spinner_item, roles)
-        adapterSpinner.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spnRole.adapter = adapterSpinner
+        // Inisialisasi View (Spinner DIHAPUS)
+        val etName = view.findViewById<EditText>(R.id.etName)
+        val etUser = view.findViewById<EditText>(R.id.etUsername)
+        val etPhone = view.findViewById<EditText>(R.id.etPhone)
+        val etPass = view.findViewById<EditText>(R.id.etPassword)
 
-        // 2. Jika Mode Edit, isi form dengan data lama
+        // Isi data jika Mode Edit
         if (userToEdit != null) {
+            etName.setText(userToEdit.name)
             etUser.setText(userToEdit.username)
+            etPhone.setText(userToEdit.phone)
             etPass.setText(userToEdit.password)
-
-            // Set posisi spinner sesuai role yang ada di database
-            val rolePosition = roles.indexOf(userToEdit.role)
-            if (rolePosition >= 0) {
-                spnRole.setSelection(rolePosition)
-            }
         }
 
         val title = if (userToEdit == null) "Tambah User Baru" else "Edit User #${userToEdit.id}"
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setView(view)
-            .setPositiveButton("Simpan") { _, _ ->
-                val username = etUser.text.toString()
-                val password = etPass.text.toString()
-                val selectedRole = roles[spnRole.selectedItemPosition] // Ambil role yang dipilih
+            .setPositiveButton("Simpan", null) // null agar tidak auto-close
+            .setNegativeButton("Batal", null)
+            .create()
 
-                if (username.isNotEmpty() && password.isNotEmpty()) {
+        dialog.setOnShowListener {
+            val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            button.setOnClickListener {
+                val nama = etName.text.toString().trim()
+                val username = etUser.text.toString().trim()
+                val hp = etPhone.text.toString().trim()
+                val password = etPass.text.toString().trim()
+
+                // 🔥 LANGSUNG SET ROLE JADI ADMIN
+                val selectedRole = "admin"
+
+                // --- 🛡️ VALIDASI ---
+                var isValid = true
+
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(username).matches()) {
+                    etUser.error = "Format email salah!"
+                    isValid = false
+                }
+
+                if (hp.length < 10 || !hp.all { it.isDigit() }) {
+                    etPhone.error = "No HP min 10 angka"
+                    isValid = false
+                }
+
+                if (nama.isEmpty() || password.isEmpty()) {
+                    Toast.makeText(this, "Data tidak boleh kosong!", Toast.LENGTH_SHORT).show()
+                    isValid = false
+                }
+
+                // --- EKSEKUSI ---
+                if (isValid) {
                     if (userToEdit == null) {
-                        // --- MODE TAMBAH ---
+                        // MODE TAMBAH
                         val newUser = User(
+                            name = nama,
                             username = username,
+                            phone = hp,
                             password = password,
-                            role = selectedRole
+                            role = selectedRole // Otomatis Admin
                         )
                         viewModel.insertUser(newUser)
-                        Toast.makeText(this, "User berhasil dibuat!", Toast.LENGTH_SHORT).show()
+                        viewModel.syncUser(newUser)
+                        Toast.makeText(this, "User Admin berhasil dibuat!", Toast.LENGTH_SHORT).show()
                     } else {
-                        // --- MODE EDIT ---
-                        // Copy data lama, tapi ganti yang diedit
+                        // MODE EDIT
                         val updatedUser = userToEdit.copy(
+                            name = nama,
                             username = username,
+                            phone = hp,
                             password = password,
-                            role = selectedRole
+                            role = selectedRole // Tetap/Update jadi Admin
                         )
                         viewModel.updateUser(updatedUser)
+                        viewModel.syncUser(updatedUser)
                         Toast.makeText(this, "Data User diperbarui!", Toast.LENGTH_SHORT).show()
                     }
-                } else {
-                    Toast.makeText(this, "Username & Password wajib diisi!", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
                 }
             }
-            .setNegativeButton("Batal", null)
-            .show()
+        }
+        dialog.show()
     }
 
     private fun confirmDelete(user: User) {
         AlertDialog.Builder(this)
             .setTitle("Hapus User?")
-            .setMessage("Yakin hapus kasir: ${user.username}?")
+            .setMessage("Yakin hapus user: ${user.name} (${user.username})?")
             .setPositiveButton("Hapus") { _, _ ->
                 viewModel.deleteUser(user)
                 Toast.makeText(this, "User dihapus!", Toast.LENGTH_SHORT).show()

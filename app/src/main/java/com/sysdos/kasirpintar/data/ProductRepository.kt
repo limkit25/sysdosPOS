@@ -237,4 +237,21 @@ class ProductRepository(
             }
         }
     }
+    // 🔥 FUNGSI LAPOR KE SERVER
+    suspend fun syncUserToServer(user: User) {
+        withContext(Dispatchers.IO) {
+            try {
+                val api = ApiClient.getInstance(context)
+                val response = api.registerUser(user).execute()
+
+                if (response.isSuccessful) {
+                    Log.d("SysdosPOS", "✅ User ${user.username} berhasil disync ke Server!")
+                } else {
+                    Log.e("SysdosPOS", "❌ Gagal Sync User: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosPOS", "⚠️ Server Offline / Error: ${e.message}")
+            }
+        }
+    }
 }

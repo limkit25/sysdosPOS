@@ -1,47 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:layout_height="wrap_content">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Username"
-        android:textStyle="bold"/>
-    <EditText
-        android:id="@+id/etDialogUser"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Contoh: Budi"
-        android:inputType="text"/>
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Password"
-        android:textStyle="bold"
-        android:layout_marginTop="12dp"/>
-    <EditText
-        android:id="@+id/etDialogPass"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="******"
-        android:inputType="textPassword"/>
+        <EditText
+            android:id="@+id/etName"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/bg_rounded_white"
+            android:hint="Nama Lengkap"
+            android:inputType="textPersonName"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="12dp"/>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Role / Hak Akses"
-        android:textStyle="bold"
-        android:layout_marginTop="12dp"/>
+        <EditText
+            android:id="@+id/etUsername"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/bg_rounded_white"
+            android:hint="Email (Contoh: budi@gmail.com)"
+            android:inputType="textEmailAddress"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="12dp"/>
 
-    <Spinner
-        android:id="@+id/spnRole"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="48dp"
-        android:layout_marginTop="8dp"/>
+        <EditText
+            android:id="@+id/etPhone"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/bg_rounded_white"
+            android:hint="Nomor HP / WhatsApp"
+            android:inputType="phone"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="12dp"/>
 
-</LinearLayout>
+        <EditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/bg_rounded_white"
+            android:hint="Password"
+            android:inputType="textPassword"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:id="@+id/tvRoleLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Daftar Sebagai:"
+            android:textColor="@color/gray_600"
+            android:textSize="12sp" />
+
+
+        <Spinner
+            android:id="@+id/spnRole"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="4dp"/>
+
+    </LinearLayout>
+</ScrollView>
