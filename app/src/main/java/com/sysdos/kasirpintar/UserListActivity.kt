@@ -68,7 +68,7 @@ class UserListActivity : AppCompatActivity() {
     private fun showUserDialog(userToEdit: User?) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_user_entry, null)
 
-        // Inisialisasi View (Spinner DIHAPUS)
+        // Inisialisasi View (Spinner SUDAH DIHAPUS)
         val etName = view.findViewById<EditText>(R.id.etName)
         val etUser = view.findViewById<EditText>(R.id.etUsername)
         val etPhone = view.findViewById<EditText>(R.id.etPhone)
@@ -82,7 +82,7 @@ class UserListActivity : AppCompatActivity() {
             etPass.setText(userToEdit.password)
         }
 
-        val title = if (userToEdit == null) "Tambah User Baru" else "Edit User #${userToEdit.id}"
+        val title = if (userToEdit == null) "Tambah Admin Baru" else "Edit User #${userToEdit.id}"
 
         val dialog = AlertDialog.Builder(this)
             .setTitle(title)
@@ -99,8 +99,8 @@ class UserListActivity : AppCompatActivity() {
                 val hp = etPhone.text.toString().trim()
                 val password = etPass.text.toString().trim()
 
-                // 🔥 LANGSUNG SET ROLE JADI ADMIN
-                val selectedRole = "admin"
+                // 🔥 PAKSA ROLE JADI ADMIN (HARDCODE)
+                val fixedRole = "admin"
 
                 // --- 🛡️ VALIDASI ---
                 var isValid = true
@@ -123,25 +123,25 @@ class UserListActivity : AppCompatActivity() {
                 // --- EKSEKUSI ---
                 if (isValid) {
                     if (userToEdit == null) {
-                        // MODE TAMBAH
+                        // MODE TAMBAH (Otomatis Admin)
                         val newUser = User(
                             name = nama,
                             username = username,
                             phone = hp,
                             password = password,
-                            role = selectedRole // Otomatis Admin
+                            role = fixedRole
                         )
                         viewModel.insertUser(newUser)
                         viewModel.syncUser(newUser)
-                        Toast.makeText(this, "User Admin berhasil dibuat!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Admin berhasil dibuat!", Toast.LENGTH_SHORT).show()
                     } else {
-                        // MODE EDIT
+                        // MODE EDIT (Tetap Admin / Update data lain)
                         val updatedUser = userToEdit.copy(
                             name = nama,
                             username = username,
                             phone = hp,
                             password = password,
-                            role = selectedRole // Tetap/Update jadi Admin
+                            role = fixedRole
                         )
                         viewModel.updateUser(updatedUser)
                         viewModel.syncUser(updatedUser)

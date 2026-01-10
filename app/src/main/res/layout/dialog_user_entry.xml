@@ -24,7 +24,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="@drawable/bg_rounded_white"
-            android:hint="Email (Contoh: budi@gmail.com)"
+            android:hint="Email (Username)"
             android:inputType="textEmailAddress"
             android:paddingHorizontal="12dp"
             android:layout_marginBottom="12dp"/>
@@ -34,7 +34,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="@drawable/bg_rounded_white"
-            android:hint="Nomor HP / WhatsApp"
+            android:hint="Nomor HP"
             android:inputType="phone"
             android:paddingHorizontal="12dp"
             android:layout_marginBottom="12dp"/>
@@ -48,21 +48,6 @@
             android:inputType="textPassword"
             android:paddingHorizontal="12dp"
             android:layout_marginBottom="12dp"/>
-
-        <TextView
-            android:id="@+id/tvRoleLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Daftar Sebagai:"
-            android:textColor="@color/gray_600"
-            android:textSize="12sp" />
-
-
-        <Spinner
-            android:id="@+id/spnRole"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="4dp"/>
 
     </LinearLayout>
 </ScrollView>

@@ -17,7 +17,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.3.3"
+        versionName = "1.3.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -43,7 +43,7 @@ android {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
             // Hasilnya nanti: sysdosKasir.apk
-            output?.outputFileName = "sysdosKasir-V1-3.4.apk"
+            output?.outputFileName = "sysdosKasir-V1-3.5.apk"
         }
     }
 }

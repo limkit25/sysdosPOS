@@ -104,6 +104,9 @@ interface ProductDao {
     @Query("DELETE FROM products")
     suspend fun deleteAllProducts()
 
+    @Query("SELECT * FROM user_table WHERE username = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): User?
+
 
 
 

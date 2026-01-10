@@ -7,11 +7,9 @@ import com.sysdos.kasirpintar.data.dao.ShiftDao
 import com.sysdos.kasirpintar.data.dao.StockLogDao
 import com.sysdos.kasirpintar.data.model.*
 
-// --- PENTING: Import Fitur Koneksi & Session ---
-import com.sysdos.kasirpintar.api.ApiClient
+import com.sysdos.kasirpintar.api.ApiClient // <--- SUDAH HYBRID
 import com.sysdos.kasirpintar.api.ProductResponse
 import com.sysdos.kasirpintar.utils.SessionManager
-// -----------------------------------------------
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -23,14 +21,14 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 
 class ProductRepository(
-    private val context: Context, // <--- TAMBAHAN WAJIB (Biar bisa baca IP)
+    private val context: Context,
     private val productDao: ProductDao,
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao
 ) {
 
     // =================================================================
-    // 📦 1. PRODUK (LOKAL & SERVER)
+    // 📦 1. PRODUK (PAKAI JALUR LOKAL / TOKO)
     // =================================================================
 
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -39,23 +37,19 @@ class ProductRepository(
     suspend fun update(product: Product) = productDao.update(product)
     suspend fun delete(product: Product) = productDao.delete(product)
 
-    /**
-     * 🔥 FUNGSI SYNC BARU: RESET TOTAL & PAKSA ID SAMA DENGAN SERVER
-     */
     suspend fun uploadCsvFile(file: File) {
         withContext(Dispatchers.IO) {
             try {
                 Log.d("SysdosPOS", "Mulai Upload CSV: ${file.name}")
-
                 val requestFile = file.asRequestBody("text/csv".toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
 
-                val api = ApiClient.getInstance(context)
+                // 🔥 JALUR TOKO (LOCAL)
+                val api = ApiClient.getLocalClient(context)
                 val response = api.importCsv(body).execute()
 
                 if (response.isSuccessful) {
                     Log.d("SysdosPOS", "✅ Sukses Import CSV!")
-                    // Refresh data agar muncul di list
                     refreshProductsFromApi()
                 } else {
                     Log.e("SysdosPOS", "❌ Gagal Import: ${response.code()}")
@@ -65,54 +59,48 @@ class ProductRepository(
             }
         }
     }
+
     suspend fun refreshProductsFromApi() {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosRepo", "🔄 Mulai Sinkronisasi Total...")
+                Log.d("SysdosRepo", "🔄 Sinkronisasi dari Server Toko...")
 
-                val api = ApiClient.getInstance(context)
+                // 🔥 JALUR TOKO (LOCAL)
+                val api = ApiClient.getLocalClient(context)
                 val session = SessionManager(context)
-                val dynamicBaseUrl = session.getServerUrl()
+                val dynamicBaseUrl = session.getServerUrl() // IP Toko
 
-                // 1. AMBIL PRODUK DARI SERVER
                 val responseProd = api.getProducts().execute()
 
                 if (responseProd.isSuccessful) {
                     val serverProducts = responseProd.body()
                     if (serverProducts != null) {
-
-                        // 🔥 LANGKAH KRUSIAL: HAPUS DATA LAMA BIAR BERSIH
-                        // Ini mencegah duplikat barang (ID 1 vs ID 5)
                         productDao.deleteAllProducts()
 
                         serverProducts.forEach { apiItem ->
-
                             val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) {
                                 dynamicBaseUrl + apiItem.image_path
                             } else {
                                 null
                             }
-
                             val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
 
-                            // 🔥 INSERT DENGAN MEMAKSA ID DARI SERVER (apiItem.id)
                             val newProd = Product(
-                                id = apiItem.id, // <--- KUNCINYA DISINI! JANGAN BIARKAN AUTO-GENERATE
+                                id = apiItem.id,
                                 name = apiItem.name,
                                 price = apiItem.price.toDouble(),
                                 costPrice = apiItem.cost_price.toDouble(),
                                 stock = apiItem.stock,
                                 category = serverCategory,
-                                barcode = "", // Atau apiItem.barcode jika ada
+                                barcode = "",
                                 imagePath = fullImagePath
                             )
                             productDao.insert(newProd)
                         }
-                        Log.d("SysdosRepo", "✅ Sukses Refresh: ID HP sekarang sama dengan Server!")
+                        Log.d("SysdosRepo", "✅ Sukses Refresh Produk!")
                     }
                 }
 
-                // 2. AMBIL KATEGORI (SAMA SEPERTI SEBELUMNYA)
                 val responseCat = api.getCategories().execute()
                 if (responseCat.isSuccessful) {
                     val serverCats = responseCat.body()
@@ -124,15 +112,14 @@ class ProductRepository(
                         }
                     }
                 }
-
             } catch (e: Exception) {
-                Log.e("SysdosRepo", "Error Koneksi: ${e.message}")
+                Log.e("SysdosRepo", "Error Koneksi Toko: ${e.message}")
             }
         }
     }
 
     // =================================================================
-    // 📂 2. KATEGORI, SUPPLIER, USER, DLL
+    // 📂 2. KATEGORI & LAIN-LAIN
     // =================================================================
     val allCategories: Flow<List<Category>> = productDao.getAllCategories()
     suspend fun insertCategory(category: Category) = productDao.insertCategory(category)
@@ -160,22 +147,18 @@ class ProductRepository(
     val allShiftLogs: Flow<List<ShiftLog>> = shiftDao.getAllLogs()
     suspend fun insertShiftLog(log: ShiftLog) { shiftDao.insertLog(log) }
 
-    // 🔥 TAMBAHKAN FUNGSI INI 🔥
-    suspend fun getProductById(id: Int): Product? {
-        return productDao.getProductById(id)
+    suspend fun getProductById(id: Int): Product? = productDao.getProductById(id)
+    suspend fun getProductByBarcode(barcode: String): Product? = productDao.getProductByBarcode(barcode)
+    suspend fun getUserByEmail(email: String): User? {
+        return productDao.getUserByEmail(email)
     }
-    // 🔥 TAMBAHKAN INI 🔥
-    suspend fun getProductByBarcode(barcode: String): Product? {
-        return productDao.getProductByBarcode(barcode)
-    }
-
     // =================================================================
-    // 🚀 FITUR UPLOAD TRANSAKSI KE SERVER
+    // 🚀 FITUR UPLOAD TRANSAKSI KE SERVER (JALUR TOKO / LOKAL)
     // =================================================================
     suspend fun uploadTransactionToServer(trx: Transaction, cartItems: List<Product>) {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosPOS", "Mengupload transaksi lengkap...")
+                Log.d("SysdosPOS", "Mengupload transaksi ke Toko...")
 
                 val itemList = cartItems.map { product ->
                     com.sysdos.kasirpintar.api.TransactionItemRequest(
@@ -186,17 +169,17 @@ class ProductRepository(
 
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
                     total_amount = trx.totalAmount,
-                    profit = trx.profit, // <--- KIRIM PROFIT DISINI
+                    profit = trx.profit,
                     items_summary = trx.itemsSummary,
                     items = itemList
                 )
 
-                // 🔥 PAKE INSTANCE DINAMIS
-                val api = ApiClient.getInstance(context)
+                // 🔥 JALUR TOKO (LOCAL)
+                val api = ApiClient.getLocalClient(context)
                 val response = api.uploadTransaction(requestData).execute()
 
                 if (response.isSuccessful) {
-                    Log.d("SysdosPOS", "✅ Laporan Terkirim & Stok Server Terpotong!")
+                    Log.d("SysdosPOS", "✅ Laporan Terkirim ke Server Toko!")
                 } else {
                     Log.e("SysdosPOS", "❌ Gagal Upload: ${response.code()}")
                 }
@@ -208,7 +191,7 @@ class ProductRepository(
     }
 
     // =================================================================
-    // 🔄 REVERSE SYNC: UPDATE DARI HP KE SERVER
+    // 🔄 REVERSE SYNC (JALUR TOKO / LOKAL)
     // =================================================================
     suspend fun updateProductToServer(product: Product) {
         withContext(Dispatchers.IO) {
@@ -223,12 +206,12 @@ class ProductRepository(
                     image_path = null
                 )
 
-                // 🔥 PAKE INSTANCE DINAMIS
-                val api = ApiClient.getInstance(context)
+                // 🔥 JALUR TOKO (LOCAL)
+                val api = ApiClient.getLocalClient(context)
                 val response = api.updateProduct(dataKirim).execute()
 
                 if (response.isSuccessful) {
-                    Log.d("SysdosPOS", "✅ Sukses Update Data ke Server!")
+                    Log.d("SysdosPOS", "✅ Sukses Update Data ke Server Toko!")
                 } else {
                     Log.e("SysdosPOS", "❌ Gagal Update: ${response.code()}")
                 }
@@ -237,20 +220,25 @@ class ProductRepository(
             }
         }
     }
-    // 🔥 FUNGSI LAPOR KE SERVER
+
+    // =================================================================
+    // 🔥 SYNC USER KE SERVER PUSAT (JALUR WEB / CLOUD) 🔥
+    // =================================================================
     suspend fun syncUserToServer(user: User) {
         withContext(Dispatchers.IO) {
             try {
-                val api = ApiClient.getInstance(context)
+                // 🔥 JALUR CLOUD (WEB) - Inilah bedanya!
+                val api = ApiClient.webClient
+
                 val response = api.registerUser(user).execute()
 
                 if (response.isSuccessful) {
-                    Log.d("SysdosPOS", "✅ User ${user.username} berhasil disync ke Server!")
+                    Log.d("SysdosPOS", "✅ User ${user.username} sync ke WEB PUSAT!")
                 } else {
-                    Log.e("SysdosPOS", "❌ Gagal Sync User: ${response.code()}")
+                    Log.e("SysdosPOS", "❌ Gagal Sync User ke WEB: ${response.code()}")
                 }
             } catch (e: Exception) {
-                Log.e("SysdosPOS", "⚠️ Server Offline / Error: ${e.message}")
+                Log.e("SysdosPOS", "⚠️ Gagal Konek Web Pusat: ${e.message}")
             }
         }
     }

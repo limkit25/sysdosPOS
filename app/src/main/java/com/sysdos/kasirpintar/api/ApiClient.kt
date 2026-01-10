@@ -7,22 +7,38 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    // Variabel Retrofit yang bisa berubah
-    private var retrofit: Retrofit? = null
+    // ==========================================
+    // 1. JALUR KHUSUS PENDAFTARAN (CLOUD / WEB)
+    // ==========================================
+    // Ganti dengan URL Hosting/VPS Anda nanti.
+    // User baru TIDAK PERLU setting IP, langsung tembak sini.
+    private const val WEB_URL = "http://192.168.1.9:3000/"
 
-    // Fungsi untuk mendapatkan Instance API
-    // Sekarang butuh Context untuk membaca SessionManager
-    fun getInstance(context: Context): ApiService {
+    val webClient: ApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(WEB_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+    }
+
+    // ==========================================
+    // 2. JALUR KHUSUS OPERASIONAL TOKO (LOCAL)
+    // ==========================================
+    // Ini berubah-ubah sesuai IP Komputer Kasir (192.168.x.x)
+    private var localRetrofit: Retrofit? = null
+
+    fun getLocalClient(context: Context): ApiService {
         val session = SessionManager(context)
-        val dynamicUrl = session.getServerUrl()
+        val dynamicUrl = session.getServerUrl() // Ambil dari SharedPreferences
 
-        // Jika retrofit belum ada atau URL berubah, bikin baru
-        if (retrofit == null || retrofit?.baseUrl().toString() != dynamicUrl) {
-            retrofit = Retrofit.Builder()
-                .baseUrl(dynamicUrl) // <--- Pake URL dari Simpanan
+        // Cek: Bikin baru jika null ATAU jika user baru saja ganti IP di setting
+        if (localRetrofit == null || localRetrofit?.baseUrl().toString() != dynamicUrl) {
+            localRetrofit = Retrofit.Builder()
+                .baseUrl(dynamicUrl)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
         }
-        return retrofit!!.create(ApiService::class.java)
+        return localRetrofit!!.create(ApiService::class.java)
     }
 }

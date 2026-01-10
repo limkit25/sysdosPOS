@@ -27,4 +27,6 @@ data class User(
 
     @SerializedName("phone")
     val phone: String = ""
+
+
 ) : Parcelable
