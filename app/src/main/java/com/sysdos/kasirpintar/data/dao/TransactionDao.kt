@@ -2,25 +2,20 @@ package com.sysdos.kasirpintar.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
-// --- PENTING: Pastikan 3 baris import di bawah ini ada ---
 import kotlinx.coroutines.flow.Flow
 import com.sysdos.kasirpintar.data.model.Transaction
-import com.sysdos.kasirpintar.data.model.TransactionItem
 
 @Dao
 interface TransactionDao {
 
-    // Simpan Header Struk
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    // Simpan Item Belanjaan
-    @Insert
-    suspend fun insertTransactionItem(item: TransactionItem)
-
-    // --- KODE ANDA TADI ---
-    // Ambil semua riwayat, urutkan dari yang terbaru (DESC)
-    @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
-    fun getAllTransactions(): Flow<List<Transaction>>
+    // 🔥 PERBAIKAN DI SINI:
+    // 1. Tambahkan parameter (uid: Int) di dalam kurung fungsi
+    // 2. Tambahkan WHERE userId = :uid di dalam Query SQL
+    @Query("SELECT * FROM transaction_table WHERE userId = :uid ORDER BY timestamp DESC")
+    fun getAllTransactions(uid: Int): Flow<List<Transaction>>
 }

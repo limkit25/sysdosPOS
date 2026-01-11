@@ -142,7 +142,10 @@ class ProductRepository(
     suspend fun deleteSupplier(supplier: Supplier) = productDao.deleteSupplier(supplier)
     suspend fun updateSupplier(supplier: Supplier) = productDao.updateSupplier(supplier)
 
-    val allTransactions: Flow<List<Transaction>> = productDao.getAllTransactions()
+    // ✅ GANTI DENGAN FUNGSI INI:
+    fun getTransactionsByUser(userId: Int): Flow<List<Transaction>> {
+        return productDao.getAllTransactions(userId)
+    }
     suspend fun insertTransaction(transaction: Transaction): Long = productDao.insertTransaction(transaction)
 
     val allUsers: Flow<List<User>> = productDao.getAllUsers()
@@ -156,7 +159,9 @@ class ProductRepository(
     suspend fun recordPurchase(log: StockLog) { stockLogDao.insertLog(log) }
     suspend fun getPurchaseDetails(pId: Long): List<StockLog> { return stockLogDao.getPurchaseDetails(pId) }
 
-    val allShiftLogs: Flow<List<ShiftLog>> = shiftDao.getAllLogs()
+    fun getShiftLogsByUser(userId: Int): Flow<List<ShiftLog>> {
+        return shiftDao.getAllLogs(userId)
+    }
     suspend fun insertShiftLog(log: ShiftLog) { shiftDao.insertLog(log) }
 
     suspend fun getProductById(id: Int): Product? = productDao.getProductById(id)

@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 interface ProductDao {
 
     // --- PRODUK (Tabel: products) ---
-    // Pastikan insert pakai strategy REPLACE agar ID bisa ditimpa
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(product: Product): Long
 
@@ -35,12 +34,13 @@ interface ProductDao {
     @Query("SELECT * FROM categories ORDER BY id DESC")
     fun getAllCategories(): Flow<List<Category>>
 
-    // --- SUPPLIER (Tabel: suppliers) ---
+    @Query("DELETE FROM categories")
+    suspend fun deleteAllCategories()
+
     // --- SUPPLIER (Tabel: suppliers) ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSupplier(supplier: Supplier)
 
-    // 🔥 TAMBAHKAN INI 🔥
     @Update
     suspend fun updateSupplier(supplier: Supplier)
 
@@ -54,8 +54,9 @@ interface ProductDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    @Query("SELECT * FROM transaction_table ORDER BY timestamp DESC")
-    fun getAllTransactions(): Flow<List<Transaction>>
+    // 🔥 PERBAIKAN DI SINI (Ditambahkan parameter uid dan WHERE userId)
+    @Query("SELECT * FROM transaction_table WHERE userId = :uid ORDER BY timestamp DESC")
+    fun getAllTransactions(uid: Int): Flow<List<Transaction>>
 
     // --- USER (Tabel: user_table) ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -70,12 +71,14 @@ interface ProductDao {
     @Query("SELECT * FROM user_table ORDER BY username ASC")
     fun getAllUsers(): Flow<List<User>>
 
-    // 🔥 TAMBAHAN YANG HILANG (Dibutuhkan oleh ProductViewModel) 🔥
     @Query("UPDATE user_table SET password = :newPass WHERE id = :userId")
     suspend fun updatePassword(userId: Int, newPass: String)
 
     @Query("SELECT * FROM user_table WHERE username = :username AND password = :password")
     suspend fun login(username: String, password: String): User?
+
+    @Query("SELECT * FROM user_table WHERE username = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): User?
 
     // --- LOG STOK (Tabel: stock_logs) ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -84,30 +87,16 @@ interface ProductDao {
     @Query("SELECT * FROM stock_logs ORDER BY timestamp DESC")
     fun getAllStockLogs(): Flow<List<StockLog>>
 
-    // 🔥 TAMBAHKAN INI 🔥
-    // Cari barang berdasarkan nama (limit 1 saja biar cepat)
+    // --- UTILS LAINNYA ---
     @Query("SELECT * FROM products WHERE name = :productName LIMIT 1")
     suspend fun getProductByName(productName: String): Product?
 
-    // 🔥 TAMBAHKAN INI: Fungsi untuk menghapus semua kategori 🔥
-    @Query("DELETE FROM categories")
-    suspend fun deleteAllCategories()
-
-    // 🔥 TAMBAHKAN INI 🔥
     @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
     suspend fun getProductById(id: Int): Product?
-    // 🔥 TAMBAHKAN INI UNTUK SCANNER 🔥
+
     @Query("SELECT * FROM products WHERE barcode = :barcode LIMIT 1")
     suspend fun getProductByBarcode(barcode: String): Product?
 
-    // 🔥 TAMBAHAN BARU: HAPUS SEMUA BARANG
     @Query("DELETE FROM products")
     suspend fun deleteAllProducts()
-
-    @Query("SELECT * FROM user_table WHERE username = :email LIMIT 1")
-    suspend fun getUserByEmail(email: String): User?
-
-
-
-
 }

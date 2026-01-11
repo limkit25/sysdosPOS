@@ -11,6 +11,11 @@ interface ShiftDao {
     @Insert
     suspend fun insertLog(log: ShiftLog)
 
-    @Query("SELECT * FROM shift_logs ORDER BY timestamp DESC")
-    fun getAllLogs(): Flow<List<ShiftLog>>
+    // 🔥 PERBAIKAN DI SINI (Ditambahkan parameter uid dan WHERE userId)
+    @Query("SELECT * FROM shift_logs WHERE userId = :uid ORDER BY timestamp DESC")
+    fun getAllLogs(uid: Int): Flow<List<ShiftLog>>
+
+    // Tambahan untuk cek status shift terakhir user
+    @Query("SELECT * FROM shift_logs WHERE userId = :uid ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLastLog(uid: Int): ShiftLog?
 }

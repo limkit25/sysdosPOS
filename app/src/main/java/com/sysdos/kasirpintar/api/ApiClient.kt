@@ -12,7 +12,7 @@ object ApiClient {
     // ==========================================
     // Ganti dengan URL Hosting/VPS Anda nanti.
     // User baru TIDAK PERLU setting IP, langsung tembak sini.
-    private const val WEB_URL = "http://192.168.1.9:3000/"
+    private const val WEB_URL = "http://192.168.1.7:3000/"
 
     val webClient: ApiService by lazy {
         Retrofit.Builder()

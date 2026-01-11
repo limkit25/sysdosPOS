@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
         android.util.Log.d("Sysdos", "Mencoba menghubungi server...")
 
         // 🔥 PERBAIKAN DI SINI: Gunakan .getInstance(this) 🔥
-        com.sysdos.kasirpintar.api.ApiClient.getLocalClient(this).getProducts().enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
+        com.sysdos.kasirpintar.api.ApiClient.getLocalClient(this).getProducts(0).enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
             override fun onResponse(
                 call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>,
                 response: retrofit2.Response<List<com.sysdos.kasirpintar.api.ProductResponse>>
@@ -401,8 +401,10 @@ class MainActivity : AppCompatActivity() {
                 paymentMethod = method,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount,
-                note = finalNote,  // Jangan lupa koma disini
-                userId = 0      // <--- TAMBAHKAN INI (INJECT DISINI)
+                note = finalNote,   // <--- PASTIKAN ADA KOMA DI SINI
+
+                userId = 0          // 🔥 TAMBAHKAN BARIS INI
+
             ) { transaction ->
                 if (transaction != null) {
 

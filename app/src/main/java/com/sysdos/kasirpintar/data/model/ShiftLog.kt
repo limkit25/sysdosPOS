@@ -11,5 +11,6 @@ data class ShiftLog(
     val kasirName: String,   // Siapa yang jaga
     val expectedAmount: Double, // Uang yang SEHARUSNYA ada (Sistem)
     val actualAmount: Double,   // Uang FISIK yang diinput kasir
-    val difference: Double      // Selisih (Plus/Minus)
+    val difference: Double,      // Selisih (Plus/Minus)
+    val userId: Int = 0
 )
