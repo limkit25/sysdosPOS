@@ -211,10 +211,12 @@ class HistoryActivity : AppCompatActivity() {
 
         Thread {
             try {
+                // Cek Izin Bluetooth (Android 12+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
 
                 val device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(targetMac)
-                val socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                val uuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                val socket = device.createRfcommSocketToServiceRecord(uuid)
                 socket.connect()
                 val os = socket.outputStream
 
@@ -231,6 +233,19 @@ class HistoryActivity : AppCompatActivity() {
                     return "$kT$sp$r\n"
                 }
 
+                // ==========================================
+                // 🔥 LOGIKA PARSING DATA (SAMA DGN PRINT STRUK) 🔥
+                // ==========================================
+
+                // 1. Pisahkan Data Barang dan Info Pelanggan
+                val summaryParts = trx.itemsSummary.split(" || ")
+                val rawItems = summaryParts[0].split(";")
+                val infoPelanggan = if (summaryParts.size > 1) summaryParts[1] else ""
+
+                // ==========================================
+                // 🖨️ MULAI CETAK HEADER
+                // ==========================================
+
                 // 1. HEADER TOKO
                 p.append("\u001B\u0061\u0001") // Align Center
                 p.append("\u001B\u0045\u0001${prefs.getString("name", "Toko")}\n\u001B\u0045\u0000") // Bold Nama Toko
@@ -245,20 +260,28 @@ class HistoryActivity : AppCompatActivity() {
                 // 3. INFO TRANSAKSI
                 p.append("\u001B\u0061\u0000") // Align Left
                 p.append("ID: #${trx.id}\n")
-                p.append("Tgl: ${SimpleDateFormat("dd/MM/yy HH:mm").format(Date(trx.timestamp))}\n")
+                p.append("Tgl: ${SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(trx.timestamp))}\n")
                 p.append("Kasir: ${session.getString("username","Admin")}\n")
+
+                // 🔥 CETAK MEJA & PELANGGAN DI SINI 🔥
+                if (infoPelanggan.isNotEmpty()) {
+                    val formattedInfo = infoPelanggan.replace(" | ", "\n").trim()
+                    p.append("\u001B\u0045\u0001") // Bold Nyala
+                    p.append("$formattedInfo\n")
+                    p.append("\u001B\u0045\u0000") // Bold Mati
+                }
+
                 p.append("--------------------------------\n")
 
-                // 4. DAFTAR BARANG
-                val items = trx.itemsSummary.split(";")
-                for (item in items) {
-                    val parts = item.split("|")
-                    if (parts.size >= 4) {
-                        // Nama Barang
-                        p.append("${parts[0]}\n")
-                        val pr = parts[2].toDoubleOrNull()?:0.0
-                        val tot = parts[3].toDoubleOrNull()?:0.0
-                        // Qty x Harga .... Total
+                // 4. DAFTAR BARANG (Looping yang benar)
+                for (itemStr in rawItems) {
+                    val parts = itemStr.split("|")
+                    // Pastikan format valid: Nama|Qty|Harga|Total
+                    if (parts.size == 4) {
+                        p.append("${parts[0]}\n") // Nama Barang
+                        val pr = parts[2].toDoubleOrNull() ?: 0.0
+                        val tot = parts[3].toDoubleOrNull() ?: 0.0
+                        // Cetak baris: Qty x Harga .... Total
                         p.append(row("  ${parts[1]} x ${formatRupiah(pr).replace("Rp ","")}", tot))
                     }
                 }

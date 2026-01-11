@@ -265,7 +265,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     // =================================================================
     fun checkout(
         subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
-        cashReceived: Double, changeAmount: Double, onResult: (Transaction?) -> Unit
+        cashReceived: Double, changeAmount: Double, note: String = "", onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
 
         val cartItems = _cart.value ?: emptyList()
@@ -285,7 +285,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
-            itemsSummary = itemsSummary,
+            itemsSummary = itemsSummary + (if(note.isNotEmpty()) " || $note" else ""),
             totalAmount = subtotal + tax - discount,
             subtotal = subtotal,
             discount = discount,
@@ -293,7 +293,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             profit = totalProfit,
             paymentMethod = paymentMethod,
             cashReceived = cashReceived,
-            changeAmount = changeAmount
+            changeAmount = changeAmount,
+
         )
 
         // Simpan Lokal

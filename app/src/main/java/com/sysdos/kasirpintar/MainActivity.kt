@@ -281,12 +281,18 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
+        // --- 1. DEFINISI VIEW ---
         val tvTitle = dialogView.findViewById<TextView>(R.id.tvPaymentTitle)
         val etReceived = dialogView.findViewById<EditText>(R.id.etAmountReceived)
         val btnBack = dialogView.findViewById<View>(R.id.btnBackPayment)
         val btnConfirm = dialogView.findViewById<View>(R.id.btnConfirmPayment)
         val spMethod = dialogView.findViewById<Spinner>(R.id.spPaymentMethod)
         val gridQuickCash = dialogView.findViewById<View>(R.id.gridQuickCash)
+
+        // Inputan Tambahan (Pelanggan, Meja, Note)
+        val etCustomer = dialogView.findViewById<EditText>(R.id.etCustomer)
+        val etTable = dialogView.findViewById<EditText>(R.id.etTable)
+        val etNote = dialogView.findViewById<EditText>(R.id.etNote)
 
         val btnDisc = dialogView.findViewById<Button>(R.id.btnDisc)
         val btnTax = dialogView.findViewById<Button>(R.id.btnTax)
@@ -307,6 +313,7 @@ class MainActivity : AppCompatActivity() {
         val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer")
         spMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
 
+        // --- 2. LOGIKA HITUNG ULANG ---
         fun recalculate() {
             discValue = if (isDiscActive) currentSubtotal * 0.10 else 0.0
             val afterDisc = currentSubtotal - discValue
@@ -317,6 +324,7 @@ class MainActivity : AppCompatActivity() {
 
             val activeBg = R.drawable.bg_solid_primary
             val inactiveBg = R.drawable.bg_outline_primary
+
             btnTax.setBackgroundResource(if (isTaxActive) activeBg else inactiveBg)
             btnTax.setTextColor(if (isTaxActive) Color.WHITE else Color.parseColor("#1976D2"))
             btnTax.text = if (isTaxActive) "Tax : 10%" else "Tax : 0%"
@@ -330,6 +338,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // --- 3. EVENT LISTENER ---
         spMethod.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (methods[position] == "Tunai") {
@@ -356,11 +365,25 @@ class MainActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { dialog.dismiss() }
 
+        // --- 4. TOMBOL BAYAR (CONFIRM) ---
         btnConfirm.setOnClickListener {
             val method = spMethod.selectedItem.toString()
             val receivedStr = etReceived.text.toString()
             var cashReceived = if (receivedStr.isNotEmpty()) receivedStr.toDouble() else 0.0
 
+            // 🔥 DISINI KITA AMBIL DATA INPUTAN (Saat tombol ditekan)
+            val customerName = etCustomer.text.toString().trim()
+            val tableNumber = etTable.text.toString().trim()
+            val noteRaw = etNote.text.toString().trim()
+
+            // Gabungkan info ini menjadi satu string catatan
+            // Contoh: "Jangan pedas | Meja: 05 | An: Budi"
+            var finalNote = noteRaw
+            if (tableNumber.isNotEmpty()) finalNote += " | Meja: $tableNumber"
+            if (customerName.isNotEmpty()) finalNote += " | An: $customerName"
+            finalNote = finalNote.trim().removePrefix("|").trim()
+
+            // Validasi
             if (method == "Tunai" && cashReceived < grandTotal) {
                 Toast.makeText(this, "⚠️ Uang Kurang!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -369,17 +392,22 @@ class MainActivity : AppCompatActivity() {
 
             val changeAmount = cashReceived - grandTotal
 
+            // Panggil ViewModel Checkout
+            // (Pastikan ViewModel Anda sudah diupdate untuk menerima parameter note/customer)
             viewModel.checkout(
                 subtotal = currentSubtotal,
                 discount = discValue,
                 tax = taxValue,
                 paymentMethod = method,
                 cashReceived = cashReceived,
-                changeAmount = changeAmount
+                changeAmount = changeAmount,
+                // Kita kirim data gabungan ini sebagai parameter tambahan
+                // Jika error merah disini, lihat langkah selanjutnya di bawah!
+                note = finalNote
             ) { transaction ->
                 if (transaction != null) {
 
-                    // 🔥 UPDATE DATA SHIFT (Penjualan Tunai) 🔥
+                    // Update Shift (Khusus Tunai)
                     if (method == "Tunai") {
                         val currentCash = shiftPrefs.getFloat("CASH_SALES_TODAY", 0f)
                         val newTotal = currentCash + grandTotal.toFloat()
@@ -557,6 +585,7 @@ class MainActivity : AppCompatActivity() {
             var attempt = 0
             val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
 
+            // 1. Coba Konek Bluetooth
             while (attempt < 3 && !isConnected) {
                 try {
                     attempt++
@@ -579,11 +608,66 @@ class MainActivity : AppCompatActivity() {
                 val kasirName = session.getString("username", "Admin")
                 val dateStr = java.text.SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(java.util.Date(trx.timestamp))
 
+                // ==========================================
+                // 🔥 LOGIKA PEMISAHAN DATA BARU 🔥
+                // ==========================================
+
+                // Kita pecah dulu string panjangnya
+                // itemsSummary isinya: "Nasi|1|1000|1000;Teh|1|500|500 || Meja: 1 | An: Budi"
+
+                // 1. Coba pisahkan Catatan Tambahan (Meja/Pelanggan) jika pakai pemisah " || "
+                val summaryParts = trx.itemsSummary.split(" || ")
+
+                // Bagian Produk adalah bagian pertama
+                val rawItems = summaryParts[0].split(";")
+
+                // Bagian Info Tambahan adalah bagian kedua (jika ada)
+                var infoPelanggan = if (summaryParts.size > 1) summaryParts[1] else ""
+
+                // 2. Validasi Ulang (Jaga-jaga kalau formatnya tercampur tanpa " || ")
+                val productList = ArrayList<String>()
+
+                for (itemStr in rawItems) {
+                    val parts = itemStr.split("|")
+                    // Cek apakah ini format Produk Valid? (Harus ada 4 bagian: Nama|Qty|Harga|Total)
+                    if (parts.size == 4) {
+                        productList.add(itemStr)
+                    } else {
+                        // Kalau bukan format produk, berarti ini potongan catatan yang terselip
+                        if (itemStr.isNotBlank() && !itemStr.contains("An:")) {
+                            // Abaikan sampah, tapi kalau penting simpan
+                        }
+                    }
+                }
+
+                // ==========================================
+                // 🖨️ MULAI CETAK
+                // ==========================================
                 val p = StringBuilder()
+
+                // Header Toko
                 p.append("\u001B\u0061\u0001\u001B\u0045\u0001$storeName\n\u001B\u0045\u0000$storeAddress\n")
                 if (!storePhone.isNullOrEmpty()) p.append("Telp: $storePhone\n")
-                p.append("--------------------------------\n\u001B\u0061\u0000ID   : #${trx.id}\nTgl  : $dateStr\nKasir: $kasirName\n--------------------------------\n")
+                p.append("--------------------------------\n")
 
+                // Info Transaksi
+                p.append("\u001B\u0061\u0000") // Rata Kiri
+                p.append("ID   : #${trx.id}\n")
+                p.append("Tgl  : $dateStr\n")
+                p.append("Kasir: $kasirName\n")
+
+                // 🔥 CETAK INFO MEJA & PELANGGAN DISINI (DI HEADER) 🔥
+                if (infoPelanggan.isNotEmpty()) {
+                    // Ubah format "Meja: 1 | An: Budi" menjadi baris baru agar rapi
+                    val formattedInfo = infoPelanggan.replace(" | ", "\n").trim()
+                    p.append("\u001B\u0045\u0001") // Bold Nyala
+                    p.append("$formattedInfo\n")
+                    p.append("\u001B\u0045\u0000") // Bold Mati
+                }
+
+                p.append("--------------------------------\n")
+
+                // Fungsi Helper Baris Rata Kanan Kiri
                 fun row(kiri: String, valDbl: Double, isMinus: Boolean = false): String {
                     val formattedVal = String.format(Locale("id","ID"), "Rp %,d", valDbl.toLong()).replace(',', '.')
                     val kanan = if(isMinus) "-$formattedVal" else formattedVal
@@ -594,25 +678,39 @@ class MainActivity : AppCompatActivity() {
                     return "$textKiri${" ".repeat(if(sisa>0) sisa else 1)}$kanan\n"
                 }
 
-                val items = trx.itemsSummary.split(";")
-                for (itemStr in items) {
+                // Loop Hanya Produk Murni
+                for (itemStr in productList) {
                     val parts = itemStr.split("|")
-                    if (parts.size == 4) {
-                        p.append("${parts[0]}\n")
-                        p.append(row("  ${parts[1]} x ${formatRupiah(parts[2].toDouble())}", parts[3].toDouble()))
-                    } else p.append("$itemStr\n")
+                    // Format: Nama|Qty|Harga|Total
+                    p.append("${parts[0]}\n")
+                    p.append(row("  ${parts[1]} x ${formatRupiah(parts[2].toDouble())}", parts[3].toDouble()))
                 }
+
                 p.append("--------------------------------\n")
+
+                // Totalan
                 p.append(row("Subtotal", trx.subtotal))
                 if (trx.discount > 0) p.append(row("Diskon", trx.discount, true))
                 if (trx.tax > 0) p.append(row("Pajak", trx.tax))
-                p.append("--------------------------------\n\u001B\u0045\u0001${row("TOTAL", trx.totalAmount)}\u001B\u0045\u0000")
-                if (trx.paymentMethod.contains("Tunai")) {
-                    p.append(row("Tunai", trx.cashReceived)); p.append(row("Kembali", trx.changeAmount))
-                } else p.append("Metode: ${trx.paymentMethod}\n")
-                p.append("\u001B\u0061\u0001--------------------------------\n${prefs.getString("email", "Terima Kasih!")}\n\n\n")
 
-                outputStream.write(p.toString().toByteArray()); outputStream.flush(); Thread.sleep(1500); socket.close()
+                p.append("--------------------------------\n")
+                p.append("\u001B\u0045\u0001${row("TOTAL", trx.totalAmount)}\u001B\u0045\u0000") // Total Bold
+
+                if (trx.paymentMethod.contains("Tunai")) {
+                    p.append(row("Tunai", trx.cashReceived))
+                    p.append(row("Kembali", trx.changeAmount))
+                } else {
+                    p.append("Metode: ${trx.paymentMethod}\n")
+                }
+
+                p.append("\u001B\u0061\u0001--------------------------------\n")
+                p.append("${prefs.getString("email", "Terima Kasih!")}\n\n\n")
+
+                outputStream.write(p.toString().toByteArray())
+                outputStream.flush()
+                Thread.sleep(1500)
+                socket.close()
+
             } catch (e: Exception) { try { socket?.close() } catch (e: Exception) {} }
         }.start()
     }

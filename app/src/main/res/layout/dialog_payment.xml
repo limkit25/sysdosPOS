@@ -66,29 +66,35 @@
             android:layout_height="wrap_content"
             android:text="Piutang"/>
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnCustomer"
+        <EditText
+            android:id="@+id/etCustomer"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="40dp"
-            android:text="Pelanggan"
-            android:textSize="12sp"
+            android:hint="Pelanggan"
             android:background="@drawable/bg_outline_primary"
-            android:textColor="#1976D2"
+            android:textColor="#333"
+            android:textColorHint="#757575"
+            android:paddingHorizontal="10dp"
+            android:textSize="12sp"
             android:layout_marginStart="8dp"
-            android:textAllCaps="false"/>
+            android:singleLine="true"
+            android:inputType="textPersonName"/>
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnTable"
+        <EditText
+            android:id="@+id/etTable"
             android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_weight="0.6"
             android:layout_height="40dp"
-            android:text="No Meja"
-            android:textSize="12sp"
+            android:hint="No Meja"
             android:background="@drawable/bg_outline_primary"
-            android:textColor="#1976D2"
+            android:textColor="#333"
+            android:textColorHint="#757575"
+            android:paddingHorizontal="10dp"
+            android:textSize="12sp"
             android:layout_marginStart="8dp"
-            android:textAllCaps="false"/>
+            android:singleLine="true"
+            android:inputType="text"/>
     </LinearLayout>
 
     <LinearLayout
