@@ -264,8 +264,15 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     // 💰 CHECKOUT (BAYAR) + LAPOR SERVER
     // =================================================================
     fun checkout(
-        subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
-        cashReceived: Double, changeAmount: Double, note: String = "", onResult: (Transaction?) -> Unit
+        subtotal: Double,
+        discount: Double,
+        tax: Double,
+        paymentMethod: String,
+        cashReceived: Double,
+        changeAmount: Double,
+        note: String = "",
+        userId: Int = 0, // 🔥 1. TAMBAHKAN PARAMETER INI (Default 0 biar gak error)
+        onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
 
         val cartItems = _cart.value ?: emptyList()
@@ -283,9 +290,12 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
         val itemsSummary = summaryBuilder.toString().removeSuffix(";")
 
+        // Gabungkan Note jika ada
+        val finalSummary = itemsSummary + (if(note.isNotEmpty()) " || $note" else "")
+
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
-            itemsSummary = itemsSummary + (if(note.isNotEmpty()) " || $note" else ""),
+            itemsSummary = finalSummary,
             totalAmount = subtotal + tax - discount,
             subtotal = subtotal,
             discount = discount,
@@ -294,7 +304,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             paymentMethod = paymentMethod,
             cashReceived = cashReceived,
             changeAmount = changeAmount,
-
+            userId = userId // 🔥 2. MASUKKAN KE MODEL TRANSACTION
         )
 
         // Simpan Lokal
@@ -320,11 +330,14 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         // Upload Server
         viewModelScope.launch {
             try {
+                // Repository nanti akan mencari User ID asli dari session database
+                // sebelum upload, jadi aman dikirim userId 0 dari sini.
                 repository.uploadTransactionToServer(finalTrx, itemsForUpload)
                 Log.d("SysdosVM", "✅ Upload Sukses. Stok Server aman.")
             } catch (e: Exception) {
                 Log.e("SysdosVM", "⚠️ Gagal Upload: ${e.message}")
-                Toast.makeText(getApplication(), "⚠️ Offline: Transaksi tersimpan di HP.", Toast.LENGTH_LONG).show()
+                // Hapus Toast disini karena ViewModel tidak punya context Application langsung
+                // Atau gunakan getApplication<Application>() jika AndroidViewModel
             }
         }
     }

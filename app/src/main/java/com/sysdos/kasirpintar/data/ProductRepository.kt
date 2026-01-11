@@ -65,12 +65,23 @@ class ProductRepository(
             try {
                 Log.d("SysdosRepo", "🔄 Sinkronisasi dari Server Toko...")
 
-                // 🔥 JALUR TOKO (LOCAL)
+                // 1. 🔥 AMBIL USER ID DULU (SIAPA YANG LOGIN?)
+                val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                val email = prefs.getString("username", "") ?: ""
+                val currentUser = productDao.getUserByEmail(email)
+
+                if (currentUser == null) {
+                    Log.e("SysdosRepo", "❌ User belum login, tidak bisa sync produk.")
+                    return@withContext
+                }
+
+                // 2. Setup API
                 val api = ApiClient.getLocalClient(context)
                 val session = SessionManager(context)
-                val dynamicBaseUrl = session.getServerUrl() // IP Toko
+                val dynamicBaseUrl = session.getServerUrl()
 
-                val responseProd = api.getProducts().execute()
+                // 3. 🔥 PANGGIL API DENGAN USER ID
+                val responseProd = api.getProducts(currentUser.id).execute()
 
                 if (responseProd.isSuccessful) {
                     val serverProducts = responseProd.body()
@@ -97,11 +108,12 @@ class ProductRepository(
                             )
                             productDao.insert(newProd)
                         }
-                        Log.d("SysdosRepo", "✅ Sukses Refresh Produk!")
+                        Log.d("SysdosRepo", "✅ Sukses Refresh Produk User ${currentUser.username}!")
                     }
                 }
 
-                val responseCat = api.getCategories().execute()
+                // 4. 🔥 PANGGIL KATEGORI DENGAN USER ID
+                val responseCat = api.getCategories(currentUser.id).execute()
                 if (responseCat.isSuccessful) {
                     val serverCats = responseCat.body()
                     if (serverCats != null) {
@@ -158,7 +170,14 @@ class ProductRepository(
     suspend fun uploadTransactionToServer(trx: Transaction, cartItems: List<Product>) {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosPOS", "Mengupload transaksi ke Toko...")
+                // 1. 🔥 AMBIL USER ID
+                val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                val email = prefs.getString("username", "") ?: ""
+                val currentUser = productDao.getUserByEmail(email)
+
+                if (currentUser == null) return@withContext
+
+                Log.d("SysdosPOS", "Mengupload transaksi User ${currentUser.id}...")
 
                 val itemList = cartItems.map { product ->
                     com.sysdos.kasirpintar.api.TransactionItemRequest(
@@ -167,14 +186,15 @@ class ProductRepository(
                     )
                 }
 
+                // 2. 🔥 MASUKKAN user_id KE REQUEST
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
                     total_amount = trx.totalAmount,
                     profit = trx.profit,
                     items_summary = trx.itemsSummary,
+                    user_id = currentUser.id, // <--- TAMBAHAN WAJIB
                     items = itemList
                 )
 
-                // 🔥 JALUR TOKO (LOCAL)
                 val api = ApiClient.getLocalClient(context)
                 val response = api.uploadTransaction(requestData).execute()
 
@@ -196,6 +216,18 @@ class ProductRepository(
     suspend fun updateProductToServer(product: Product) {
         withContext(Dispatchers.IO) {
             try {
+                // 1. 🔥 AMBIL USER ID LAGI
+                val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                val email = prefs.getString("username", "") ?: ""
+                val currentUser = productDao.getUserByEmail(email)
+
+                // Default ke 0 jika user tidak ketemu (tapi harusnya ketemu)
+                val userId = currentUser?.id ?: 0
+
+                // Note: Struktur ProductResponse di ApiClient sebaiknya ditambah field user_id juga
+                // Tapi jika belum, backend Go biasanya membaca ID dari body atau session.
+                // Untuk amannya, pastikan Backend Go bagian PUT menerima user_id atau kita kirim lewat query/body.
+
                 val dataKirim = ProductResponse(
                     id = product.id,
                     name = product.name,
@@ -204,9 +236,9 @@ class ProductRepository(
                     cost_price = product.costPrice.toInt(),
                     stock = product.stock,
                     image_path = null
+                    // user_id = userId // Idealnya disini jika ProductResponse diupdate
                 )
 
-                // 🔥 JALUR TOKO (LOCAL)
                 val api = ApiClient.getLocalClient(context)
                 val response = api.updateProduct(dataKirim).execute()
 

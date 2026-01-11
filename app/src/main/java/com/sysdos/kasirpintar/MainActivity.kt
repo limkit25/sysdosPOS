@@ -401,9 +401,8 @@ class MainActivity : AppCompatActivity() {
                 paymentMethod = method,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount,
-                // Kita kirim data gabungan ini sebagai parameter tambahan
-                // Jika error merah disini, lihat langkah selanjutnya di bawah!
-                note = finalNote
+                note = finalNote,  // Jangan lupa koma disini
+                userId = 0      // <--- TAMBAHKAN INI (INJECT DISINI)
             ) { transaction ->
                 if (transaction != null) {
 

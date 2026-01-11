@@ -8,15 +8,15 @@ import retrofit2.http.* // <--- PENTING: Ini meng-import Query, GET, POST, Body,
 
 interface ApiService {
 
-    // 1. GET PRODUCTS
+    // 1. GET PRODUCTS (Sekarang butuh user_id)
     @GET("api/products")
-    fun getProducts(): Call<List<ProductResponse>>
+    fun getProducts(@Query("user_id") userId: Int): Call<List<ProductResponse>>
 
-    // 2. GET CATEGORIES
+    // 2. GET CATEGORIES (Sekarang butuh user_id)
     @GET("api/categories")
-    fun getCategories(): Call<List<CategoryResponse>>
+    fun getCategories(@Query("user_id") userId: Int): Call<List<CategoryResponse>>
 
-    // 3. UPLOAD TRANSAKSI
+    // 3. UPLOAD TRANSAKSI (Request Body-nya yang berubah)
     @POST("api/transactions")
     fun uploadTransaction(@Body data: TransactionUploadRequest): Call<ResponseBody>
 
@@ -25,7 +25,7 @@ interface ApiService {
     @POST("api/products/import")
     fun importCsv(@Part file: MultipartBody.Part): Call<ResponseBody>
 
-    // 5. UPDATE PRODUCT (Reverse Sync)
+    // 5. UPDATE PRODUCT (Perlu kirim User ID atau di body)
     @PUT("api/products")
     fun updateProduct(@Body product: ProductResponse): Call<ResponseBody>
 
@@ -34,9 +34,11 @@ interface ApiService {
     fun registerUser(@Body user: User): Call<ResponseBody>
 
     // 7. 🔥 SCAN BARCODE (Pencarian Spesifik)
-    // Ini yang tadi error karena kurang import Query
     @GET("api/products")
-    fun getProductByBarcode(@Query("barcode") barcode: String): Call<List<ProductResponse>>
+    fun getProductByBarcode(
+        @Query("barcode") barcode: String,
+        @Query("user_id") userId: Int // <--- Tambahkan ini
+    ): Call<List<ProductResponse>>
 }
 
 // --- DATA CLASSES UNTUK RESPONSE API ---
@@ -56,10 +58,12 @@ data class CategoryResponse(
     val name: String
 )
 
+// 🔥 UPDATE DATA CLASS REQUEST:
 data class TransactionUploadRequest(
     val total_amount: Double,
     val profit: Double,
     val items_summary: String,
+    val user_id: Int, // <--- 🔥 TAMBAHAN WAJIB
     val items: List<TransactionItemRequest>
 )
 

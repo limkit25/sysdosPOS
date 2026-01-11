@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
-@Entity(tableName = "transaction_table") // <--- WAJIB SAMA DENGAN DAO
+@Entity(tableName = "transaction_table")
 data class Transaction(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val itemsSummary: String, // Ringkasan barang yg dibeli
@@ -18,5 +18,8 @@ data class Transaction(
     val changeAmount: Double,
     val subtotal: Double,
     val discount: Double,
-    val tax: Double
+    val tax: Double,
+
+    // 🔥 TAMBAHKAN KOLOM INI AGAR MULTI-TOKO BERJALAN 🔥
+    val userId: Int = 0
 ) : Parcelable
