@@ -34,7 +34,11 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     val allProducts: LiveData<List<Product>> = repository.allProducts.asLiveData()
     val allCategories: LiveData<List<Category>> = repository.allCategories.asLiveData()
     val allSuppliers: LiveData<List<Supplier>> = repository.allSuppliers.asLiveData()
-    val allUsers: LiveData<List<User>> = repository.allUsers.asLiveData()
+    val allUsers: LiveData<List<User>> = _currentUserId.switchMap { uid ->
+        repository.allUsers.asLiveData().map { users ->
+            users.filter { it.id == uid }
+        }
+    }
 
     // 🔥 PERBAIKAN 3: switchMap sekarang AMAN karena repository sudah ada isinya
     val allTransactions: LiveData<List<Transaction>> = _currentUserId.switchMap { uid ->
@@ -321,5 +325,19 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     fun syncData() {
         viewModelScope.launch { try { repository.refreshProductsFromApi() } catch (e: Exception) {} }
+    }
+    // 🔥 FUNGSI LOGOUT & RESET
+    fun logoutAndReset(onComplete: () -> Unit) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            // 1. Hapus Database
+            repository.clearAllData()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // 2. Kembali ke Main Thread untuk callback
+        launch(kotlinx.coroutines.Dispatchers.Main) {
+            onComplete()
+        }
     }
 }

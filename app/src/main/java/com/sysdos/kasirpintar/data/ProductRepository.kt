@@ -279,4 +279,8 @@ class ProductRepository(
             }
         }
     }
+    suspend fun clearAllData() {
+        // Menghapus semua isi tabel di database Room
+        AppDatabase.getDatabase(context).clearAllTables()
+    }
 }

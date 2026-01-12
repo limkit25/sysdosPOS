@@ -2,7 +2,6 @@ package com.sysdos.kasirpintar
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -49,7 +48,7 @@ class DashboardActivity : AppCompatActivity() {
         // AMBIL KARTU MENU
         val cardPOS = findViewById<CardView>(R.id.cardPOS)
         val cardProduct = findViewById<CardView>(R.id.cardProduct)
-        val cardPurchase = findViewById<CardView>(R.id.cardPurchase) // 🔥 MENU BARU
+        val cardPurchase = findViewById<CardView>(R.id.cardPurchase)
         val cardReport = findViewById<CardView>(R.id.cardReport)
         val cardUser = findViewById<CardView>(R.id.cardUser)
         val cardStore = findViewById<CardView>(R.id.cardStore)
@@ -80,23 +79,20 @@ class DashboardActivity : AppCompatActivity() {
         authorizedCards.add(cardPOS)
 
         if (role == "admin") {
-            // ADMIN: AKSES SEMUA
             authorizedCards.add(cardProduct)
-            authorizedCards.add(cardPurchase) // 🔥 TAMBAH MENU BELANJA
+            authorizedCards.add(cardPurchase)
             authorizedCards.add(cardReport)
             authorizedCards.add(cardUser)
             authorizedCards.add(cardShift)
             authorizedCards.add(cardStore)
             authorizedCards.add(cardPrinter)
         } else if (role == "manager") {
-            // MANAGER: TANPA USER & SETTING TOKO
             authorizedCards.add(cardProduct)
-            authorizedCards.add(cardPurchase) // 🔥 TAMBAH MENU BELANJA
+            authorizedCards.add(cardPurchase)
             authorizedCards.add(cardReport)
             authorizedCards.add(cardShift)
             authorizedCards.add(cardPrinter)
         } else {
-            // KASIR: HANYA LAPORAN & PRINTER (SIMPLE)
             authorizedCards.add(cardReport)
             authorizedCards.add(cardPrinter)
         }
@@ -139,7 +135,7 @@ class DashboardActivity : AppCompatActivity() {
         // --- CLICK LISTENERS ---
         cardPOS.setOnClickListener { checkModalBeforePOS() }
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
-        cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) } // 🔥 KLIK MENU BELANJA
+        cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) }
         cardReport.setOnClickListener { startActivity(Intent(this, SalesReportActivity::class.java)) }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
         cardStore.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "STORE") }) }
@@ -147,24 +143,32 @@ class DashboardActivity : AppCompatActivity() {
         cardShift?.setOnClickListener { startActivity(Intent(this, ShiftHistoryActivity::class.java)) }
         cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 2) }) }
 
+        // 🔥 FITUR LOGOUT BARU 🔥
         btnLogout.setOnClickListener {
             if (role == "kasir") {
+                // KASIR: Tutup Shift dulu
                 val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "Log Out Biasa")
                 AlertDialog.Builder(this)
                     .setTitle("Menu Keluar")
                     .setItems(options) { _, which ->
                         when (which) {
                             0 -> showCloseSessionDialog(session)
-                            1 -> performLogout(session)
+                            1 -> performLogout(session, false)
                         }
                     }
                     .setNegativeButton("Batal", null)
                     .show()
             } else {
+                // ADMIN/MANAGER: Pilihan Hapus Data
+                val options = arrayOf("🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
                 AlertDialog.Builder(this)
-                    .setTitle("Konfirmasi")
-                    .setMessage("Keluar aplikasi?")
-                    .setPositiveButton("Ya") { _, _ -> performLogout(session) }
+                    .setTitle("Konfirmasi Keluar")
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> performLogout(session, false)
+                            1 -> showResetConfirmation(session) // Konfirmasi lagi biar ga salah pencet
+                        }
+                    }
                     .setNegativeButton("Batal", null)
                     .show()
             }
@@ -202,38 +206,41 @@ class DashboardActivity : AppCompatActivity() {
     // --- FUNGSI BUKA SHIFT ---
     private fun checkModalBeforePOS() {
         val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("IS_OPEN", false)) {
-            showInputModalDialogForPOS(prefs)
+
+        // 🔥 AMBIL KEY UNIK (Agar shift Budi tidak kecampur shift Ani)
+        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+        val username = session.getString("username", "default") ?: "default"
+
+        if (!prefs.getBoolean("IS_OPEN_$username", false)) {
+            showInputModalDialogForPOS(prefs, username)
         } else {
             startActivity(Intent(this, MainActivity::class.java))
         }
     }
 
-    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences) {
+    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences, username: String) {
         val input = EditText(this)
         input.inputType = InputType.TYPE_CLASS_NUMBER
         input.hint = "Contoh: 200000"
 
         AlertDialog.Builder(this)
             .setTitle("🏪 Buka Shift Baru")
-            .setMessage("Masukkan Modal Awal:")
+            .setMessage("Halo $username! Masukkan Modal Awal:")
             .setView(input)
             .setCancelable(false)
             .setPositiveButton("BUKA") { _, _ ->
                 val modalStr = input.text.toString()
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
-                    val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-                    val user = session.getString("username", "Kasir") ?: "Kasir"
 
                     prefs.edit().apply {
-                        putBoolean("IS_OPEN", true)
-                        putFloat("MODAL_AWAL", modal.toFloat())
-                        putFloat("CASH_SALES_TODAY", 0f)
-                        putLong("START_TIME", System.currentTimeMillis())
+                        putBoolean("IS_OPEN_$username", true)
+                        putFloat("MODAL_AWAL_$username", modal.toFloat())
+                        putFloat("CASH_SALES_TODAY_$username", 0f)
+                        putLong("START_TIME_$username", System.currentTimeMillis())
                         apply()
                     }
-                    viewModel.openShift(user, modal)
+                    viewModel.openShift(username, modal)
                     Toast.makeText(this, "Shift Dibuka!", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, MainActivity::class.java))
                 }
@@ -245,9 +252,12 @@ class DashboardActivity : AppCompatActivity() {
     // --- FUNGSI TUTUP SHIFT ---
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
         val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val modalAwal = prefs.getFloat("MODAL_AWAL", 0f).toDouble()
-        val startTime = prefs.getLong("START_TIME", 0L)
+        val username = session.getString("username", "default") ?: "default"
 
+        val modalAwal = prefs.getFloat("MODAL_AWAL_$username", 0f).toDouble()
+        val startTime = prefs.getLong("START_TIME_$username", 0L)
+
+        // Filter transaksi user ini sejak buka shift
         val currentShiftTrx = allTrx.filter { it.timestamp >= startTime }
 
         var totalTunai = 0.0
@@ -272,17 +282,15 @@ class DashboardActivity : AppCompatActivity() {
         input.hint = "Total uang fisik di laci"
 
         val msg = """
-            🕒 Mulai Shift: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))}
+            🕒 Shift: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))}
             
-            💵 Rincian Pendapatan:
+            💵 Pendapatan Kasir:
             • Tunai    : ${formatRupiah(totalTunai)}
-            • QRIS     : ${formatRupiah(totalQRIS)}
-            • Transfer : ${formatRupiah(totalTransfer)}
-            • Debit    : ${formatRupiah(totalDebit)}
+            • Non-Tunai: ${formatRupiah(totalQRIS + totalTransfer + totalDebit)}
             ------------------------------
             TOTAL OMZET: ${formatRupiah(totalOmzetSistem)}
             
-            💰 Uang Fisik Seharusnya:
+            💰 Target Uang Fisik:
             Modal (${formatRupiah(modalAwal)}) + Tunai (${formatRupiah(totalTunai)})
             = ${formatRupiah(totalUangDiLaci)}
         """.trimIndent()
@@ -296,20 +304,69 @@ class DashboardActivity : AppCompatActivity() {
                 val strFisik = input.text.toString()
                 if (strFisik.isNotEmpty()) {
                     val uangFisik = strFisik.toDouble()
-                    val user = session.getString("username", "Kasir") ?: "Kasir"
 
-                    viewModel.closeShift(user, totalUangDiLaci, uangFisik)
-                    printShiftReport(user, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
+                    viewModel.closeShift(username, totalUangDiLaci, uangFisik)
+                    printShiftReport(username, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
 
-                    prefs.edit().clear().apply()
+                    // Reset Data Shift User Ini
+                    prefs.edit()
+                        .remove("IS_OPEN_$username")
+                        .remove("MODAL_AWAL_$username")
+                        .remove("START_TIME_$username")
+                        .remove("CASH_SALES_TODAY_$username")
+                        .apply()
+
                     Toast.makeText(this, "Laporan Dicetak & Shift Ditutup.", Toast.LENGTH_LONG).show()
-                    performLogout(session)
+                    performLogout(session, false)
                 } else {
                     Toast.makeText(this, "Wajib isi total uang fisik!", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Batal", null)
             .show()
+    }
+
+    private fun showResetConfirmation(session: android.content.SharedPreferences) {
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ PERINGATAN KERAS")
+            .setMessage("Anda yakin ingin MENGHAPUS SEMUA DATA?\n\nSemua Produk, Transaksi, dan User akan hilang permanen. Aplikasi akan kembali seperti baru diinstall.\n\nCocok untuk pergantian pengguna Trial.")
+            .setPositiveButton("YA, HAPUS SEMUANYA") { _, _ ->
+                performLogout(session, true) // TRUE = Reset Data
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun performLogout(session: android.content.SharedPreferences, resetData: Boolean) {
+        // 1. Hapus Sesi Lokal
+        session.edit().clear().apply()
+
+        // Hapus juga preferensi shift agar bersih
+        val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+        shiftPrefs.edit().clear().apply()
+
+        // 2. Jika Reset Data Diminta (Khusus Admin Trial)
+        if (resetData) {
+            Toast.makeText(this, "Sedang menghapus data...", Toast.LENGTH_SHORT).show()
+            viewModel.logoutAndReset {
+                // Callback setelah database bersih
+                signOutGoogleAndExit()
+            }
+        } else {
+            signOutGoogleAndExit()
+        }
+    }
+
+    private fun signOutGoogleAndExit() {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        googleSignInClient.signOut().addOnCompleteListener {
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 
     private fun printShiftReport(
@@ -390,24 +447,6 @@ class DashboardActivity : AppCompatActivity() {
                 e.printStackTrace()
             }
         }.start()
-    }
-
-    private fun performLogout(session: android.content.SharedPreferences) {
-        // 1. Hapus Sesi Lokal (Shared Preferences)
-        session.edit().clear().apply()
-
-        // 2. Cek apakah ada sesi Google yang aktif? Jika ya, Sign Out.
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
-        val googleSignInClient = GoogleSignIn.getClient(this, gso)
-
-        // Kita coba sign out Google (walaupun user login manual, ini aman dijalankan)
-        googleSignInClient.signOut().addOnCompleteListener {
-            // Setelah sukses logout Google (atau jika tidak ada sesi), pindah ke Login
-            val intent = Intent(this, LoginActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
-        }
     }
 
     private fun formatRupiah(amount: Double): String {

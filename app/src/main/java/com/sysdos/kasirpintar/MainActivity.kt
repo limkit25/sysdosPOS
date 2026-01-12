@@ -29,7 +29,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager // <--- IMPORT INI
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
@@ -63,6 +63,10 @@ class MainActivity : AppCompatActivity() {
     // PREFERENCE UNTUK SHIFT (MODAL & SESI)
     private lateinit var session: SharedPreferences
     private lateinit var shiftPrefs: SharedPreferences
+
+    // 🔥 HELPER: Ambil Key Unik Berdasarkan Username yg Login
+    private val currentUserKey: String
+        get() = session.getString("username", "default") ?: "default"
 
     // SCANNER LAUNCHER
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
@@ -110,7 +114,6 @@ class MainActivity : AppCompatActivity() {
             onItemLongClick = { product -> showCartActionDialog(product) }
         )
 
-        // 🔥 UBAH DARI GRID KE LINEAR (LIST) AGAR RAPI 🔥
         rvProducts.layoutManager = LinearLayoutManager(this)
         rvProducts.adapter = productAdapter
 
@@ -133,18 +136,13 @@ class MainActivity : AppCompatActivity() {
         // BIND VIEW BARU
         val cardStatus = findViewById<androidx.cardview.widget.CardView>(R.id.cardStatusServer)
         val tvStatus = findViewById<TextView>(R.id.tvStatusServer)
-        val dotStatus = findViewById<View>(R.id.viewStatusDot)
 
-        // 🔥 OBSERVE STATUS KONEKSI 🔥
         viewModel.isOnline.observe(this) { connected ->
             if (connected) {
-                // TAMPILAN ONLINE (HIJAU)
-                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#4CAF50")) // Hijau
+                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
                 tvStatus.text = "ONLINE"
-                // dotStatus.setBackgroundResource(R.drawable.bg_circle_white) // Jika mau ganti warna titik
             } else {
-                // TAMPILAN OFFLINE (MERAH)
-                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#FF5252")) // Merah
+                cardStatus.setCardBackgroundColor(android.graphics.Color.parseColor("#FF5252"))
                 tvStatus.text = "OFFLINE"
             }
         }
@@ -179,51 +177,37 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 7. HANDLE BACK BUTTON (Menu Keluar / Tutup Shift)
+        // 7. HANDLE BACK BUTTON
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // Langsung tutup halaman POS dan balik ke Dashboard
                 finish()
             }
         })
 
-        // 8. CEK STATUS SHIFT SAAT PERTAMA BUKA
+        // 8. CEK STATUS SHIFT
         checkShiftStatus()
-        // ============================================================
-        // 9. TES KONEKSI SERVER
-        // ============================================================
-        android.util.Log.d("Sysdos", "Mencoba menghubungi server...")
 
-        // 🔥 PERBAIKAN DI SINI: Gunakan .getInstance(this) 🔥
+        // 9. TES KONEKSI
         com.sysdos.kasirpintar.api.ApiClient.getLocalClient(this).getProducts(0).enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
-            override fun onResponse(
-                call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>,
-                response: retrofit2.Response<List<com.sysdos.kasirpintar.api.ProductResponse>>
-            ) {
+            override fun onResponse(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, response: retrofit2.Response<List<com.sysdos.kasirpintar.api.ProductResponse>>) {
                 if (response.isSuccessful) {
-                    val dataBarang = response.body()
-                    android.widget.Toast.makeText(this@MainActivity, "Koneksi OK! Data: ${dataBarang?.size}", android.widget.Toast.LENGTH_LONG).show()
-                } else {
-                    android.widget.Toast.makeText(this@MainActivity, "Server Error: ${response.code()}", android.widget.Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Koneksi OK!", Toast.LENGTH_LONG).show()
                 }
             }
-
-            override fun onFailure(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, t: Throwable) {
-                android.widget.Toast.makeText(this@MainActivity, "Gagal Konek. Cek IP di Login!", android.widget.Toast.LENGTH_LONG).show()
-            }
+            override fun onFailure(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, t: Throwable) {}
         })
-        // ============================================================
     }
 
 
     // ==========================================
-    // 🔥 LOGIKA SHIFT SYSTEM (BUKA/TUTUP)
+    // 🔥 LOGIKA SHIFT SYSTEM (PER USER)
     // ==========================================
 
     private fun checkShiftStatus() {
-        val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN", false)
+        // 🔥 GUNAKAN KEY UNIK: IS_OPEN_budi, IS_OPEN_ani, dst.
+        val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_$currentUserKey", false)
         if (!isShiftOpen) {
-            showOpenShiftDialog() // Paksa Input Modal
+            showOpenShiftDialog()
         }
     }
 
@@ -239,26 +223,23 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("☀️ Buka Shift (Input Modal)")
-            .setMessage("Masukkan jumlah uang modal di laci kasir:")
+            .setMessage("Halo $currentUserKey! Masukkan modal awal:")
             .setView(layout)
             .setCancelable(false)
             .setPositiveButton("BUKA KASIR") { _, _ ->
                 val modalStr = etModal.text.toString()
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
-                    val kasirName = session.getString("username", "Kasir") ?: "Kasir"
 
-                    // Simpan ke Prefs
+                    // 🔥 SIMPAN DENGAN KEY UNIK PER USER
                     shiftPrefs.edit()
-                        .putBoolean("IS_OPEN", true)
-                        .putFloat("MODAL_AWAL", modal.toFloat())
-                        .putLong("START_TIME", System.currentTimeMillis())
-                        .putFloat("CASH_SALES_TODAY", 0f)
+                        .putBoolean("IS_OPEN_$currentUserKey", true)
+                        .putFloat("MODAL_AWAL_$currentUserKey", modal.toFloat())
+                        .putLong("START_TIME_$currentUserKey", System.currentTimeMillis())
+                        .putFloat("CASH_SALES_TODAY_$currentUserKey", 0f)
                         .apply()
 
-                    // Simpan ke Database
-                    viewModel.openShift(kasirName, modal)
-
+                    viewModel.openShift(currentUserKey, modal)
                     Toast.makeText(this, "Shift Dibuka! Semangat 🚀", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Isi 0 jika tanpa modal", Toast.LENGTH_SHORT).show()
@@ -281,7 +262,6 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        // --- 1. DEFINISI VIEW ---
         val tvTitle = dialogView.findViewById<TextView>(R.id.tvPaymentTitle)
         val etReceived = dialogView.findViewById<EditText>(R.id.etAmountReceived)
         val btnBack = dialogView.findViewById<View>(R.id.btnBackPayment)
@@ -289,7 +269,6 @@ class MainActivity : AppCompatActivity() {
         val spMethod = dialogView.findViewById<Spinner>(R.id.spPaymentMethod)
         val gridQuickCash = dialogView.findViewById<View>(R.id.gridQuickCash)
 
-        // Inputan Tambahan (Pelanggan, Meja, Note)
         val etCustomer = dialogView.findViewById<EditText>(R.id.etCustomer)
         val etTable = dialogView.findViewById<EditText>(R.id.etTable)
         val etNote = dialogView.findViewById<EditText>(R.id.etNote)
@@ -297,7 +276,6 @@ class MainActivity : AppCompatActivity() {
         val btnDisc = dialogView.findViewById<Button>(R.id.btnDisc)
         val btnTax = dialogView.findViewById<Button>(R.id.btnTax)
 
-        // Tombol Uang Cepat
         val btnExact = dialogView.findViewById<Button>(R.id.btnExactMoney)
         val btn20k = dialogView.findViewById<Button>(R.id.btn20k)
         val btn50k = dialogView.findViewById<Button>(R.id.btn50k)
@@ -313,7 +291,6 @@ class MainActivity : AppCompatActivity() {
         val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer")
         spMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
 
-        // --- 2. LOGIKA HITUNG ULANG ---
         fun recalculate() {
             discValue = if (isDiscActive) currentSubtotal * 0.10 else 0.0
             val afterDisc = currentSubtotal - discValue
@@ -338,7 +315,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // --- 3. EVENT LISTENER ---
         spMethod.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (methods[position] == "Tunai") {
@@ -365,25 +341,20 @@ class MainActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { dialog.dismiss() }
 
-        // --- 4. TOMBOL BAYAR (CONFIRM) ---
         btnConfirm.setOnClickListener {
             val method = spMethod.selectedItem.toString()
             val receivedStr = etReceived.text.toString()
             var cashReceived = if (receivedStr.isNotEmpty()) receivedStr.toDouble() else 0.0
 
-            // 🔥 DISINI KITA AMBIL DATA INPUTAN (Saat tombol ditekan)
             val customerName = etCustomer.text.toString().trim()
             val tableNumber = etTable.text.toString().trim()
             val noteRaw = etNote.text.toString().trim()
 
-            // Gabungkan info ini menjadi satu string catatan
-            // Contoh: "Jangan pedas | Meja: 05 | An: Budi"
             var finalNote = noteRaw
             if (tableNumber.isNotEmpty()) finalNote += " | Meja: $tableNumber"
             if (customerName.isNotEmpty()) finalNote += " | An: $customerName"
             finalNote = finalNote.trim().removePrefix("|").trim()
 
-            // Validasi
             if (method == "Tunai" && cashReceived < grandTotal) {
                 Toast.makeText(this, "⚠️ Uang Kurang!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -392,8 +363,6 @@ class MainActivity : AppCompatActivity() {
 
             val changeAmount = cashReceived - grandTotal
 
-            // Panggil ViewModel Checkout
-            // (Pastikan ViewModel Anda sudah diupdate untuk menerima parameter note/customer)
             viewModel.checkout(
                 subtotal = currentSubtotal,
                 discount = discValue,
@@ -401,25 +370,20 @@ class MainActivity : AppCompatActivity() {
                 paymentMethod = method,
                 cashReceived = cashReceived,
                 changeAmount = changeAmount,
-                note = finalNote,   // <--- PASTIKAN ADA KOMA DI SINI
-
-                userId = 0          // 🔥 TAMBAHKAN BARIS INI
-
+                note = finalNote,
+                userId = 0
             ) { transaction ->
                 if (transaction != null) {
-
-                    // Update Shift (Khusus Tunai)
                     if (method == "Tunai") {
-                        val currentCash = shiftPrefs.getFloat("CASH_SALES_TODAY", 0f)
+                        // 🔥 GUNAKAN KEY UNIK SAAT UPDATE OMZET
+                        val currentCash = shiftPrefs.getFloat("CASH_SALES_TODAY_$currentUserKey", 0f)
                         val newTotal = currentCash + grandTotal.toFloat()
-                        shiftPrefs.edit().putFloat("CASH_SALES_TODAY", newTotal).apply()
+                        shiftPrefs.edit().putFloat("CASH_SALES_TODAY_$currentUserKey", newTotal).apply()
                     }
 
                     dialog.dismiss()
 
-                    // Auto Print
-                    val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-                    val printerMac = prefs.getString("printer_mac", "")
+                    val printerMac = getSharedPreferences("store_prefs", Context.MODE_PRIVATE).getString("printer_mac", "")
                     if (!printerMac.isNullOrEmpty()) {
                         printStruk(transaction)
                         Toast.makeText(this, "Mencetak Struk...", Toast.LENGTH_SHORT).show()
@@ -442,10 +406,6 @@ class MainActivity : AppCompatActivity() {
         recalculate()
         dialog.show()
     }
-
-    // ==========================================
-    // 🛠️ HELPER FUNCTIONS
-    // ==========================================
 
     private fun showCartPreview() {
         val currentCart = viewModel.cart.value ?: emptyList()
@@ -610,33 +570,36 @@ class MainActivity : AppCompatActivity() {
                 val dateStr = java.text.SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(java.util.Date(trx.timestamp))
 
                 // ==========================================
-                // 🔥 LOGIKA PEMISAHAN DATA BARU 🔥
+                // 🔥 LOGIKA PEMISAHAN DATA BARU (REVISI) 🔥
                 // ==========================================
 
-                // Kita pecah dulu string panjangnya
-                // itemsSummary isinya: "Nasi|1|1000|1000;Teh|1|500|500 || Meja: 1 | An: Budi"
-
-                // 1. Coba pisahkan Catatan Tambahan (Meja/Pelanggan) jika pakai pemisah " || "
-                val summaryParts = trx.itemsSummary.split(" || ")
-
-                // Bagian Produk adalah bagian pertama
-                val rawItems = summaryParts[0].split(";")
-
-                // Bagian Info Tambahan adalah bagian kedua (jika ada)
-                var infoPelanggan = if (summaryParts.size > 1) summaryParts[1] else ""
-
-                // 2. Validasi Ulang (Jaga-jaga kalau formatnya tercampur tanpa " || ")
+                // ItemsSummary contoh: "Nasi|1|1000|1000;Teh|1|500|500 || Meja: 1 | An: Budi"
+                val rawSummary = trx.itemsSummary
                 val productList = ArrayList<String>()
+                var infoPelanggan = ""
 
-                for (itemStr in rawItems) {
-                    val parts = itemStr.split("|")
-                    // Cek apakah ini format Produk Valid? (Harus ada 4 bagian: Nama|Qty|Harga|Total)
-                    if (parts.size == 4) {
-                        productList.add(itemStr)
-                    } else {
-                        // Kalau bukan format produk, berarti ini potongan catatan yang terselip
-                        if (itemStr.isNotBlank() && !itemStr.contains("An:")) {
-                            // Abaikan sampah, tapi kalau penting simpan
+                if (rawSummary.contains(" || ")) {
+                    val parts = rawSummary.split(" || ")
+                    // Bagian 1: Produk
+                    val productsPart = parts[0]
+                    // Bagian 2: Info (Meja/An)
+                    if (parts.size > 1) {
+                        infoPelanggan = parts[1]
+                    }
+
+                    // Pecah produk berdasarkan ";"
+                    val items = productsPart.split(";")
+                    for (item in items) {
+                        if (item.contains("|")) {
+                            productList.add(item)
+                        }
+                    }
+                } else {
+                    // Jika tidak ada info tambahan, berarti semua adalah produk
+                    val items = rawSummary.split(";")
+                    for (item in items) {
+                        if (item.contains("|")) {
+                            productList.add(item)
                         }
                     }
                 }
@@ -683,8 +646,11 @@ class MainActivity : AppCompatActivity() {
                 for (itemStr in productList) {
                     val parts = itemStr.split("|")
                     // Format: Nama|Qty|Harga|Total
-                    p.append("${parts[0]}\n")
-                    p.append(row("  ${parts[1]} x ${formatRupiah(parts[2].toDouble())}", parts[3].toDouble()))
+                    // Cek size minimal 4 agar tidak crash
+                    if (parts.size >= 4) {
+                        p.append("${parts[0]}\n")
+                        p.append(row("  ${parts[1]} x ${formatRupiah(parts[2].toDouble())}", parts[3].toDouble()))
+                    }
                 }
 
                 p.append("--------------------------------\n")
