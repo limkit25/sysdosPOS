@@ -5,25 +5,15 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.sysdos.kasirpintar.data.dao.CategoryDao
-import com.sysdos.kasirpintar.data.dao.ProductDao
-import com.sysdos.kasirpintar.data.dao.ShiftDao
-import com.sysdos.kasirpintar.data.dao.StockLogDao
-import com.sysdos.kasirpintar.data.model.StockLog
-import com.sysdos.kasirpintar.data.dao.SupplierDao
-import com.sysdos.kasirpintar.data.model.Category
-import com.sysdos.kasirpintar.data.model.Product
-import com.sysdos.kasirpintar.data.model.ShiftLog
-import com.sysdos.kasirpintar.data.model.Supplier
-import com.sysdos.kasirpintar.data.model.Transaction
-import com.sysdos.kasirpintar.data.model.User
+import com.sysdos.kasirpintar.data.dao.* // Import semua DAO
+import com.sysdos.kasirpintar.data.model.* // Import semua Model (Termasuk StoreConfig)
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 // [PERBAIKAN]
-// 1. Tambahkan StockLog::class di entities
-// 2. Naikkan version menjadi 4
+// 1. Ditambahkan StoreConfig::class ke entities (WAJIB)
+// 2. Version dinaikkan ke 6 (agar aman refresh database)
 @Database(
     entities = [
         Product::class,
@@ -32,18 +22,21 @@ import kotlinx.coroutines.launch
         User::class,
         ShiftLog::class,
         Supplier::class,
-        StockLog::class // <--- WAJIB ADA (Agar tabel dibuat)
+        StockLog::class,
+        StoreConfig::class // 🔥 WAJIB ADA: Agar tabel setting toko dibuat
     ],
-    version = 5, // <--- Naikkan ke 4
+    version = 6, // 🔥 Naikkan versi jika mengubah struktur
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
+    // Daftarkan semua DAO yang Anda pakai
     abstract fun productDao(): ProductDao
     abstract fun categoryDao(): CategoryDao
     abstract fun shiftDao(): ShiftDao
     abstract fun supplierDao(): SupplierDao
-    abstract fun stockLogDao(): StockLogDao // <--- WAJIB ADA (Agar bisa simpan history)
+    abstract fun stockLogDao(): StockLogDao
+    abstract fun storeConfigDao(): StoreConfigDao // 🔥 Akses ke DAO Config
 
     companion object {
         @Volatile
@@ -56,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sysdos_pos_db"
                 )
-                    .fallbackToDestructiveMigration() // Reset data lama agar struktur baru masuk
+                    .fallbackToDestructiveMigration() // Reset data jika versi berubah
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
@@ -69,8 +62,8 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
+                        // Isi data awal (Seed) jika perlu
                         val categoryDao = database.categoryDao()
-                        // Isi Kategori Default
                         categoryDao.insertCategory(Category(name = "Makanan"))
                         categoryDao.insertCategory(Category(name = "Minuman"))
                         categoryDao.insertCategory(Category(name = "Snack"))

@@ -133,7 +133,35 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         // --- CLICK LISTENERS ---
-        cardPOS.setOnClickListener { checkModalBeforePOS() }
+
+        // 🔥 PERBAIKAN DI SINI: CARD POS 🔥
+        cardPOS.setOnClickListener {
+            // 1. Ambil Status Lisensi TERBARU dari Prefs
+            val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+            val isExpired = licensePrefs.getBoolean("is_expired", false) // Default false agar aman
+
+            if (isExpired) {
+                // 2. Jika Expired, Tampilkan Peringatan
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ MASA TRIAL HABIS")
+                    .setMessage("Masa percobaan 7 hari telah berakhir.\n\nSilakan hubungi Admin Sysdos untuk upgrade ke Full Version.")
+                    .setPositiveButton("Hubungi Admin") { _, _ ->
+                        // Buka WA Admin
+                        try {
+                            val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/6281234567890"))
+                            startActivity(i)
+                        } catch (e: Exception) {
+                            Toast.makeText(this, "WhatsApp tidak terinstall", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .setNegativeButton("Tutup", null)
+                    .show()
+            } else {
+                // 3. Jika Aman, Lanjut Buka Kasir
+                checkModalBeforePOS()
+            }
+        }
+
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
         cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) }
         cardReport.setOnClickListener { startActivity(Intent(this, SalesReportActivity::class.java)) }
@@ -174,14 +202,25 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        // TRIAL CHECK
+        // TRIAL CHECK (VISUAL STATUS DI BAWAH)
         val tvTrial = findViewById<TextView>(R.id.tvTrialStatus)
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
         val isFull = prefs.getBoolean("is_full_version", false)
 
+        // Cek pesan dari server dulu (Prioritas)
+        val serverMsg = prefs.getString("license_msg", "")
+
         if (isFull) {
             tvTrial.visibility = View.GONE
+        } else if (!serverMsg.isNullOrEmpty()) {
+            // Jika ada pesan dari server (misal: "Expired" atau "Sisa X Hari")
+            tvTrial.text = serverMsg
+            tvTrial.visibility = View.VISIBLE
+            if (prefs.getBoolean("is_expired", false)) {
+                tvTrial.setTextColor(android.graphics.Color.RED)
+            }
         } else {
+            // Fallback: Hitung Manual (Jika server belum respon)
             val firstRunDate = prefs.getLong("first_install_date", 0L)
             if (firstRunDate != 0L) {
                 val now = System.currentTimeMillis()

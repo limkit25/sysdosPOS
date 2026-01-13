@@ -17,7 +17,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.ViewModelProvider // <--- PENTING
 import com.sysdos.kasirpintar.data.AppDatabase
+import com.sysdos.kasirpintar.viewmodel.ProductViewModel // <--- PENTING
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -27,6 +29,8 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 class StoreSettingsActivity : AppCompatActivity() {
+
+    private lateinit var viewModel: ProductViewModel // 🔥 1. VIEWMODEL
 
     // NAMA DB
     private val DB_NAME = "sysdos_pos_db"
@@ -54,7 +58,7 @@ class StoreSettingsActivity : AppCompatActivity() {
     // 🔥 KARTU-KARTU (Container) 🔥
     private lateinit var cardSectionStore: CardView
     private lateinit var cardSectionPrinter: CardView
-    private lateinit var cardSectionLicense: CardView // INI YANG BARU
+    private lateinit var cardSectionLicense: CardView
 
     // UI Umum
     private lateinit var tvTitle: TextView
@@ -72,18 +76,20 @@ class StoreSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_store_settings)
 
-        // 1. CEK INTENT
+        // 🔥 2. INIT VIEWMODEL
+        viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+
+        // 3. CEK INTENT
         isInitialSetup = intent.getBooleanExtra("IS_INITIAL_SETUP", false)
         val target = intent.getStringExtra("TARGET")
 
-        // 2. BIND VIEW
+        // 4. BIND VIEW
         tvTitle = findViewById(R.id.tvSettingsTitle)
         btnBack = findViewById(R.id.btnBack)
 
-        // Kartu Sections
         cardSectionStore = findViewById(R.id.cardSectionStore)
         cardSectionPrinter = findViewById(R.id.cardSectionPrinter)
-        cardSectionLicense = findViewById(R.id.cardSectionLicense) // Bind ID baru
+        cardSectionLicense = findViewById(R.id.cardSectionLicense)
 
         layoutSaveBtn = findViewById(R.id.layoutSaveBtn)
 
@@ -102,24 +108,27 @@ class StoreSettingsActivity : AppCompatActivity() {
         tvLicenseStatus = findViewById(R.id.tvLicenseStatus)
         btnActivate = findViewById(R.id.btnActivateLicense)
 
-        // 3. LOAD DATA
-        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        etStoreName.setText(prefs.getString("name", ""))
-        etStoreAddress.setText(prefs.getString("address", ""))
-        etStorePhone.setText(prefs.getString("phone", ""))
-        etStoreFooter.setText(prefs.getString("email", "Terima Kasih!"))
+        // 🔥 5. LOAD DATA TOKO DARI DATABASE (BUKAN PREFS LAGI) 🔥
+        viewModel.storeConfig.observe(this) { config ->
+            if (config != null) {
+                etStoreName.setText(config.storeName)
+                etStoreAddress.setText(config.storeAddress)
+                etStorePhone.setText(config.storePhone)
+                etStoreFooter.setText(config.strukFooter)
+            }
+        }
 
-        // 4. SETUP UI
+        // 6. SETUP UI
         listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
 
-        setupUI(target) // 🔥 DISINI LOGIKA SEMBUNYIKAN KARTU
+        setupUI(target) // Logika Sembunyikan Kartu
 
         checkLicenseStatus()
 
-        // 5. LISTENERS
+        // 7. LISTENERS
         btnBack.setOnClickListener { finish() }
-        btnSave.setOnClickListener { saveStoreSettings() }
+        btnSave.setOnClickListener { saveStoreSettings() } // 🔥 Panggil Fungsi Baru
         btnActivate.setOnClickListener { showActivationDialog() }
 
         // Bluetooth
@@ -131,7 +140,11 @@ class StoreSettingsActivity : AppCompatActivity() {
             if (checkPermission() && bluetoothAdapter?.isDiscovering == true) bluetoothAdapter.cancelDiscovery()
             val selectedMac = deviceMacs[position]
             val rawName = deviceList[position].split("\n")[0].replace(" [✅ AKTIF]", "")
+
+            // Simpan Printer Mac ke Prefs (Sementara tetap disana agar PrinterHelper mudah akses)
+            val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
             prefs.edit().putString("printer_mac", selectedMac).apply()
+
             Toast.makeText(this, "Printer Utama: $rawName", Toast.LENGTH_SHORT).show()
             showPairedDevices()
         }
@@ -145,34 +158,29 @@ class StoreSettingsActivity : AppCompatActivity() {
         if (target == "PRINTER" && checkPermission()) showPairedDevices()
     }
 
-    // --- SETUP TAMPILAN (LOGIKA UTAMA) ---
+    // --- SETUP TAMPILAN ---
     private fun setupUI(target: String?) {
         if (isInitialSetup) {
-            // SETUP AWAL
             tvTitle.text = "Setup Profil Toko"
             btnBack.visibility = View.GONE
             cardSectionPrinter.visibility = View.GONE
-            cardSectionLicense.visibility = View.GONE // Sembunyikan Lisensi dulu
-
+            cardSectionLicense.visibility = View.GONE
             btnSave.text = "SIMPAN & MASUK DASHBOARD"
             btnBackup.visibility = View.GONE
             btnRestore.visibility = View.VISIBLE
         }
         else if (target == "PRINTER") {
-            // MENU PRINTER
             tvTitle.text = "Koneksi Printer"
-            cardSectionStore.visibility = View.GONE   // Sembunyikan Toko
-            cardSectionLicense.visibility = View.GONE // 🔥 SEMBUNYIKAN LISENSI 🔥
-
+            cardSectionStore.visibility = View.GONE
+            cardSectionLicense.visibility = View.GONE
             layoutSaveBtn.visibility = View.GONE
             btnBackup.visibility = View.GONE
             btnRestore.visibility = View.GONE
         }
         else {
-            // MENU TOKO (DEFAULT)
             tvTitle.text = "Pengaturan Toko"
-            cardSectionPrinter.visibility = View.GONE // Sembunyikan Printer
-            cardSectionLicense.visibility = View.VISIBLE // TAMPILKAN LISENSI DISINI
+            cardSectionPrinter.visibility = View.GONE
+            cardSectionLicense.visibility = View.VISIBLE
         }
     }
 
@@ -182,25 +190,19 @@ class StoreSettingsActivity : AppCompatActivity() {
         val isFull = prefs.getBoolean("is_full_version", false)
 
         if (isFull) {
-            // === JIKA FULL VERSION (PREMIUM) ===
             tvLicenseStatus.text = "Status: FULL VERSION (Premium) ✅"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
             btnActivate.visibility = View.GONE
-
-            // 🔥 AKTIFKAN FITUR BACKUP 🔥
             btnBackup.isEnabled = true
-            btnBackup.alpha = 1.0f // Warna tombol normal (terang)
-            btnBackup.text = "BACKUP DATABASE" // Reset teks normal
+            btnBackup.alpha = 1.0f
+            btnBackup.text = "BACKUP DATABASE"
         } else {
-            // === JIKA MASIH TRIAL ===
             tvLicenseStatus.text = "Status: TRIAL (Terbatas) ⏳"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#E65100"))
             btnActivate.visibility = View.VISIBLE
-
-            // 🔥 MATIKAN FITUR BACKUP 🔥
-            btnBackup.isEnabled = false // Tombol tidak bisa diklik
-            btnBackup.alpha = 0.5f      // Tombol jadi transparan/abu-abu
-            btnBackup.text = "BACKUP 🔒 (Premium Only)" // Info ke user
+            btnBackup.isEnabled = false
+            btnBackup.alpha = 0.5f
+            btnBackup.text = "BACKUP 🔒 (Premium Only)"
         }
     }
 
@@ -216,7 +218,6 @@ class StoreSettingsActivity : AppCompatActivity() {
             .setView(input)
             .setPositiveButton("Aktifkan") { _, _ ->
                 val tokenInput = input.text.toString().trim()
-                // Rumus: Request + 11111
                 val validToken = (requestCode + 11111).toString()
 
                 if (tokenInput == validToken) {
@@ -285,25 +286,28 @@ class StoreSettingsActivity : AppCompatActivity() {
         }
     }
 
+    // 🔥 FUNGSI SIMPAN BARU (KE DATABASE) 🔥
     private fun saveStoreSettings() {
         val name = etStoreName.text.toString()
+        val address = etStoreAddress.text.toString()
+        val phone = etStorePhone.text.toString()
+        val footer = etStoreFooter.text.toString()
+
         if (name.isEmpty()) { Toast.makeText(this, "Nama Toko Wajib Diisi!", Toast.LENGTH_SHORT).show(); return }
 
+        // Ambil Mac Address Printer dari Prefs (agar tidak hilang saat save config)
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putString("name", name)
-            putString("address", etStoreAddress.text.toString())
-            putString("phone", etStorePhone.text.toString())
-            putString("email", etStoreFooter.text.toString())
-            apply()
-        }
+        val printerMac = prefs.getString("printer_mac", "")
+
+        // 🔥 SIMPAN KE DATABASE VIA VIEWMODEL 🔥
+        viewModel.saveStoreSettings(name, address, phone, footer, printerMac)
 
         if (isInitialSetup) {
             val intent = Intent(this, DashboardActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent); finish()
         } else {
-            Toast.makeText(this, "Info Toko Disimpan!", Toast.LENGTH_SHORT).show(); finish()
+            Toast.makeText(this, "Info Toko Disimpan ke Database!", Toast.LENGTH_SHORT).show(); finish()
         }
     }
 

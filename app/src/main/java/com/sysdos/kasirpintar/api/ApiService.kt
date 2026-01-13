@@ -39,9 +39,28 @@ interface ApiService {
         @Query("barcode") barcode: String,
         @Query("user_id") userId: Int // <--- Tambahkan ini
     ): Call<List<ProductResponse>>
+    // 🔥 ENDPOINT KHUSUS PROMO (Url-nya beda, nanti kita atur di Client)
+    @POST
+    fun sendLeadData(@Url url: String, @Body data: LeadRequest): Call<ResponseBody>
+
+    @GET
+    fun checkLicense(@Url url: String, @Query("email") email: String): Call<LicenseResponse>
 }
 
 // --- DATA CLASSES UNTUK RESPONSE API ---
+data class LicenseResponse(
+    val status: String,    // "TRIAL", "EXPIRED", "PREMIUM"
+    val days_left: Int,
+    val message: String
+)
+data class LeadRequest(
+    val name: String,
+    val store_name: String,
+    val store_address: String, // Baru
+    val store_phone: String,   // Baru
+    val phone: String,
+    val email: String
+)
 
 data class ProductResponse(
     val id: Int,

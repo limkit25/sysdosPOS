@@ -84,12 +84,17 @@ class LoginActivity : AppCompatActivity() {
         } catch (e: Exception) {}
 
         // 1. LOGIN MANUAL
+        // 1. LOGIN MANUAL
         btnLogin.setOnClickListener {
             val u = etUser.text.toString().trim()
             val p = etPass.text.toString().trim()
             if (u.isNotEmpty() && p.isNotEmpty()) {
                 viewModel.login(u, p) { user ->
                     if (user != null) {
+                        // 🔥 1. SISIPKAN DI SINI (Login Manual Sukses)
+                        viewModel.sendDataToSalesSystem(user)
+                        viewModel.checkServerLicense(user.username)
+
                         saveSession(user)
                         startActivity(Intent(this, DashboardActivity::class.java))
                         finish()
@@ -133,20 +138,18 @@ class LoginActivity : AppCompatActivity() {
         val email = account.email ?: return
         val name = account.displayName ?: "User Google"
 
-        // 🔥 PERBAIKAN: Gunakan fungsi checkGoogleUser (bukan observe allUsers)
         viewModel.checkGoogleUser(email) { existingUser ->
 
             if (existingUser != null) {
                 // === SKENARIO 1: USER SUDAH ADA ===
                 Log.d("GoogleLogin", "User lama ditemukan: ${existingUser.username}")
 
-                // 1. Simpan Sesi
+                // 🔥 2. SISIPKAN DI SINI (Opsional: Lapor User Lama Login)
+                viewModel.sendDataToSalesSystem(existingUser)
+                viewModel.checkServerLicense(existingUser.username)
+
                 saveSession(existingUser)
-
-                // 2. Lapor ke Server (Sync status)
                 syncToWeb(existingUser)
-
-                // 3. Pindah ke Dashboard
                 gotoDashboard()
 
             } else {
@@ -156,22 +159,20 @@ class LoginActivity : AppCompatActivity() {
                 val newUser = User(
                     name = name,
                     username = email,
-                    password = "google_auth", // Password dummy
-                    role = "admin" // Default jadi Admin
+                    password = "google_auth",
+                    role = "admin"
                 )
 
-                // 1. Simpan ke Database HP
                 viewModel.insertUser(newUser)
 
-                // 2. Kirim ke Web Pusat
-                syncToWeb(newUser)
+                // 🔥 3. SISIPKAN DI SINI (WAJIB: User Baru dari Google)
+                viewModel.sendDataToSalesSystem(newUser)
 
-                // 3. Simpan Sesi
+                syncToWeb(newUser)
                 saveSession(newUser)
 
                 Toast.makeText(this, "Selamat Datang Admin, $name!", Toast.LENGTH_LONG).show()
 
-                // 4. User baru wajib ke Setup Toko
                 val intent = Intent(this, StoreSettingsActivity::class.java)
                 intent.putExtra("IS_INITIAL_SETUP", true)
                 startActivity(intent)
@@ -243,6 +244,7 @@ class LoginActivity : AppCompatActivity() {
 
                 // 2. SIMPAN DATABASE HP (LOKAL)
                 viewModel.insertUser(newUser)
+                viewModel.sendDataToSalesSystem(newUser)
 
                 // 3. KIRIM KE WEB (CLOUD)
                 // Kita panggil manual disini agar bisa mengontrol kapan 'finish()' dipanggil
@@ -316,7 +318,7 @@ class LoginActivity : AppCompatActivity() {
     // Fungsi kecil untuk pindah halaman biar rapi
     private fun finalizeRegistration(user: User, dialog: AlertDialog) {
         saveSession(user)
-
+        viewModel.checkServerLicense(user.username)
         // Ke Setup Toko
         val intent = Intent(this, StoreSettingsActivity::class.java)
         intent.putExtra("IS_INITIAL_SETUP", true)

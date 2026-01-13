@@ -5,46 +5,57 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.*
 import com.sysdos.kasirpintar.api.ApiClient
+import com.sysdos.kasirpintar.api.LeadRequest // Pastikan import ini ada
 import com.sysdos.kasirpintar.data.AppDatabase
 import com.sysdos.kasirpintar.data.ProductRepository
 import com.sysdos.kasirpintar.data.model.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
-    // 🔥 PERBAIKAN 1: Inisialisasi Repository LANGSUNG DISINI (Bukan di init)
-    // Agar variabel di bawahnya bisa membacanya tanpa NullPointerException
+    // 🔥 PERBAIKAN 1: Repository DI-INIT LANGSUNG (Paling Atas)
+    // Agar siap dipakai oleh variabel di bawahnya
     private val repository: ProductRepository
 
     init {
-        // 🔥 PERBAIKAN 2: Pindahkan pembuatan Repository ke paling atas blok init
         val database = AppDatabase.getDatabase(application)
         repository = ProductRepository(
             application,
             database.productDao(),
             database.shiftDao(),
-            database.stockLogDao()
+            database.stockLogDao(),
+            database.storeConfigDao()
         )
     }
 
-    // 🔥 STATE USER (Dideklarasikan setelah repository siap, aman)
+    // 🔥 PERBAIKAN 2: _currentUserId DITARUH DI ATAS
+    // Wajib ada sebelum dipanggil oleh switchMap di bawah
     private val _currentUserId = MutableLiveData<Int>(0)
 
-    // --- LIVE DATA ---
+    // --- LIVE DATA (Sekarang aman karena repository & userId sudah ada di atas) ---
+
+    // Data Master
     val allProducts: LiveData<List<Product>> = repository.allProducts.asLiveData()
     val allCategories: LiveData<List<Category>> = repository.allCategories.asLiveData()
     val allSuppliers: LiveData<List<Supplier>> = repository.allSuppliers.asLiveData()
+
+    // Setting Toko
+    val storeConfig: LiveData<StoreConfig?> = repository.storeConfig.asLiveData()
+
+    // Filter User (Hanya tampilkan diri sendiri)
     val allUsers: LiveData<List<User>> = _currentUserId.switchMap { uid ->
         repository.allUsers.asLiveData().map { users ->
             users.filter { it.id == uid }
         }
     }
 
-    // 🔥 PERBAIKAN 3: switchMap sekarang AMAN karena repository sudah ada isinya
+    // Filter Transaksi (Sesuai User Login)
     val allTransactions: LiveData<List<Transaction>> = _currentUserId.switchMap { uid ->
         repository.getTransactionsByUser(uid).asLiveData()
     }
 
+    // Filter Shift (Sesuai User Login)
     val allShiftLogs: LiveData<List<ShiftLog>> = _currentUserId.switchMap { uid ->
         repository.getShiftLogsByUser(uid).asLiveData()
     }
@@ -323,21 +334,116 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         onResult(details)
     }
 
+    // 🔥 UPDATE FUNGSI INI (Agar saat simpan toko, data di web ikut berubah)
+    fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?) = viewModelScope.launch {
+        // 1. Simpan ke Database Lokal (HP)
+        val config = StoreConfig(
+            id = 1,
+            storeName = name,
+            storeAddress = address,
+            storePhone = phone,
+            strukFooter = footer,
+            printerMac = printerMac
+        )
+        repository.saveStoreConfig(config)
+
+        // 2. 🔥 KIRIM UPDATE KE SERVER SALES 🔥
+        // Ambil data user yang sedang login
+        val uid = _currentUserId.value ?: 0
+        if (uid > 0) {
+            // Kita cari data user berdasarkan ID
+            val allUsers = repository.allUsers.first() // Ambil list user dari DB
+            val currentUser = allUsers.find { it.id == uid }
+
+            if (currentUser != null) {
+                Log.d("SalesCRM", "Mengirim update toko ke server...")
+                sendDataToSalesSystem(currentUser) // <-- INI KUNCINYA
+            }
+        }
+    }
+
     fun syncData() {
         viewModelScope.launch { try { repository.refreshProductsFromApi() } catch (e: Exception) {} }
     }
+
     // 🔥 FUNGSI LOGOUT & RESET
     fun logoutAndReset(onComplete: () -> Unit) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
-            // 1. Hapus Database
             repository.clearAllData()
         } catch (e: Exception) {
             e.printStackTrace()
         }
-
-        // 2. Kembali ke Main Thread untuk callback
         launch(kotlinx.coroutines.Dispatchers.Main) {
             onComplete()
+        }
+    }
+
+    // 🔥 UPDATE: KIRIM DATA LENGKAP (TOKO & ALAMAT) KE SALES
+    fun sendDataToSalesSystem(user: User) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            // 1. Ambil Config Toko dari Database (agar data real)
+            val storeConfig = repository.getStoreConfigDirect()
+
+            // 2. Siapkan Data default jika user belum setting toko
+            val finalStoreName = if (!storeConfig?.storeName.isNullOrEmpty()) storeConfig!!.storeName else "Toko Belum Setup"
+            val finalAddress = if (!storeConfig?.storeAddress.isNullOrEmpty()) storeConfig!!.storeAddress else "-"
+            val finalStorePhone = if (!storeConfig?.storePhone.isNullOrEmpty()) storeConfig!!.storePhone else "-"
+
+            // 3. Setup Request
+            val promoUrl = "https://backend.sysdos.my.id/api/register-lead" // Sesuaikan IP
+
+            val request = LeadRequest(
+                name = user.name ?: "User Baru",
+                store_name = finalStoreName,     // ✅ Nama Toko Asli
+                store_address = finalAddress,    // ✅ Alamat Toko Asli
+                store_phone = finalStorePhone,   // ✅ Telepon Toko Asli
+                phone = user.phone ?: "-",
+                email = user.username
+            )
+
+            // 4. Kirim
+            val api = ApiClient.getLocalClient(getApplication())
+            api.sendLeadData(promoUrl, request).execute()
+
+            Log.d("SalesCRM", "✅ Data LENGKAP berhasil dikirim ke Tim Sales")
+        } catch (e: Exception) {
+            Log.e("SalesCRM", "⚠️ Gagal lapor sales: ${e.message}")
+        }
+    }
+    // 🔥 FUNGSI CEK LISENSI KE VPS
+    fun checkServerLicense(email: String) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val url = "https://backend.sysdos.my.id/api/check-license"
+            val api = ApiClient.getLocalClient(getApplication())
+
+            val response = api.checkLicense(url, email).execute()
+
+            if (response.isSuccessful && response.body() != null) {
+                val data = response.body()!!
+
+                // Simpan Status ke SharedPreferences agar bisa dipakai offline sementara
+                val prefs = getApplication<Application>().getSharedPreferences("app_license", Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+
+                if (data.status == "PREMIUM") {
+                    editor.putBoolean("is_full_version", true)
+                    editor.putString("license_msg", "FULL VERSION (Premium)")
+                } else if (data.status == "EXPIRED") {
+                    editor.putBoolean("is_full_version", false)
+                    editor.putBoolean("is_expired", true) // Tandai Expired
+                    editor.putString("license_msg", "Masa Trial Habis! Silakan Beli.")
+                } else {
+                    // Masih Trial
+                    editor.putBoolean("is_full_version", false)
+                    editor.putBoolean("is_expired", false)
+                    editor.putString("license_msg", "Trial Sisa ${data.days_left} Hari")
+                }
+                editor.apply()
+
+                Log.d("License", "Status: ${data.status}")
+            }
+        } catch (e: Exception) {
+            Log.e("License", "Gagal cek lisensi: ${e.message}")
         }
     }
 }

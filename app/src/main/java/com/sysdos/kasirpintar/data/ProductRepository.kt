@@ -9,6 +9,7 @@ import com.sysdos.kasirpintar.data.model.*
 
 import com.sysdos.kasirpintar.api.ApiClient // <--- SUDAH HYBRID
 import com.sysdos.kasirpintar.api.ProductResponse
+import com.sysdos.kasirpintar.data.dao.StoreConfigDao
 import com.sysdos.kasirpintar.utils.SessionManager
 
 import kotlinx.coroutines.Dispatchers
@@ -24,9 +25,19 @@ class ProductRepository(
     private val context: Context,
     private val productDao: ProductDao,
     private val shiftDao: ShiftDao,
-    private val stockLogDao: StockLogDao
+    private val stockLogDao: StockLogDao,
+    private val storeConfigDao: StoreConfigDao
 ) {
+    // --- STORE CONFIG ---
+    val storeConfig = storeConfigDao.getStoreConfig()
 
+    suspend fun saveStoreConfig(config: StoreConfig) {
+        storeConfigDao.saveConfig(config)
+    }
+
+    suspend fun getStoreConfigDirect(): StoreConfig? {
+        return storeConfigDao.getStoreConfigOneShot()
+    }
     // =================================================================
     // 📦 1. PRODUK (PAKAI JALUR LOKAL / TOKO)
     // =================================================================
