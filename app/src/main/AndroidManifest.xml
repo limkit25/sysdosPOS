@@ -83,6 +83,9 @@
             android:name=".WelcomeActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity android:name=".AboutActivity" android:exported="false" android:label="Tentang Aplikasi"/>
+        <activity android:name=".PaymentActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
 
     </application>
 

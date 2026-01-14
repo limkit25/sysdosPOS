@@ -45,9 +45,30 @@ interface ApiService {
 
     @GET
     fun checkLicense(@Url url: String, @Query("email") email: String): Call<LicenseResponse>
+
+
+    @GET("api/check-license")
+    fun checkLicense(@Query("email") email: String): Call<LicenseCheckResponse>
+
+    // 🔥 3. TAMBAHKAN ENDPOINT INI (Agar AboutActivity.kt tidak error)
+    @POST("api/payment/create")
+    fun createPayment(@Query("email") email: String): Call<PaymentResponse>
 }
 
+// 🔥 1. TAMBAHKAN CLASS INI (Untuk menangkap balasan link bayar dari server)
+data class PaymentResponse(
+    val payment_url: String,
+    val order_id: String
+)
+
+// 🔥 2. TAMBAHKAN CLASS INI (Untuk menangkap status lisensi)
+data class LicenseCheckResponse(
+    val status: String,
+    val days_left: Int,
+    val message: String
+)
 // --- DATA CLASSES UNTUK RESPONSE API ---
+
 data class LicenseResponse(
     val status: String,    // "TRIAL", "EXPIRED", "PREMIUM"
     val days_left: Int,

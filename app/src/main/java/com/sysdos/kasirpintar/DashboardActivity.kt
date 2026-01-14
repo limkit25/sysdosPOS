@@ -54,6 +54,8 @@ class DashboardActivity : AppCompatActivity() {
         val cardStore = findViewById<CardView>(R.id.cardStore)
         val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
         val cardShift = findViewById<CardView>(R.id.cardShift)
+        // 🔥 1. DEFINISI CARD ABOUT BARU
+        val cardAbout = findViewById<CardView>(R.id.cardAbout)
 
         val tvLowStock = findViewById<TextView>(R.id.tvLowStockCount)
         val cardLowStockInfo = findViewById<CardView>(R.id.cardLowStockInfo)
@@ -77,6 +79,8 @@ class DashboardActivity : AppCompatActivity() {
 
         // SEMUA BISA AKSES KASIR
         authorizedCards.add(cardPOS)
+        // 🔥 2. SEMUA BISA AKSES ABOUT (Tambahkan disini)
+
 
         if (role == "admin") {
             authorizedCards.add(cardProduct)
@@ -96,7 +100,7 @@ class DashboardActivity : AppCompatActivity() {
             authorizedCards.add(cardReport)
             authorizedCards.add(cardPrinter)
         }
-
+        authorizedCards.add(cardAbout)
         for (card in authorizedCards) {
             mainGrid.addView(card)
             card.visibility = View.VISIBLE
@@ -133,20 +137,15 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         // --- CLICK LISTENERS ---
-
-        // 🔥 PERBAIKAN DI SINI: CARD POS 🔥
         cardPOS.setOnClickListener {
-            // 1. Ambil Status Lisensi TERBARU dari Prefs
             val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
-            val isExpired = licensePrefs.getBoolean("is_expired", false) // Default false agar aman
+            val isExpired = licensePrefs.getBoolean("is_expired", false)
 
             if (isExpired) {
-                // 2. Jika Expired, Tampilkan Peringatan
                 AlertDialog.Builder(this)
                     .setTitle("⚠️ MASA TRIAL HABIS")
                     .setMessage("Masa percobaan 7 hari telah berakhir.\n\nSilakan hubungi Admin Sysdos untuk upgrade ke Full Version.")
                     .setPositiveButton("Hubungi Admin") { _, _ ->
-                        // Buka WA Admin
                         try {
                             val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/6281234567890"))
                             startActivity(i)
@@ -157,7 +156,6 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Tutup", null)
                     .show()
             } else {
-                // 3. Jika Aman, Lanjut Buka Kasir
                 checkModalBeforePOS()
             }
         }
@@ -171,10 +169,20 @@ class DashboardActivity : AppCompatActivity() {
         cardShift?.setOnClickListener { startActivity(Intent(this, ShiftHistoryActivity::class.java)) }
         cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 2) }) }
 
-        // 🔥 FITUR LOGOUT BARU 🔥
+        // 🔥 3. KLIK CARD ABOUT -> PINDAH HALAMAN
+        cardAbout.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+
+        // 🔥 FITUR LOGOUT (Update: Sembunyikan Reset jika Premium) 🔥
         btnLogout.setOnClickListener {
+            // 1. Cek dulu status Lisensi
+            val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+            val isFullVersion = licensePrefs.getBoolean("is_full_version", false)
+
             if (role == "kasir") {
-                // KASIR: Tutup Shift dulu
+                // === KASIR ===
+                // Kasir selalu butuh tutup shift, tidak butuh reset data
                 val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "Log Out Biasa")
                 AlertDialog.Builder(this)
                     .setTitle("Menu Keluar")
@@ -187,40 +195,53 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Batal", null)
                     .show()
             } else {
-                // ADMIN/MANAGER: Pilihan Hapus Data
-                val options = arrayOf("🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
-                AlertDialog.Builder(this)
-                    .setTitle("Konfirmasi Keluar")
-                    .setItems(options) { _, which ->
-                        when (which) {
-                            0 -> performLogout(session, false)
-                            1 -> showResetConfirmation(session) // Konfirmasi lagi biar ga salah pencet
+                // === ADMIN / MANAGER ===
+
+                if (isFullVersion) {
+                    // ✅ JIKA SUDAH PREMIUM:
+                    // Langsung Logout biasa. Tombol Reset DIHAPUS agar aman.
+                    AlertDialog.Builder(this)
+                        .setTitle("Konfirmasi Keluar")
+                        .setMessage("Apakah Anda yakin ingin keluar dari aplikasi?")
+                        .setPositiveButton("YA, KELUAR") { _, _ ->
+                            performLogout(session, false) // False = Tidak hapus data
                         }
-                    }
-                    .setNegativeButton("Batal", null)
-                    .show()
+                        .setNegativeButton("Batal", null)
+                        .show()
+
+                } else {
+                    // ⏳ JIKA MASIH TRIAL:
+                    // Masih butuh tombol Reset untuk uji coba ulang
+                    val options = arrayOf("🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
+                    AlertDialog.Builder(this)
+                        .setTitle("Menu Keluar (Mode Trial)")
+                        .setItems(options) { _, which ->
+                            when (which) {
+                                0 -> performLogout(session, false)
+                                1 -> showResetConfirmation(session) // Hati-hati, hapus data
+                            }
+                        }
+                        .setNegativeButton("Batal", null)
+                        .show()
+                }
             }
         }
 
-        // TRIAL CHECK (VISUAL STATUS DI BAWAH)
+        // TRIAL CHECK
         val tvTrial = findViewById<TextView>(R.id.tvTrialStatus)
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
         val isFull = prefs.getBoolean("is_full_version", false)
-
-        // Cek pesan dari server dulu (Prioritas)
         val serverMsg = prefs.getString("license_msg", "")
 
         if (isFull) {
             tvTrial.visibility = View.GONE
         } else if (!serverMsg.isNullOrEmpty()) {
-            // Jika ada pesan dari server (misal: "Expired" atau "Sisa X Hari")
             tvTrial.text = serverMsg
             tvTrial.visibility = View.VISIBLE
             if (prefs.getBoolean("is_expired", false)) {
                 tvTrial.setTextColor(android.graphics.Color.RED)
             }
         } else {
-            // Fallback: Hitung Manual (Jika server belum respon)
             val firstRunDate = prefs.getLong("first_install_date", 0L)
             if (firstRunDate != 0L) {
                 val now = System.currentTimeMillis()
@@ -245,8 +266,6 @@ class DashboardActivity : AppCompatActivity() {
     // --- FUNGSI BUKA SHIFT ---
     private fun checkModalBeforePOS() {
         val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-
-        // 🔥 AMBIL KEY UNIK (Agar shift Budi tidak kecampur shift Ani)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "default") ?: "default"
 
@@ -271,7 +290,6 @@ class DashboardActivity : AppCompatActivity() {
                 val modalStr = input.text.toString()
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
-
                     prefs.edit().apply {
                         putBoolean("IS_OPEN_$username", true)
                         putFloat("MODAL_AWAL_$username", modal.toFloat())
@@ -295,8 +313,6 @@ class DashboardActivity : AppCompatActivity() {
 
         val modalAwal = prefs.getFloat("MODAL_AWAL_$username", 0f).toDouble()
         val startTime = prefs.getLong("START_TIME_$username", 0L)
-
-        // Filter transaksi user ini sejak buka shift
         val currentShiftTrx = allTrx.filter { it.timestamp >= startTime }
 
         var totalTunai = 0.0
@@ -343,18 +359,14 @@ class DashboardActivity : AppCompatActivity() {
                 val strFisik = input.text.toString()
                 if (strFisik.isNotEmpty()) {
                     val uangFisik = strFisik.toDouble()
-
                     viewModel.closeShift(username, totalUangDiLaci, uangFisik)
                     printShiftReport(username, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
-
-                    // Reset Data Shift User Ini
                     prefs.edit()
                         .remove("IS_OPEN_$username")
                         .remove("MODAL_AWAL_$username")
                         .remove("START_TIME_$username")
                         .remove("CASH_SALES_TODAY_$username")
                         .apply()
-
                     Toast.makeText(this, "Laporan Dicetak & Shift Ditutup.", Toast.LENGTH_LONG).show()
                     performLogout(session, false)
                 } else {
@@ -370,27 +382,20 @@ class DashboardActivity : AppCompatActivity() {
             .setTitle("⚠️ PERINGATAN KERAS")
             .setMessage("Anda yakin ingin MENGHAPUS SEMUA DATA?\n\nSemua Produk, Transaksi, dan User akan hilang permanen. Aplikasi akan kembali seperti baru diinstall.\n\nCocok untuk pergantian pengguna Trial.")
             .setPositiveButton("YA, HAPUS SEMUANYA") { _, _ ->
-                performLogout(session, true) // TRUE = Reset Data
+                performLogout(session, true)
             }
             .setNegativeButton("Batal", null)
             .show()
     }
 
     private fun performLogout(session: android.content.SharedPreferences, resetData: Boolean) {
-        // 1. Hapus Sesi Lokal
         session.edit().clear().apply()
-
-        // Hapus juga preferensi shift agar bersih
         val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
         shiftPrefs.edit().clear().apply()
 
-        // 2. Jika Reset Data Diminta (Khusus Admin Trial)
         if (resetData) {
             Toast.makeText(this, "Sedang menghapus data...", Toast.LENGTH_SHORT).show()
-            viewModel.logoutAndReset {
-                // Callback setelah database bersih
-                signOutGoogleAndExit()
-            }
+            viewModel.logoutAndReset { signOutGoogleAndExit() }
         } else {
             signOutGoogleAndExit()
         }
@@ -399,7 +404,6 @@ class DashboardActivity : AppCompatActivity() {
     private fun signOutGoogleAndExit() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
-
         googleSignInClient.signOut().addOnCompleteListener {
             val intent = Intent(this, LoginActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -415,23 +419,19 @@ class DashboardActivity : AppCompatActivity() {
     ) {
         val storePrefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val targetMac = storePrefs.getString("printer_mac", "")
-
         if (targetMac.isNullOrEmpty()) return
 
         Thread {
             try {
                 val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
-
                 val device = bluetoothAdapter.getRemoteDevice(targetMac)
                 val socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                 socket.connect()
-
                 val os = socket.outputStream
                 val storeName = storePrefs.getString("name", "Toko Saya")
                 val now = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date())
                 val startStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))
-
                 val p = StringBuilder()
                 p.append("\u001B\u0061\u0001")
                 p.append("\u001B\u0045\u0001$storeName\u001B\u0045\u0000\n")
@@ -443,13 +443,11 @@ class DashboardActivity : AppCompatActivity() {
                 p.append("Waktu  : $now\n")
                 p.append("Shift  : $startStr s/d Sekarang\n")
                 p.append("--------------------------------\n")
-
                 fun row(label: String, value: Double) {
                     val vStr = formatRupiah(value).replace("Rp ", "")
                     val space = 32 - label.length - vStr.length
                     p.append("$label${" ".repeat(if (space > 0) space else 1)}$vStr\n")
                 }
-
                 p.append("PENJUALAN:\n")
                 row("Tunai", tunai)
                 row("QRIS", qris)
@@ -461,14 +459,12 @@ class DashboardActivity : AppCompatActivity() {
                 row("TOTAL OMZET", totalOmzet)
                 p.append("\u001B\u0045\u0000")
                 p.append("--------------------------------\n\n")
-
                 p.append("REKONSILIASI KAS (FISIK):\n")
                 row("Modal Awal", modal)
                 row("Tunai Masuk", tunai)
                 p.append("---------------- --\n")
                 row("Total Hrpn", expected)
                 row("Aktual Laci", actual)
-
                 val selisih = actual - expected
                 p.append("--------------------------------\n")
                 val labelSelisih = if(selisih < 0) "KURANG" else if(selisih > 0) "LEBIH" else "KLOP"
@@ -476,15 +472,11 @@ class DashboardActivity : AppCompatActivity() {
                 p.append("--------------------------------\n")
                 p.append("\u001B\u0061\u0001")
                 p.append("\n\n\n")
-
                 os.write(p.toString().toByteArray())
                 os.flush()
                 Thread.sleep(2000)
                 socket.close()
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }.start()
     }
 
