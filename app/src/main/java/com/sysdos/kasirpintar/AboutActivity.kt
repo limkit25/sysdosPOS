@@ -81,38 +81,61 @@ class AboutActivity : AppCompatActivity() {
         }
 
         btnUpgrade.setOnClickListener {
-            val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-            // Ambil email/username yang sedang login
-            val email = session.getString("username", "") ?: ""
+            // ============================================================
+            // 🚀 MODE BYPASS (TESTING TAMPILAN)
+            // Langsung buka PaymentActivity tanpa tanya Server dulu
+            // ============================================================
 
-            if (email.isNotEmpty()) {
-                Toast.makeText(this, "Membuat Pesanan...", Toast.LENGTH_SHORT).show()
+            // 1. Siapkan Niat (Intent) ke PaymentActivity
+/*
+val intent = Intent(this@AboutActivity, PaymentActivity::class.java)
 
-                // Pastikan di ApiClient.kt Anda sudah ada 'webClient'
-                // Jika error di 'webClient', ganti jadi 'apiService' atau 'client' sesuai nama di ApiClient.kt Anda
-                val api = ApiClient.webClient
+// 2. Isi Link Palsu dulu (Misal ke Google atau Dummy Midtrans)
+// Nanti kalau Server sudah bener, ini akan otomatis diganti link asli
+intent.putExtra("PAYMENT_URL", "https://simulator.sandbox.midtrans.com/gopay/partner/app/payment-pin")
 
-                api.createPayment(email).enqueue(object : Callback<PaymentResponse> {
-                    override fun onResponse(call: Call<PaymentResponse>, response: Response<PaymentResponse>) {
-                        if (response.isSuccessful && response.body() != null) {
-                            val url = response.body()!!.payment_url
+// 3. JALAN!
+startActivity(intent)
 
-                            // 🔥 UBAH BAGIAN INI (PAKAI WEBVIEW) 🔥
-                            val intent = Intent(this@AboutActivity, PaymentActivity::class.java)
-                            intent.putExtra("PAYMENT_URL", url)
-                            startActivity(intent)
-                        } else {
-                            Toast.makeText(this@AboutActivity, "Gagal koneksi server bayar. Code: ${response.code()}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+ */
+// ============================================================
+// ⚠️ KODE ASLI (KITA MATIKAN DULU SAMPAI SERVER BENAR)
+// ============================================================
 
-                    override fun onFailure(call: Call<PaymentResponse>, t: Throwable) {
-                        Toast.makeText(this@AboutActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
-                    }
-                })
-            } else {
-                Toast.makeText(this, "Gagal: Email user tidak ditemukan", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+// Ambil email/username yang sedang login
+val email = session.getString("username", "") ?: ""
+
+if (email.isNotEmpty()) {
+Toast.makeText(this, "Membuat Pesanan...", Toast.LENGTH_SHORT).show()
+
+// Pastikan di ApiClient.kt Anda sudah ada 'webClient'
+// Jika error di 'webClient', ganti jadi 'apiService' atau 'client' sesuai nama di ApiClient.kt Anda
+val api = ApiClient.webClient
+
+api.createPayment(email).enqueue(object : Callback<PaymentResponse> {
+override fun onResponse(call: Call<PaymentResponse>, response: Response<PaymentResponse>) {
+if (response.isSuccessful && response.body() != null) {
+    val url = response.body()!!.payment_url
+
+    // 🔥 UBAH BAGIAN INI (PAKAI WEBVIEW) 🔥
+    val intent = Intent(this@AboutActivity, PaymentActivity::class.java)
+    intent.putExtra("PAYMENT_URL", url)
+    startActivity(intent)
+} else {
+    Toast.makeText(this@AboutActivity, "Gagal koneksi server bayar. Code: ${response.code()}", Toast.LENGTH_SHORT).show()
+}
+}
+
+override fun onFailure(call: Call<PaymentResponse>, t: Throwable) {
+Toast.makeText(this@AboutActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+}
+})
+} else {
+Toast.makeText(this, "Gagal: Email user tidak ditemukan", Toast.LENGTH_SHORT).show()
+}
+
+
+}
+}
 }

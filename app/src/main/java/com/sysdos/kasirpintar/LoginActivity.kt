@@ -19,10 +19,11 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
 import com.sysdos.kasirpintar.api.ApiClient
+import com.sysdos.kasirpintar.api.LeadRequest
 import com.sysdos.kasirpintar.data.model.User
 import com.sysdos.kasirpintar.utils.SessionManager
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import okhttp3.ResponseBody // <--- IMPORT PENTING INI
+import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -32,19 +33,21 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var sessionManager: SessionManager
 
-    // Launcher untuk Google Sign In
+    // 🔥 VARIABEL PENTING: Untuk membedakan Login atau Register
+    private var isRegisterMode = false
+    // Biar dialog register bisa ditutup otomatis saat sukses Google
+    private var activeRegisterDialog: AlertDialog? = null
+
+    // Launcher Google
     private val googleSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)
-                handleGoogleLoginSuccess(account)
+                handleGoogleResult(account)
             } catch (e: ApiException) {
-                Toast.makeText(this, "Gagal Login: Code ${e.statusCode}", Toast.LENGTH_LONG).show()
-                e.printStackTrace()
+                Toast.makeText(this, "Gagal Login Google: ${e.statusCode}", Toast.LENGTH_LONG).show()
             }
-        } else {
-            Toast.makeText(this, "Login Dibatalkan", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -52,14 +55,11 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Cek Panggilan dari Welcome Screen
         if (intent.getBooleanExtra("OPEN_REGISTER_DIRECTLY", false)) {
             showRegisterDialog()
         }
 
         sessionManager = SessionManager(this)
-
-        // Cek Sesi (Sudah Login?)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         if (session.contains("username")) {
             startActivity(Intent(this, DashboardActivity::class.java))
@@ -72,40 +72,77 @@ class LoginActivity : AppCompatActivity() {
         val etUser = findViewById<TextInputEditText>(R.id.etUsername)
         val etPass = findViewById<TextInputEditText>(R.id.etPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
-        val btnGoogle = findViewById<MaterialCardView>(R.id.btnGoogleLogin)
+        val btnGoogleLogin = findViewById<MaterialCardView>(R.id.btnGoogleLogin) // Tombol di Layar Login
         val btnRegisterLink = findViewById<TextView>(R.id.btnRegisterLink)
         val btnGear = findViewById<ImageButton>(R.id.btnServerSetting)
         val tvAppVersion = findViewById<TextView>(R.id.tvAppVersion)
 
-        // Tampilkan Versi Aplikasi
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             tvAppVersion.text = "Ver ${pInfo.versionName}"
         } catch (e: Exception) {}
 
-        // 1. LOGIN MANUAL
-        // 1. LOGIN MANUAL
+        // 1. LOGIN MANUAL (YANG SUDAH DIPERBAIKI)
         btnLogin.setOnClickListener {
             val u = etUser.text.toString().trim()
             val p = etPass.text.toString().trim()
+
             if (u.isNotEmpty() && p.isNotEmpty()) {
+
+                // LANGKAH 1: Cek di Database HP (Lokal)
                 viewModel.login(u, p) { user ->
                     if (user != null) {
-                        // 🔥 1. SISIPKAN DI SINI (Login Manual Sukses)
-                        viewModel.sendDataToSalesSystem(user)
-                        viewModel.checkServerLicense(user.username)
-
-                        saveSession(user)
-                        startActivity(Intent(this, DashboardActivity::class.java))
-                        finish()
+                        // KASUS A: User masih ada di HP -> Langsung Masuk
+                        processLoginSuccess(user)
                     } else {
-                        Toast.makeText(this, "Username/Password Salah!", Toast.LENGTH_SHORT).show()
+                        // KASUS B: Data di HP Kosong (Habis Logout/Reset)
+                        // 🔥 JANGAN MENYERAH! CEK KE SERVER DULU 🔥
+
+                        val loading = android.app.ProgressDialog(this)
+                        loading.setMessage("Mencari data akun Anda di Server...")
+                        loading.show()
+
+                        viewModel.checkUserOnCloud(u) { existsOnCloud ->
+                            loading.dismiss()
+
+                            if (existsOnCloud) {
+                                // ✅ KETEMU DI SERVER!
+                                // Artinya dia owner lama yang habis logout.
+                                // Kita "Pulihkan" akunnya ke HP ini pakai password yang dia ketik.
+
+                                val restoredUser = User(
+                                    name = "Owner Toko", // Nama default krn server gak simpan nama lengkap user login
+                                    username = u,
+                                    password = p, // Pakai password yang barusan diketik
+                                    role = "admin"
+                                )
+
+                                // Simpan ulang ke Database HP
+                                viewModel.insertUser(restoredUser)
+
+                                Toast.makeText(this, "Akun dipulihkan dari Server! Masuk...", Toast.LENGTH_LONG).show()
+                                processLoginSuccess(restoredUser)
+
+                            } else {
+                                // ❌ MEMANG GAK ADA DI MANA-MANA
+                                Toast.makeText(this, "Username/Password Salah atau Belum Daftar!", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 }
             } else {
-                Toast.makeText(this, "Harap isi semua kolom", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Harap isi email dan password", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // 2. LOGIN GOOGLE (TOMBOL DI LAYAR LOGIN)
+        btnGoogleLogin.setOnClickListener {
+            isRegisterMode = false // Mode LOGIN
+            startGoogleSignIn()
+        }
+
+        btnRegisterLink.setOnClickListener { showRegisterDialog() }
+        btnGear.setOnClickListener { showServerDialog() }
 
         etPass.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
@@ -113,171 +150,245 @@ class LoginActivity : AppCompatActivity() {
                 true
             } else false
         }
-
-        // 2. LOGIN GOOGLE
-        btnGoogle.setOnClickListener { startGoogleSignIn() }
-
-        // 3. DAFTAR (REGISTER)
-        btnRegisterLink.setOnClickListener { showRegisterDialog() }
-
-        // 4. SETTING SERVER (IP TOKO)
-        btnGear.setOnClickListener { showServerDialog() }
     }
 
-    // --- FUNGSI GOOGLE SIGN IN ---
     private fun startGoogleSignIn() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .build()
         val mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
-        val signInIntent = mGoogleSignInClient.signInIntent
-        googleSignInLauncher.launch(signInIntent)
+        // Logout dulu biar bisa pilih akun lain
+        mGoogleSignInClient.signOut().addOnCompleteListener {
+            googleSignInLauncher.launch(mGoogleSignInClient.signInIntent)
+        }
     }
 
-    private fun handleGoogleLoginSuccess(account: GoogleSignInAccount) {
+    // 🔥 UPDATE LOGIKA LOGIN GOOGLE (BIAR BISA GANTI-GANTI AKUN)
+    private fun handleGoogleResult(account: GoogleSignInAccount) {
         val email = account.email ?: return
         val name = account.displayName ?: "User Google"
 
+        // 1. Cek Database Lokal (HP)
         viewModel.checkGoogleUser(email) { existingUser ->
 
-            if (existingUser != null) {
-                // === SKENARIO 1: USER SUDAH ADA ===
-                Log.d("GoogleLogin", "User lama ditemukan: ${existingUser.username}")
-
-                // 🔥 2. SISIPKAN DI SINI (Opsional: Lapor User Lama Login)
-                viewModel.sendDataToSalesSystem(existingUser)
-                viewModel.checkServerLicense(existingUser.username)
-
-                saveSession(existingUser)
-                syncToWeb(existingUser)
-                gotoDashboard()
+            if (isRegisterMode) {
+                // === MODE REGISTER (User Sengaja Klik Tombol Daftar) ===
+                if (existingUser != null) {
+                    Toast.makeText(this, "Email ini sudah ada di HP ini. Login saja.", Toast.LENGTH_LONG).show()
+                } else {
+                    // Cek ke Cloud dulu, jangan sampai duplikat
+                    viewModel.checkUserOnCloud(email) { existsOnCloud ->
+                        if (existsOnCloud) {
+                            Toast.makeText(this, "Email ini SUDAH TERDAFTAR di Server! Silakan Login.", Toast.LENGTH_LONG).show()
+                        } else {
+                            performGoogleRegistration(name, email)
+                        }
+                    }
+                }
 
             } else {
-                // === SKENARIO 2: USER BARU ===
-                Log.d("GoogleLogin", "User baru! Mendaftar...")
+                // === MODE LOGIN (User Klik Masuk) ===
+                if (existingUser != null) {
+                    // KASUS A: User ada di HP -> Langsung Masuk
+                    processLoginSuccess(existingUser)
+                } else {
+                    // KASUS B: User TIDAK ADA di HP (Mungkin habis di-reset User lain)
+                    // 🔥 JANGAN LANGSUNG TOLAK! CEK CLOUD DULU 🔥
 
-                val newUser = User(
-                    name = name,
-                    username = email,
-                    password = "google_auth",
-                    role = "admin"
-                )
+                    val loading = android.app.ProgressDialog(this)
+                    loading.setMessage("Mencari data akun Anda...")
+                    loading.show()
 
-                viewModel.insertUser(newUser)
+                    viewModel.checkUserOnCloud(email) { existsOnCloud ->
+                        loading.dismiss()
 
-                // 🔥 3. SISIPKAN DI SINI (WAJIB: User Baru dari Google)
-                viewModel.sendDataToSalesSystem(newUser)
+                        if (existsOnCloud) {
+                            // ✅ KETEMU DI SERVER! LAKUKAN RESTORE (PULIHKAN AKUN)
+                            Toast.makeText(this, "Akun ditemukan! Memulihkan data...", Toast.LENGTH_SHORT).show()
 
-                syncToWeb(newUser)
-                saveSession(newUser)
+                            // Hapus sisa data user sebelumnya (User B)
+                            viewModel.logoutAndReset {
+                                // Insert Ulang User A ke Database Lokal
+                                val restoredUser = User(
+                                    name = name,
+                                    username = email,
+                                    password = "google_auth",
+                                    role = "admin"
+                                )
+                                viewModel.insertUser(restoredUser)
 
-                Toast.makeText(this, "Selamat Datang Admin, $name!", Toast.LENGTH_LONG).show()
+                                // Cek Lisensi & Masuk
+                                processLoginSuccess(restoredUser)
+                            }
 
-                val intent = Intent(this, StoreSettingsActivity::class.java)
-                intent.putExtra("IS_INITIAL_SETUP", true)
-                startActivity(intent)
-                finish()
+                        } else {
+                            // ❌ MEMANG TIDAK ADA DI MANA-MANA
+                            showErrorDialog("Akun Belum Terdaftar", "Email ($email) belum terdaftar di sistem kami.\n\nSilakan klik 'Daftar Akun Baru'.")
+                        }
+                    }
+                }
             }
         }
     }
 
-    // 🔥 PERBAIKAN UTAMA DI SINI (Pakai ResponseBody) 🔥
-    private fun syncToWeb(user: User) {
-        val call = ApiClient.webClient.registerUser(user)
+    // 🔥 UPDATE FUNGSI INI (Google Register)
+    private fun performGoogleRegistration(name: String, email: String) {
+        val loading = android.app.ProgressDialog(this)
+        loading.setMessage("Mendaftarkan akun Google...")
+        loading.setCancelable(false)
+        loading.show()
 
-        // Menggunakan Callback<ResponseBody> sesuai error log
-        call.enqueue(object : Callback<ResponseBody> {
-            override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
-                if(response.isSuccessful) Log.d("GoogleLogin", "Sync Web Sukses")
-                else Log.e("GoogleLogin", "Gagal Web: ${response.code()}")
-            }
-            override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                Log.e("GoogleLogin", "Gagal Koneksi Web: ${t.message}")
-            }
-        })
+        // 1. Reset Data Lama
+        viewModel.logoutAndReset {
+            getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
+
+            // 2. Simpan User Baru
+            val newUser = User(
+                name = name,
+                username = email,
+                password = "google_auth",
+                role = "admin"
+            )
+            viewModel.insertUser(newUser)
+
+            // 3. Kirim ke Cloud
+            val leadRequest = LeadRequest(
+                name = name, store_name = "Toko $name", store_address = "-", store_phone = "-", phone = "-", email = email
+            )
+            ApiClient.webClient.registerLead(leadRequest).enqueue(object : Callback<ResponseBody> {
+                override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
+                    loading.dismiss()
+                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
+
+                    Toast.makeText(this@LoginActivity, "Registrasi Berhasil! Silakan Setup Toko.", Toast.LENGTH_LONG).show()
+
+                    // 🔥 ARAHKAN KE SETUP TOKO, BUKAN DASHBOARD
+                    finalizeRegistration(newUser, activeRegisterDialog)
+                }
+
+                override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
+                    loading.dismiss()
+                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
+
+                    Toast.makeText(this@LoginActivity, "Registrasi Offline. Silakan Setup Toko.", Toast.LENGTH_LONG).show()
+
+                    // 🔥 ARAHKAN KE SETUP TOKO
+                    finalizeRegistration(newUser, activeRegisterDialog)
+                }
+            })
+        }
     }
 
-    // --- FUNGSI REGISTER MANUAL ---
+    private fun processLoginSuccess(user: User) {
+        // Cek apakah data toko masih default/kosong?
+        // Kalau kosong (baru daftar), arahkan ke Setup Toko
+        // Kalau sudah ada, arahkan ke Dashboard
+
+        viewModel.sendDataToSalesSystem(user)
+        viewModel.checkServerLicense(user.username)
+        saveSession(user)
+
+        // Cek sederhana: apakah user ini baru saja dibuat? (Biasanya kalau baru, role masih admin default dan belum ada transaksi)
+        // Atau kita bisa selalu arahkan ke Dashboard, nanti Dashboard yang cek kelengkapan data.
+        // Untuk aman, kita langsung ke Dashboard saja.
+
+        Toast.makeText(this, "Selamat Datang, ${user.name}!", Toast.LENGTH_SHORT).show()
+        startActivity(Intent(this, DashboardActivity::class.java))
+        finish()
+    }
+
     private fun showRegisterDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_user_entry, null)
 
+        // Find Views
         val etName = view.findViewById<EditText>(R.id.etName)
         val etUser = view.findViewById<EditText>(R.id.etUsername)
         val etPhone = view.findViewById<EditText>(R.id.etPhone)
         val etPass = view.findViewById<EditText>(R.id.etPassword)
+        val btnGoogleReg = view.findViewById<MaterialCardView>(R.id.btnGoogleRegister) // Tombol Baru
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Daftar Akun Baru")
             .setView(view)
-            .setPositiveButton("DAFTAR", null) // null dulu
+            .setPositiveButton("DAFTAR MANUAL", null)
             .setNegativeButton("BATAL", null)
             .create()
+
+        activeRegisterDialog = dialog // Simpan referensi biar bisa ditutup
+
+        // --- TOMBOL GOOGLE DI REGISTER ---
+        btnGoogleReg.setOnClickListener {
+            isRegisterMode = true // Set Mode ke REGISTER
+            startGoogleSignIn()
+        }
 
         dialog.setOnShowListener {
             val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             button.setOnClickListener {
+                // LOGIKA DAFTAR MANUAL (Sama seperti sebelumnya)
                 val nama = etName.text.toString().trim()
                 val email = etUser.text.toString().trim()
                 val hp = etPhone.text.toString().trim()
                 val pass = etPass.text.toString().trim()
 
-                // Validasi
                 if (nama.isEmpty() || email.isEmpty() || hp.isEmpty() || pass.isEmpty()) {
-                    Toast.makeText(this, "Semua data wajib diisi!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Lengkapi semua data!", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
 
-                // 1. TAMPILKAN LOADING (Agar user menunggu)
                 val loading = android.app.ProgressDialog(this)
-                loading.setMessage("Sedang mendaftarkan ke Server Pusat...")
-                loading.setCancelable(false)
+                loading.setMessage("Proses Pendaftaran...")
                 loading.show()
 
-                // Siapkan Data
-                val newUser = User(
-                    name = nama,
-                    username = email,
-                    phone = hp,
-                    password = pass,
-                    role = "admin"
-                )
+                viewModel.logoutAndReset {
+                    getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
 
-                // 2. SIMPAN DATABASE HP (LOKAL)
-                viewModel.insertUser(newUser)
-                viewModel.sendDataToSalesSystem(newUser)
+                    val newUser = User(name = nama, username = email, phone = hp, password = pass, role = "admin")
+                    viewModel.insertUser(newUser)
 
-                // 3. KIRIM KE WEB (CLOUD)
-                // Kita panggil manual disini agar bisa mengontrol kapan 'finish()' dipanggil
-                val call = ApiClient.webClient.registerUser(newUser)
-
-                call.enqueue(object : Callback<ResponseBody> {
-                    override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
-                        loading.dismiss() // Tutup loading
-
-                        if (response.isSuccessful) {
-                            Log.d("Register", "✅ SUKSES MASUK WEB!")
-                            Toast.makeText(this@LoginActivity, "Registrasi Online Berhasil!", Toast.LENGTH_LONG).show()
-                        } else {
-                            Log.e("Register", "❌ Gagal Web: ${response.code()}")
-                            Toast.makeText(this@LoginActivity, "Disimpan di HP (Server Web Error: ${response.code()})", Toast.LENGTH_LONG).show()
+                    val req = LeadRequest(name = nama, store_name = "Toko $nama", store_address = "-", store_phone = "-", phone = hp, email = email)
+                    ApiClient.webClient.registerLead(req).enqueue(object : Callback<ResponseBody> {
+                        override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
+                            loading.dismiss()
+                            finalizeRegistration(newUser, dialog)
                         }
-
-                        // 🔥 BARU PINDAH HALAMAN DISINI (Setelah selesai lapor server)
-                        finalizeRegistration(newUser, dialog)
-                    }
-
-                    override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                        loading.dismiss() // Tutup loading
-                        Log.e("Register", "⚠️ Gagal Koneksi Web: ${t.message}")
-                        Toast.makeText(this@LoginActivity, "Offline: Data tersimpan di HP saja.", Toast.LENGTH_LONG).show()
-
-                        // 🔥 Tetap pindah halaman walaupun internet mati
-                        finalizeRegistration(newUser, dialog)
-                    }
-                })
+                        override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
+                            loading.dismiss()
+                            finalizeRegistration(newUser, dialog)
+                        }
+                    })
+                }
             }
         }
         dialog.show()
+    }
+
+    // 🔥 UPDATE FUNGSI INI (Pintu Keluar Register)
+    private fun finalizeRegistration(user: User, dialog: AlertDialog?) {
+        // 1. Simpan Sesi dulu biar dianggap login
+        saveSession(user)
+        viewModel.sendDataToSalesSystem(user)
+        viewModel.checkServerLicense(user.username)
+
+        dialog?.dismiss()
+
+        // 2. 🔥 BELOKKAN KE STORE SETTINGS (SETUP AWAL)
+        val intent = Intent(this, StoreSettingsActivity::class.java)
+        // Kirim sinyal bahwa ini adalah "Pendaftaran Awal"
+        intent.putExtra("IS_INITIAL_SETUP", true)
+        startActivity(intent)
+
+        // 3. Tutup LoginActivity agar user tidak bisa back ke login
+        finish()
+    }
+
+    private fun showErrorDialog(title: String, msg: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(msg)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun saveSession(user: User) {
@@ -289,42 +400,15 @@ class LoginActivity : AppCompatActivity() {
         editor.apply()
     }
 
-    private fun gotoDashboard() {
-        startActivity(Intent(this, DashboardActivity::class.java))
-        finish()
-    }
-
     private fun showServerDialog() {
         val currentUrl = sessionManager.getServerUrl().replace("http://", "").replace("/", "")
         val inputEdit = EditText(this)
-        inputEdit.hint = "Contoh: 192.168.1.15:3000"
         inputEdit.setText(currentUrl)
-        inputEdit.setPadding(60, 50, 60, 50)
-
         AlertDialog.Builder(this)
-            .setTitle("Setting IP Server (Toko)")
-            .setMessage("Masukkan IP Komputer Kasir untuk operasional harian.")
+            .setTitle("Setting IP Server")
             .setView(inputEdit)
             .setPositiveButton("SIMPAN") { _, _ ->
-                val newIp = inputEdit.text.toString().trim()
-                if (newIp.isNotEmpty()) {
-                    sessionManager.saveServerUrl(newIp)
-                    Toast.makeText(this, "IP Tersimpan!", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("BATAL", null)
-            .show()
-    }
-    // Fungsi kecil untuk pindah halaman biar rapi
-    private fun finalizeRegistration(user: User, dialog: AlertDialog) {
-        saveSession(user)
-        viewModel.checkServerLicense(user.username)
-        // Ke Setup Toko
-        val intent = Intent(this, StoreSettingsActivity::class.java)
-        intent.putExtra("IS_INITIAL_SETUP", true)
-        startActivity(intent)
-
-        dialog.dismiss()
-        finish() // ✅ Tutup LoginActivity di sini
+                sessionManager.saveServerUrl(inputEdit.text.toString().trim())
+            }.show()
     }
 }
