@@ -174,18 +174,17 @@ class DashboardActivity : AppCompatActivity() {
             startActivity(Intent(this, AboutActivity::class.java))
         }
 
-        // 🔥 FITUR LOGOUT (Update: Sembunyikan Reset jika Premium) 🔥
+        // 🔥 FITUR LOGOUT (UPDATE: ADMIN/MANAGER BISA TUTUP SHIFT) 🔥
         btnLogout.setOnClickListener {
             // 1. Cek dulu status Lisensi
             val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
             val isFullVersion = licensePrefs.getBoolean("is_full_version", false)
 
             if (role == "kasir") {
-                // === KASIR ===
-                // Kasir selalu butuh tutup shift, tidak butuh reset data
-                val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "Log Out Biasa")
+                // === KASIR (TETAP SEPERTI BIASA) ===
+                val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "🚪 Log Out Biasa")
                 AlertDialog.Builder(this)
-                    .setTitle("Menu Keluar")
+                    .setTitle("Menu Keluar (Kasir)")
                     .setItems(options) { _, which ->
                         when (which) {
                             0 -> showCloseSessionDialog(session)
@@ -195,30 +194,36 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Batal", null)
                     .show()
             } else {
-                // === ADMIN / MANAGER ===
+                // === ADMIN / MANAGER (SEKARANG BISA TUTUP SHIFT JUGA) ===
 
                 if (isFullVersion) {
                     // ✅ JIKA SUDAH PREMIUM:
-                    // Langsung Logout biasa. Tombol Reset DIHAPUS agar aman.
+                    // Tambahkan opsi Tutup Shift di sini
+                    val options = arrayOf("💰 Tutup Shift & Cetak", "🚪 Log Out Biasa")
+
                     AlertDialog.Builder(this)
-                        .setTitle("Konfirmasi Keluar")
-                        .setMessage("Apakah Anda yakin ingin keluar dari aplikasi?")
-                        .setPositiveButton("YA, KELUAR") { _, _ ->
-                            performLogout(session, false) // False = Tidak hapus data
+                        .setTitle("Menu Keluar ($role)") // Judul menyesuaikan role
+                        .setItems(options) { _, which ->
+                            when (which) {
+                                0 -> showCloseSessionDialog(session) // Admin bisa tutup shift
+                                1 -> performLogout(session, false)
+                            }
                         }
                         .setNegativeButton("Batal", null)
                         .show()
 
                 } else {
                     // ⏳ JIKA MASIH TRIAL:
-                    // Masih butuh tombol Reset untuk uji coba ulang
-                    val options = arrayOf("🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
+                    // Ada 3 Opsi: Tutup Shift, Logout Biasa, Reset Data
+                    val options = arrayOf("💰 Tutup Shift & Cetak", "🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
+
                     AlertDialog.Builder(this)
                         .setTitle("Menu Keluar (Mode Trial)")
                         .setItems(options) { _, which ->
                             when (which) {
-                                0 -> performLogout(session, false)
-                                1 -> showResetConfirmation(session) // Hati-hati, hapus data
+                                0 -> showCloseSessionDialog(session) // Admin bisa tutup shift
+                                1 -> performLogout(session, false)
+                                2 -> showResetConfirmation(session) // Hati-hati, hapus data
                             }
                         }
                         .setNegativeButton("Batal", null)
@@ -306,72 +311,94 @@ class DashboardActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- FUNGSI TUTUP SHIFT ---
+    // 🔥 UPDATE: FITUR TUTUP SHIFT DENGAN RINCIAN PEMBAYARAN 🔥
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val username = session.getString("username", "default") ?: "default"
+        val userId = session.getInt("user_id", 0)
+        val userName = session.getString("name", "User")
 
-        val modalAwal = prefs.getFloat("MODAL_AWAL_$username", 0f).toDouble()
-        val startTime = prefs.getLong("START_TIME_$username", 0L)
-        val currentShiftTrx = allTrx.filter { it.timestamp >= startTime }
+        // 1. Ambil semua transaksi dari ViewModel
+        val allTrx = viewModel.allTransactions.value ?: emptyList()
 
+        // 2. Filter Transaksi: Milik User Ini & HARI INI
+        // (Kita anggap shift dimulai dari jam 00:00 hari ini)
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        calendar.set(java.util.Calendar.MINUTE, 0)
+        calendar.set(java.util.Calendar.SECOND, 0)
+        val startOfDay = calendar.timeInMillis
+
+        val myTrx = allTrx.filter { it.userId == userId && it.timestamp >= startOfDay }
+
+        // 3. Hitung Rincian Per Metode Pembayaran
         var totalTunai = 0.0
-        var totalQRIS = 0.0
-        var totalTransfer = 0.0
+        var totalQris = 0.0
         var totalDebit = 0.0
+        var totalTransfer = 0.0
 
-        for (trx in currentShiftTrx) {
-            when (trx.paymentMethod) {
-                "Tunai" -> totalTunai += trx.totalAmount
-                "QRIS" -> totalQRIS += trx.totalAmount
-                "Transfer" -> totalTransfer += trx.totalAmount
-                "Debit" -> totalDebit += trx.totalAmount
+        for (trx in myTrx) {
+            when (trx.paymentMethod.lowercase()) { // Pastikan huruf kecil biar cocok
+                "tunai", "cash" -> totalTunai += trx.totalAmount
+                "qris" -> totalQris += trx.totalAmount
+                "debit" -> totalDebit += trx.totalAmount
+                "transfer" -> totalTransfer += trx.totalAmount
+                else -> totalTunai += trx.totalAmount // Default ke tunai jika ada metode aneh
             }
         }
 
-        val totalOmzetSistem = totalTunai + totalQRIS + totalTransfer + totalDebit
-        val totalUangDiLaci = modalAwal + totalTunai
+        val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer
 
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
-        input.hint = "Total uang fisik di laci"
+        // 4. Format Rupiah (Helper Kecil)
+        fun fmt(d: Double): String {
+            val format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID"))
+            return format.format(d)
+        }
 
-        val msg = """
-            🕒 Shift: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))}
+        // 5. Susun Pesan Laporan
+        val pesanLaporan = """
+            Halo, $userName! 👋
+            Berikut ringkasan penjualan sesi ini:
+
+            💵 TUNAI      : ${fmt(totalTunai)}
+            📱 QRIS       : ${fmt(totalQris)}
+            💳 DEBIT      : ${fmt(totalDebit)}
+            🏦 TRANSFER   : ${fmt(totalTransfer)}
+            -------------------------------------
+            💎 TOTAL OMZET : ${fmt(totalOmzet)}
             
-            💵 Pendapatan Kasir:
-            • Tunai    : ${formatRupiah(totalTunai)}
-            • Non-Tunai: ${formatRupiah(totalQRIS + totalTransfer + totalDebit)}
-            ------------------------------
-            TOTAL OMZET: ${formatRupiah(totalOmzetSistem)}
-            
-            💰 Target Uang Fisik:
-            Modal (${formatRupiah(modalAwal)}) + Tunai (${formatRupiah(totalTunai)})
-            = ${formatRupiah(totalUangDiLaci)}
+            Apakah Anda yakin ingin menutup shift dan mencetak laporan?
         """.trimIndent()
 
+        // 6. Tampilkan Dialog
         AlertDialog.Builder(this)
-            .setTitle("🔒 Laporan Tutup Shift")
-            .setMessage(msg)
-            .setView(input)
-            .setCancelable(false)
+            .setTitle("💰 Ringkasan Tutup Shift")
+            .setMessage(pesanLaporan)
             .setPositiveButton("TUTUP & CETAK") { _, _ ->
-                val strFisik = input.text.toString()
-                if (strFisik.isNotEmpty()) {
-                    val uangFisik = strFisik.toDouble()
-                    viewModel.closeShift(username, totalUangDiLaci, uangFisik)
-                    printShiftReport(username, startTime, modalAwal, totalTunai, totalQRIS, totalTransfer, totalDebit, totalUangDiLaci, uangFisik)
-                    prefs.edit()
-                        .remove("IS_OPEN_$username")
-                        .remove("MODAL_AWAL_$username")
-                        .remove("START_TIME_$username")
-                        .remove("CASH_SALES_TODAY_$username")
-                        .apply()
-                    Toast.makeText(this, "Laporan Dicetak & Shift Ditutup.", Toast.LENGTH_LONG).show()
-                    performLogout(session, false)
-                } else {
-                    Toast.makeText(this, "Wajib isi total uang fisik!", Toast.LENGTH_SHORT).show()
-                }
+                // Hitung Uang Fisik (Hanya Tunai yang perlu dihitung manual)
+                showInputCashDialog(totalTunai, totalOmzet, userName ?: "Kasir")
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    // Dialog Input Uang Fisik (Untuk validasi selisih kas Tunai)
+    private fun showInputCashDialog(expectedCash: Double, totalOmzet: Double, userName: String) {
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        input.hint = "Masukkan jumlah uang fisik di laci"
+
+        AlertDialog.Builder(this)
+            .setTitle("Verifikasi Uang Tunai")
+            .setMessage("Sistem mencatat Penjualan Tunai: ${java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(expectedCash)}\n\nBerapa uang fisik yang ada di laci?")
+            .setView(input)
+            .setPositiveButton("SIMPAN") { _, _ ->
+                val actualCashStr = input.text.toString()
+                val actualCash = if (actualCashStr.isNotEmpty()) actualCashStr.toDouble() else 0.0
+
+                // Simpan Log Tutup Shift
+                viewModel.closeShift(userName, expectedCash, actualCash)
+
+                // Reset Login (Keluar)
+                performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), true)
             }
             .setNegativeButton("Batal", null)
             .show()

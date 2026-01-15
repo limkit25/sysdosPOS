@@ -68,33 +68,42 @@ class UserListActivity : AppCompatActivity() {
     private fun showUserDialog(userToEdit: User?) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_user_entry, null)
 
-        // Inisialisasi View
+        // 1. Inisialisasi View
         val etName = view.findViewById<EditText>(R.id.etName)
         val etUser = view.findViewById<EditText>(R.id.etUsername)
         val etPhone = view.findViewById<EditText>(R.id.etPhone)
         val etPass = view.findViewById<EditText>(R.id.etPassword)
+        val spRole = view.findViewById<Spinner>(R.id.spRole) // <--- INI BARU
 
-        // 🔥 TAMBAHAN: Sembunyikan Tombol Google (Khusus Menu Admin)
-        // Kita pakai try-catch atau null check biar tidak force close kalau id nya ga ketemu
+        // Sembunyikan Tombol Google
         val btnGoogle = view.findViewById<android.view.View>(R.id.btnGoogleRegister)
-        if (btnGoogle != null) {
-            btnGoogle.visibility = android.view.View.GONE
-        }
+        if (btnGoogle != null) btnGoogle.visibility = android.view.View.GONE
 
-        // Isi data jika Mode Edit
+        // 2. Setup Pilihan Role (Spinner)
+        val roleOptions = arrayOf("admin", "manager", "kasir")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, roleOptions)
+        spRole.adapter = adapter
+
+        // 3. Isi Data Jika Mode Edit
         if (userToEdit != null) {
             etName.setText(userToEdit.name)
             etUser.setText(userToEdit.username)
             etPhone.setText(userToEdit.phone)
             etPass.setText(userToEdit.password)
+
+            // Set Pilihan Spinner sesuai Role user yang diedit
+            val roleIndex = roleOptions.indexOf(userToEdit.role)
+            if (roleIndex >= 0) {
+                spRole.setSelection(roleIndex)
+            }
         }
 
-        val title = if (userToEdit == null) "Tambah Admin Baru" else "Edit User #${userToEdit.id}"
+        val title = if (userToEdit == null) "Tambah Pegawai Baru" else "Edit User #${userToEdit.id}"
 
         val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setView(view)
-            .setPositiveButton("Simpan", null)
+            .setPositiveButton("Simpan", null) // Nanti di-override biar ga auto-close
             .setNegativeButton("Batal", null)
             .create()
 
@@ -106,8 +115,8 @@ class UserListActivity : AppCompatActivity() {
                 val hp = etPhone.text.toString().trim()
                 val password = etPass.text.toString().trim()
 
-                // 🔥 PAKSA ROLE JADI ADMIN (HARDCODE)
-                val fixedRole = "admin"
+                // 🔥 AMBIL ROLE DARI PILIHAN SPINNER
+                val selectedRole = spRole.selectedItem.toString()
 
                 // --- 🛡️ VALIDASI ---
                 var isValid = true
@@ -116,12 +125,10 @@ class UserListActivity : AppCompatActivity() {
                     etUser.error = "Format email salah!"
                     isValid = false
                 }
-
-                if (hp.length < 10 || !hp.all { it.isDigit() }) {
+                if (hp.length < 10) {
                     etPhone.error = "No HP min 10 angka"
                     isValid = false
                 }
-
                 if (nama.isEmpty() || password.isEmpty()) {
                     Toast.makeText(this, "Data tidak boleh kosong!", Toast.LENGTH_SHORT).show()
                     isValid = false
@@ -136,11 +143,11 @@ class UserListActivity : AppCompatActivity() {
                             username = username,
                             phone = hp,
                             password = password,
-                            role = fixedRole
+                            role = selectedRole // <--- PAKAI YANG DIPILIH
                         )
                         viewModel.insertUser(newUser)
-                        viewModel.syncUser(newUser)
-                        Toast.makeText(this, "Admin berhasil dibuat!", Toast.LENGTH_SHORT).show()
+                        viewModel.syncUser(newUser) // Kirim ke VPS (opsional)
+                        Toast.makeText(this, "Pegawai ($selectedRole) berhasil dibuat!", Toast.LENGTH_SHORT).show()
                     } else {
                         // MODE EDIT
                         val updatedUser = userToEdit.copy(
@@ -148,11 +155,11 @@ class UserListActivity : AppCompatActivity() {
                             username = username,
                             phone = hp,
                             password = password,
-                            role = fixedRole
+                            role = selectedRole // <--- PAKAI YANG DIPILIH
                         )
                         viewModel.updateUser(updatedUser)
                         viewModel.syncUser(updatedUser)
-                        Toast.makeText(this, "Data User diperbarui!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Data diperbarui!", Toast.LENGTH_SHORT).show()
                     }
                     dialog.dismiss()
                 }

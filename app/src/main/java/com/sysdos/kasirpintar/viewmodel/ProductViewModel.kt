@@ -398,30 +398,25 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun checkUserOnCloud(email: String, onResult: (Boolean) -> Unit) {
+    // 🔥 UPDATE: CEK STATUS LENGKAP (AGAR BISA TOLAK YANG BLOCKED)
+    fun checkUserOnCloud(email: String, onResult: (com.sysdos.kasirpintar.api.LicenseCheckResponse?) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val api = ApiClient.webClient
-
-                // 🔥 TAMBAHAN WAJIB
                 val deviceId = getDeviceId(getApplication())
                 val deviceModel = getDeviceName()
 
-                // 🔥 KIRIM 3 PARAMETER JUGA
+                // Kirim data lengkap ke server
                 val response = api.checkLicense(email, deviceId, deviceModel).execute()
 
                 if (response.isSuccessful && response.body() != null) {
-                    val msg = response.body()!!.message.lowercase()
-                    if (!msg.contains("tidak ditemukan")) {
-                        launch(kotlinx.coroutines.Dispatchers.Main) { onResult(true) }
-                    } else {
-                        launch(kotlinx.coroutines.Dispatchers.Main) { onResult(false) }
-                    }
+                    // Balikkan Data Lengkap (Status, Pesan, dll)
+                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(response.body()) }
                 } else {
-                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(false) }
+                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
                 }
             } catch (e: Exception) {
-                launch(kotlinx.coroutines.Dispatchers.Main) { onResult(false) }
+                launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
             }
         }
     }
