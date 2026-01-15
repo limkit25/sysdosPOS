@@ -19,7 +19,9 @@ data class Transaction(
     val subtotal: Double,
     val discount: Double,
     val tax: Double,
+    val userId: Int = 0,
 
-    // 🔥 TAMBAHKAN KOLOM INI AGAR MULTI-TOKO BERJALAN 🔥
-    val userId: Int = 0
+    // 🔥 TAMBAHAN BARU (WAJIB ADA BIAR GAK ERROR MERAH)
+    // Default value "" agar data lama tidak error
+    val note: String = ""
 ) : Parcelable

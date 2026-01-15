@@ -204,7 +204,6 @@ class MainActivity : AppCompatActivity() {
     // ==========================================
 
     private fun checkShiftStatus() {
-        // 🔥 GUNAKAN KEY UNIK: IS_OPEN_budi, IS_OPEN_ani, dst.
         val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_$currentUserKey", false)
         if (!isShiftOpen) {
             showOpenShiftDialog()
@@ -231,7 +230,6 @@ class MainActivity : AppCompatActivity() {
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
 
-                    // 🔥 SIMPAN DENGAN KEY UNIK PER USER
                     shiftPrefs.edit()
                         .putBoolean("IS_OPEN_$currentUserKey", true)
                         .putFloat("MODAL_AWAL_$currentUserKey", modal.toFloat())
@@ -251,7 +249,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ==========================================
-    // 💰 PEMBAYARAN & CHECKOUT
+    // 💰 PEMBAYARAN & CHECKOUT (UPDATE: LOGIKA PIUTANG)
     // ==========================================
 
     private fun showPaymentDialog() {
@@ -262,6 +260,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
+        // --- BINDING VIEW ---
         val tvTitle = dialogView.findViewById<TextView>(R.id.tvPaymentTitle)
         val etReceived = dialogView.findViewById<EditText>(R.id.etAmountReceived)
         val btnBack = dialogView.findViewById<View>(R.id.btnBackPayment)
@@ -269,13 +268,17 @@ class MainActivity : AppCompatActivity() {
         val spMethod = dialogView.findViewById<Spinner>(R.id.spPaymentMethod)
         val gridQuickCash = dialogView.findViewById<View>(R.id.gridQuickCash)
 
+        // Field Input Tambahan
+        val cbCredit = dialogView.findViewById<CheckBox>(R.id.cbCredit) // 🔥 Checkbox Piutang
         val etCustomer = dialogView.findViewById<EditText>(R.id.etCustomer)
         val etTable = dialogView.findViewById<EditText>(R.id.etTable)
         val etNote = dialogView.findViewById<EditText>(R.id.etNote)
 
+        // Tombol Diskon & Pajak
         val btnDisc = dialogView.findViewById<Button>(R.id.btnDisc)
         val btnTax = dialogView.findViewById<Button>(R.id.btnTax)
 
+        // Tombol Uang Cepat
         val btnExact = dialogView.findViewById<Button>(R.id.btnExactMoney)
         val btn20k = dialogView.findViewById<Button>(R.id.btn20k)
         val btn50k = dialogView.findViewById<Button>(R.id.btn50k)
@@ -283,40 +286,95 @@ class MainActivity : AppCompatActivity() {
         val btnOther = dialogView.findViewById<Button>(R.id.btnOtherAmount)
 
         var grandTotal = currentSubtotal
+
+        // Logic Diskon & Pajak
+        var discountType = "NONE"
+        var discountInput = 0.0
         var discValue = 0.0
+        var taxPercentage = 0.0
         var taxValue = 0.0
-        var isTaxActive = false
-        var isDiscActive = false
 
         val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer")
         spMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
 
+        // --- FUNGSI HITUNG ULANG ---
         fun recalculate() {
-            discValue = if (isDiscActive) currentSubtotal * 0.10 else 0.0
-            val afterDisc = currentSubtotal - discValue
-            taxValue = if (isTaxActive) afterDisc * 0.10 else 0.0
+            discValue = when (discountType) {
+                "PERCENT" -> currentSubtotal * (discountInput / 100)
+                "NOMINAL" -> discountInput
+                else -> 0.0
+            }
+
+            val afterDisc = if (currentSubtotal > discValue) currentSubtotal - discValue else 0.0
+            taxValue = afterDisc * (taxPercentage / 100)
             grandTotal = afterDisc + taxValue
 
             tvTitle.text = "Total : ${formatRupiah(grandTotal)}"
 
+            // Update UI Tombol
             val activeBg = R.drawable.bg_solid_primary
             val inactiveBg = R.drawable.bg_outline_primary
 
-            btnTax.setBackgroundResource(if (isTaxActive) activeBg else inactiveBg)
-            btnTax.setTextColor(if (isTaxActive) Color.WHITE else Color.parseColor("#1976D2"))
-            btnTax.text = if (isTaxActive) "Tax : 10%" else "Tax : 0%"
+            val isTaxOn = taxPercentage > 0
+            btnTax.setBackgroundResource(if (isTaxOn) activeBg else inactiveBg)
+            btnTax.setTextColor(if (isTaxOn) Color.WHITE else Color.parseColor("#1976D2"))
+            btnTax.text = if (isTaxOn) "Tax : ${taxPercentage.toInt()}%" else "Tax : 0%"
 
-            btnDisc.setBackgroundResource(if (isDiscActive) activeBg else inactiveBg)
-            btnDisc.setTextColor(if (isDiscActive) Color.WHITE else Color.parseColor("#1976D2"))
-            btnDisc.text = if (isDiscActive) "Disc : 10%" else "Disc : 0%"
+            val isDiscOn = discountType != "NONE"
+            btnDisc.setBackgroundResource(if (isDiscOn) activeBg else inactiveBg)
+            btnDisc.setTextColor(if (isDiscOn) Color.WHITE else Color.parseColor("#1976D2"))
+            btnDisc.text = when (discountType) {
+                "PERCENT" -> "Disc : ${discountInput.toInt()}%"
+                "NOMINAL" -> "Disc : ${formatRupiah(discountInput)}"
+                else -> "Disc : 0%"
+            }
 
-            if (spMethod.selectedItem?.toString() != "Tunai") {
+            // Update Field Uang Masuk jika bukan tunai atau jika Piutang
+            if (cbCredit.isChecked) {
+                etReceived.setText("0") // Kalau hutang, uang masuk 0 (atau DP)
+            } else if (spMethod.selectedItem?.toString() != "Tunai") {
                 etReceived.setText(grandTotal.toInt().toString())
             }
         }
 
+        // 🔥 LOGIKA CHECKBOX PIUTANG (Saat diklik)
+        cbCredit.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // 1. Fokus ke Nama Pelanggan (Wajib Diisi)
+                etCustomer.requestFocus()
+                // Munculkan Keyboard
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.showSoftInput(etCustomer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+
+                etCustomer.error = "Wajib diisi untuk Piutang"
+                etCustomer.hint = "Nama Penghutang (Wajib)"
+
+                // 2. Disable Input Uang (Default 0 / Belum Bayar)
+                etReceived.setText("0")
+                gridQuickCash.visibility = View.GONE
+                spMethod.isEnabled = false // Kunci metode pembayaran
+            } else {
+                // Reset jika batal piutang
+                etCustomer.hint = "Pelanggan"
+                etCustomer.error = null
+                etReceived.isEnabled = true
+                spMethod.isEnabled = true
+
+                // Balikin tampilan sesuai metode bayar
+                if (spMethod.selectedItem.toString() == "Tunai") {
+                    gridQuickCash.visibility = View.VISIBLE
+                    etReceived.setText("0")
+                } else {
+                    etReceived.setText(grandTotal.toInt().toString())
+                }
+            }
+        }
+
+        // Logic Spinner Metode Bayar
         spMethod.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (cbCredit.isChecked) return // Jangan ubah apa2 kalau lagi mode piutang
+
                 if (methods[position] == "Tunai") {
                     gridQuickCash.visibility = View.VISIBLE
                     etReceived.isEnabled = true
@@ -330,19 +388,59 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        btnTax.setOnClickListener { isTaxActive = !isTaxActive; recalculate() }
-        btnDisc.setOnClickListener { isDiscActive = !isDiscActive; recalculate() }
+        // Logic Tombol Pajak & Diskon (Popup)
+        btnTax.setOnClickListener {
+            val layout = LinearLayout(this); layout.orientation = LinearLayout.VERTICAL; layout.setPadding(50, 40, 50, 10)
+            val etInput = EditText(this); etInput.hint = "Persen Pajak (ex: 11)"; etInput.inputType = InputType.TYPE_CLASS_NUMBER
+            if (taxPercentage > 0) etInput.setText(taxPercentage.toInt().toString())
+            layout.addView(etInput)
 
+            AlertDialog.Builder(this).setTitle("Atur Pajak (%)").setView(layout)
+                .setPositiveButton("TERAPKAN") { _, _ ->
+                    val str = etInput.text.toString()
+                    if (str.isNotEmpty()) { taxPercentage = str.toDouble(); if(taxPercentage>100) taxPercentage=100.0; recalculate() }
+                }
+                .setNegativeButton("HAPUS") { _, _ -> taxPercentage = 0.0; recalculate() }
+                .show()
+        }
+
+        btnDisc.setOnClickListener {
+            val layout = LinearLayout(this); layout.orientation = LinearLayout.VERTICAL; layout.setPadding(50, 40, 50, 10)
+            val etInput = EditText(this); etInput.hint = "Angka (ex: 10 atau 5000)"; etInput.inputType = InputType.TYPE_CLASS_NUMBER
+            if (discountInput > 0) etInput.setText(discountInput.toLong().toString())
+            layout.addView(etInput)
+            val rg = RadioGroup(this); rg.orientation = RadioGroup.HORIZONTAL; rg.setPadding(0, 20, 0, 0)
+            val rbRp = RadioButton(this); rbRp.text = "Rp"; rbRp.id = 1001
+            val rbPct = RadioButton(this); rbPct.text = "%"; rbPct.id = 1002
+            rg.addView(rbRp); rg.addView(rbPct)
+            if (discountType == "PERCENT") rg.check(rbPct.id) else rg.check(rbRp.id)
+            layout.addView(rg)
+
+            AlertDialog.Builder(this).setTitle("Atur Diskon").setView(layout)
+                .setPositiveButton("TERAPKAN") { _, _ ->
+                    val str = etInput.text.toString()
+                    if (str.isNotEmpty()) {
+                        discountInput = str.toDouble()
+                        discountType = if (rg.checkedRadioButtonId == rbPct.id) "PERCENT" else "NOMINAL"
+                        if (discountType == "PERCENT" && discountInput > 100) discountInput = 100.0
+                        recalculate()
+                    }
+                }
+                .setNegativeButton("HAPUS") { _, _ -> discountType = "NONE"; discountInput = 0.0; recalculate() }
+                .show()
+        }
+
+        // Logic Uang Cepat
         btnExact.setOnClickListener { etReceived.setText(grandTotal.toInt().toString()) }
         btn20k.setOnClickListener { etReceived.setText("20000") }
         btn50k.setOnClickListener { etReceived.setText("50000") }
         btn100k.setOnClickListener { etReceived.setText("100000") }
         btnOther.setOnClickListener { etReceived.setText(""); etReceived.requestFocus() }
-
         btnBack.setOnClickListener { dialog.dismiss() }
 
+        // 🔥 LOGIKA TOMBOL KONFIRMASI (BAYAR)
         btnConfirm.setOnClickListener {
-            val method = spMethod.selectedItem.toString()
+            var method = spMethod.selectedItem.toString()
             val receivedStr = etReceived.text.toString()
             var cashReceived = if (receivedStr.isNotEmpty()) receivedStr.toDouble() else 0.0
 
@@ -350,19 +448,37 @@ class MainActivity : AppCompatActivity() {
             val tableNumber = etTable.text.toString().trim()
             val noteRaw = etNote.text.toString().trim()
 
+            // 🔥 VALIDASI KHUSUS PIUTANG
+            if (cbCredit.isChecked) {
+                if (customerName.isEmpty()) {
+                    etCustomer.error = "Nama Pelanggan WAJIB DIISI untuk Piutang!"
+                    etCustomer.requestFocus()
+                    return@setOnClickListener
+                }
+                // Ubah metode bayar jadi "PIUTANG" agar jelas di laporan
+                method = "PIUTANG"
+
+                // Uang diterima dianggap 0 kalau Piutang Full
+                // (Kecuali Anda mau fitur DP, tapi sementara kita buat 0 dulu biar simpel)
+                if (cashReceived == 0.0) cashReceived = 0.0
+            }
+
             var finalNote = noteRaw
             if (tableNumber.isNotEmpty()) finalNote += " | Meja: $tableNumber"
             if (customerName.isNotEmpty()) finalNote += " | An: $customerName"
             finalNote = finalNote.trim().removePrefix("|").trim()
 
-            if (method == "Tunai" && cashReceived < grandTotal) {
+            // Cek Uang Kurang (Hanya jika BUKAN Piutang)
+            if (!cbCredit.isChecked && method == "Tunai" && cashReceived < grandTotal) {
                 Toast.makeText(this, "⚠️ Uang Kurang!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            if (method != "Tunai") cashReceived = grandTotal
+
+            if (method != "Tunai" && !cbCredit.isChecked) cashReceived = grandTotal
 
             val changeAmount = cashReceived - grandTotal
 
+            // PROSES CHECKOUT
             viewModel.checkout(
                 subtotal = currentSubtotal,
                 discount = discValue,
@@ -374,8 +490,8 @@ class MainActivity : AppCompatActivity() {
                 userId = 0
             ) { transaction ->
                 if (transaction != null) {
+                    // Update Omzet Shift (Hanya Tunai)
                     if (method == "Tunai") {
-                        // 🔥 GUNAKAN KEY UNIK SAAT UPDATE OMZET
                         val currentCash = shiftPrefs.getFloat("CASH_SALES_TODAY_$currentUserKey", 0f)
                         val newTotal = currentCash + grandTotal.toFloat()
                         shiftPrefs.edit().putFloat("CASH_SALES_TODAY_$currentUserKey", newTotal).apply()
@@ -389,9 +505,12 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, "Mencetak Struk...", Toast.LENGTH_SHORT).show()
                     }
 
+                    // Tampilkan Info Sukses
+                    val pesanSukses = if (cbCredit.isChecked) "Piutang Berhasil Dicatat" else if (changeAmount > 0) "Kembalian: ${formatRupiah(changeAmount)}" else "Lunas"
+
                     AlertDialog.Builder(this)
                         .setTitle("✅ Transaksi Berhasil")
-                        .setMessage(if (changeAmount > 0) "Kembalian: ${formatRupiah(changeAmount)}" else "Lunas")
+                        .setMessage(pesanSukses)
                         .setPositiveButton("TUTUP", null)
                         .setNeutralButton("CETAK LAGI") { _, _ ->
                             if (!printerMac.isNullOrEmpty()) printStruk(transaction)

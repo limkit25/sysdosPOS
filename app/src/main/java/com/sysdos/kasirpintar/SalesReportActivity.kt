@@ -1,8 +1,8 @@
 package com.sysdos.kasirpintar
 
 import android.Manifest
+import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,16 +29,18 @@ import java.util.*
 class SalesReportActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
-    private var fullList: List<Transaction> = emptyList() // Simpan data untuk Print
+    private var fullList: List<Transaction> = emptyList()
 
     // UI Chart & Summary
     private lateinit var barChart: BarChart
     private lateinit var tvRevenue: TextView
     private lateinit var tvProfit: TextView
+    private lateinit var tvPiutang: TextView
     private lateinit var cardProfit: CardView
+    private lateinit var cardPiutang: CardView // 🔥 Tambahan Binding
     private lateinit var btnToggleProfit: ImageView
 
-    // UI Navigasi (Pengganti List Produk)
+    // UI Navigasi
     private lateinit var btnOpenTopProducts: Button
     private lateinit var btnOpenHistory: Button
 
@@ -55,19 +57,21 @@ class SalesReportActivity : AppCompatActivity() {
         // 1. INIT VIEW
         tvRevenue = findViewById(R.id.tvTotalRevenue)
         tvProfit = findViewById(R.id.tvTotalProfit)
+        tvPiutang = findViewById(R.id.tvTotalPiutang)
+
         cardProfit = findViewById(R.id.cardProfit)
+        cardPiutang = findViewById(R.id.cardPiutang) // 🔥 Bind Card Merah
+
         barChart = findViewById(R.id.chartRevenue)
         btnToggleProfit = findViewById(R.id.btnToggleProfit)
 
-        // Tombol Navigasi
         btnOpenTopProducts = findViewById(R.id.btnOpenTopProducts)
         btnOpenHistory = findViewById(R.id.btnOpenHistory)
 
-        // 2. LISTENERS UTAMA
+        // 2. LISTENERS
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<ImageButton>(R.id.btnPrintDaily).setOnClickListener { printDailyRecap() }
 
-        // 🔥 PINDAH HALAMAN (INTENT) 🔥
         btnOpenTopProducts.setOnClickListener {
             startActivity(Intent(this, TopProductsActivity::class.java))
         }
@@ -76,10 +80,14 @@ class SalesReportActivity : AppCompatActivity() {
             startActivity(Intent(this, HistoryActivity::class.java))
         }
 
-        // Toggle Sensor Laba
         btnToggleProfit.setOnClickListener {
             isProfitVisible = !isProfitVisible
             updateProfitDisplay()
+        }
+
+        // 🔥 FITUR KLIK PIUTANG (LIHAT RINCIAN)
+        cardPiutang.setOnClickListener {
+            showDebtDetails()
         }
 
         setupChartConfig()
@@ -94,25 +102,70 @@ class SalesReportActivity : AppCompatActivity() {
         viewModel.allTransactions.observe(this) { transactions ->
             fullList = transactions
             updateSummaryAndChart(transactions)
-            // Tidak ada logika hitung produk disini lagi, sudah dipindah!
         }
     }
 
-    // --- LOGIKA CHART & TOTAL ---
     private fun updateSummaryAndChart(list: List<Transaction>) {
         var totalOmzet = 0.0
         var totalLaba = 0.0
+        var totalPiutang = 0.0
 
         for (trx in list) {
             totalOmzet += trx.totalAmount
             totalLaba += trx.profit
+
+            if (trx.paymentMethod.equals("PIUTANG", ignoreCase = true)) {
+                totalPiutang += trx.totalAmount
+            }
         }
 
         tvRevenue.text = formatRupiah(totalOmzet)
+        tvPiutang.text = formatRupiah(totalPiutang)
+
         actualProfitValue = totalLaba
         updateProfitDisplay()
 
         updateChartData(list)
+    }
+
+    // 🔥 POPUP RINCIAN PIUTANG
+    private fun showDebtDetails() {
+        // 1. Ambil hanya data PIUTANG & Urutkan dari yang terbaru
+        val debtList = fullList.filter {
+            it.paymentMethod.equals("PIUTANG", ignoreCase = true)
+        }.sortedByDescending { it.timestamp }
+
+        if (debtList.isEmpty()) {
+            Toast.makeText(this, "Alhamdulillah, tidak ada yang hutang! 🤲", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 2. Format Data untuk Ditampilkan (Nama, Tanggal, Nominal)
+        val listItems = debtList.map { trx ->
+            val date = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
+
+            // Coba ambil nama dari Catatan (karena kita simpan format " | An: Budi")
+            var namaPelanggan = "Tanpa Nama"
+            if (trx.note.contains("An:")) {
+                namaPelanggan = trx.note.substringAfter("An:").trim()
+            } else if (trx.note.isNotEmpty()) {
+                namaPelanggan = trx.note // Pakai catatan full kalau format beda
+            }
+
+            // Format Tampilan Baris
+            "👤 $namaPelanggan\n📅 $date  •  💰 ${formatRupiah(trx.totalAmount)}"
+        }.toTypedArray()
+
+        // 3. Tampilkan Alert Dialog List
+        AlertDialog.Builder(this)
+            .setTitle("📋 Daftar Piutang (${debtList.size})")
+            .setItems(listItems) { _, which ->
+                // Nanti bisa diklik untuk pelunasan (Next Project)
+                val selectedTrx = debtList[which]
+                Toast.makeText(this, "ID Trx: ${selectedTrx.id}", Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton("TUTUP", null)
+            .show()
     }
 
     private fun updateProfitDisplay() {
@@ -141,7 +194,6 @@ class SalesReportActivity : AppCompatActivity() {
         val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
         val calendar = Calendar.getInstance()
 
-        // 7 Hari Terakhir
         calendar.add(Calendar.DAY_OF_YEAR, -6)
 
         for (i in 0..6) {
@@ -176,10 +228,12 @@ class SalesReportActivity : AppCompatActivity() {
         barChart.invalidate()
     }
 
-    // --- LOGIKA PRINT REKAP HARIAN ---
     private fun printDailyRecap() {
         val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
 
         val todayTrx = fullList.filter { it.timestamp >= calendar.timeInMillis }
 
@@ -188,16 +242,23 @@ class SalesReportActivity : AppCompatActivity() {
             return
         }
 
-        var tTunai=0.0; var tQRIS=0.0; var tTrf=0.0; var tDebit=0.0
+        var tTunai = 0.0
+        var tQRIS = 0.0
+        var tTrf = 0.0
+        var tDebit = 0.0
+        var tPiutang = 0.0
+
         for (t in todayTrx) {
-            when(t.paymentMethod) {
-                "Tunai"->tTunai+=t.totalAmount
-                "QRIS"->tQRIS+=t.totalAmount
-                "Transfer"->tTrf+=t.totalAmount
-                "Debit"->tDebit+=t.totalAmount
+            when (t.paymentMethod.uppercase()) {
+                "TUNAI" -> tTunai += t.totalAmount
+                "QRIS" -> tQRIS += t.totalAmount
+                "TRANSFER" -> tTrf += t.totalAmount
+                "DEBIT" -> tDebit += t.totalAmount
+                "PIUTANG" -> tPiutang += t.totalAmount
+                else -> tTunai += t.totalAmount
             }
         }
-        val tOmzet = tTunai+tQRIS+tTrf+tDebit
+        val tOmzet = tTunai + tQRIS + tTrf + tDebit + tPiutang
 
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val mac = prefs.getString("printer_mac", "")
@@ -208,30 +269,43 @@ class SalesReportActivity : AppCompatActivity() {
 
         Thread {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) return@Thread
 
-                val socket = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac).createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                val socket = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac)
+                    .createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                 socket.connect()
                 val os = socket.outputStream
                 val p = StringBuilder()
 
-                p.append("\u001B\u0061\u0001\u001B\u0045\u0001${prefs.getString("name","Toko")}\u001B\u0045\u0000\n")
+                p.append("\u001B\u0061\u0001\u001B\u0045\u0001${prefs.getString("name", "Toko")}\u001B\u0045\u0000\n")
                 p.append("REKAP HARIAN\n--------------------------------\n")
                 p.append("\u001B\u0061\u0000Tgl: ${SimpleDateFormat("dd/MM/yy HH:mm").format(Date())}\n")
                 p.append("Total Trx: ${todayTrx.size}\n--------------------------------\n")
 
-                fun r(l:String, v:Double){
-                    val vs=formatRupiah(v).replace("Rp ","")
-                    val s=32-l.length-vs.length
-                    p.append("$l${" ".repeat(if(s>0)s else 1)}$vs\n")
+                fun r(l: String, v: Double) {
+                    val vs = formatRupiah(v).replace("Rp ", "")
+                    val s = 32 - l.length - vs.length
+                    p.append("$l${" ".repeat(if (s > 0) s else 1)}$vs\n")
                 }
 
-                r("Tunai", tTunai); r("QRIS", tQRIS); r("Transfer", tTrf); r("Debit", tDebit)
+                r("Tunai", tTunai)
+                r("QRIS", tQRIS)
+                r("Transfer", tTrf)
+                r("Debit", tDebit)
+                if (tPiutang > 0) r("PIUTANG (BON)", tPiutang) // Cetak Bon juga
+
                 p.append("--------------------------------\n\u001B\u0045\u0001")
                 r("TOTAL OMZET", tOmzet)
                 p.append("\u001B\u0045\u0000\u001B\u0061\u0001--------------------------------\nDicetak oleh Admin\n\n\n")
 
-                os.write(p.toString().toByteArray()); os.flush(); Thread.sleep(2000); socket.close()
+                os.write(p.toString().toByteArray())
+                os.flush()
+                Thread.sleep(2000)
+                socket.close()
                 runOnUiThread { Toast.makeText(this, "Rekap Tercetak!", Toast.LENGTH_SHORT).show() }
             } catch (e: Exception) {
                 runOnUiThread { Toast.makeText(this, "Gagal Print", Toast.LENGTH_SHORT).show() }

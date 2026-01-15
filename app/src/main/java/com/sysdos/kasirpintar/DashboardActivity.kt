@@ -147,7 +147,7 @@ class DashboardActivity : AppCompatActivity() {
                     .setMessage("Masa percobaan 7 hari telah berakhir.\n\nSilakan hubungi Admin Sysdos untuk upgrade ke Full Version.")
                     .setPositiveButton("Hubungi Admin") { _, _ ->
                         try {
-                            val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/6281234567890"))
+                            val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/628179842043"))
                             startActivity(i)
                         } catch (e: Exception) {
                             Toast.makeText(this, "WhatsApp tidak terinstall", Toast.LENGTH_SHORT).show()
