@@ -68,11 +68,18 @@ class UserListActivity : AppCompatActivity() {
     private fun showUserDialog(userToEdit: User?) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_user_entry, null)
 
-        // Inisialisasi View (Spinner SUDAH DIHAPUS)
+        // Inisialisasi View
         val etName = view.findViewById<EditText>(R.id.etName)
         val etUser = view.findViewById<EditText>(R.id.etUsername)
         val etPhone = view.findViewById<EditText>(R.id.etPhone)
         val etPass = view.findViewById<EditText>(R.id.etPassword)
+
+        // 🔥 TAMBAHAN: Sembunyikan Tombol Google (Khusus Menu Admin)
+        // Kita pakai try-catch atau null check biar tidak force close kalau id nya ga ketemu
+        val btnGoogle = view.findViewById<android.view.View>(R.id.btnGoogleRegister)
+        if (btnGoogle != null) {
+            btnGoogle.visibility = android.view.View.GONE
+        }
 
         // Isi data jika Mode Edit
         if (userToEdit != null) {
@@ -87,7 +94,7 @@ class UserListActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setView(view)
-            .setPositiveButton("Simpan", null) // null agar tidak auto-close
+            .setPositiveButton("Simpan", null)
             .setNegativeButton("Batal", null)
             .create()
 
@@ -123,7 +130,7 @@ class UserListActivity : AppCompatActivity() {
                 // --- EKSEKUSI ---
                 if (isValid) {
                     if (userToEdit == null) {
-                        // MODE TAMBAH (Otomatis Admin)
+                        // MODE TAMBAH
                         val newUser = User(
                             name = nama,
                             username = username,
@@ -135,7 +142,7 @@ class UserListActivity : AppCompatActivity() {
                         viewModel.syncUser(newUser)
                         Toast.makeText(this, "Admin berhasil dibuat!", Toast.LENGTH_SHORT).show()
                     } else {
-                        // MODE EDIT (Tetap Admin / Update data lain)
+                        // MODE EDIT
                         val updatedUser = userToEdit.copy(
                             name = nama,
                             username = username,
