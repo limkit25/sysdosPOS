@@ -42,7 +42,6 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etName: TextInputEditText
     private lateinit var etPrice: TextInputEditText
     private lateinit var etCost: TextInputEditText
-    private lateinit var etStock: TextInputEditText // 🔥 NEW: Stok Awal
     private lateinit var etBarcode: TextInputEditText
     private lateinit var ivProduct: ImageView
     private lateinit var etCategory: AutoCompleteTextView
@@ -79,11 +78,10 @@ class ProductEntryActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        // BINDING VIEW
+        // BINDING VIEW (Hapus etStock)
         etName = findViewById(R.id.etProductName)
         etPrice = findViewById(R.id.etProductPrice)
         etCost = findViewById(R.id.etProductCost)
-        etStock = findViewById(R.id.etProductStock) // 🔥 Bind Stok
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
         etCategory = findViewById(R.id.etProductCategory)
@@ -172,7 +170,7 @@ class ProductEntryActivity : AppCompatActivity() {
                 etName.setText(it.name)
                 etPrice.setText(it.price.toInt().toString())
                 etCost.setText(it.costPrice.toInt().toString())
-                etStock.setText(it.stock.toString()) // Stok Edit
+                // Stok TIDAK BOLEH diedit di sini, jadi tidak ditampilkan
                 etBarcode.setText(it.barcode)
                 etCategory.setText(it.category, false)
 
@@ -188,7 +186,6 @@ class ProductEntryActivity : AppCompatActivity() {
         val name = etName.text.toString()
         val priceStr = etPrice.text.toString()
         val costStr = etCost.text.toString()
-        val stockStr = etStock.text.toString()
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
 
@@ -226,7 +223,8 @@ class ProductEntryActivity : AppCompatActivity() {
 
         val price = priceStr.toDoubleOrNull() ?: 0.0
         val cost = costStr.toDoubleOrNull() ?: 0.0
-        val stock = stockStr.toIntOrNull() ?: 0
+        // 🔥 STOK SELALU AMBIL DATA LAMA (EDIT) ATAU 0 (BARU)
+        val stock = productToEdit?.stock ?: 0
 
         // Objek Produk Utama
         val newProduct = Product(
@@ -234,7 +232,7 @@ class ProductEntryActivity : AppCompatActivity() {
             name = name,
             price = if(cbHasVariant.isChecked) 0.0 else price,
             costPrice = cost,
-            stock = stock,
+            stock = stock, // Stok aman, tidak diubah dari sini
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
             imagePath = currentPhotoPath,
@@ -252,7 +250,7 @@ class ProductEntryActivity : AppCompatActivity() {
                 }
 
                 runOnUiThread {
-                    Toast.makeText(this, "✅ Produk Disimpan!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "✅ Produk Disimpan! Silakan Restock via Menu Purchasing.", Toast.LENGTH_LONG).show()
                     finish()
                 }
             }

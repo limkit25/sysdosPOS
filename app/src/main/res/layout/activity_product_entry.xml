@@ -187,20 +187,6 @@
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
 
-<!--                    <com.google.android.material.textfield.TextInputLayout-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:hint="Stok Awal"-->
-<!--                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"-->
-<!--                        android:layout_marginBottom="12dp">-->
-<!--                        <com.google.android.material.textfield.TextInputEditText-->
-<!--                            android:id="@+id/etProductStock"-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:inputType="number"-->
-<!--                            android:text="0"/>-->
-<!--                    </com.google.android.material.textfield.TextInputLayout>-->
-
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -274,6 +260,14 @@
                             android:layout_marginStart="8dp"
                             android:layout_marginBottom="4dp"/>
                     </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="ℹ️ Stok dikelola lewat menu 'Purchasing'"
+                        android:textSize="12sp"
+                        android:textColor="#757575"
+                        android:gravity="center"/>
 
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
