@@ -13,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope // 🔥 Wajib ada ini
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
@@ -21,8 +22,23 @@ import com.sysdos.kasirpintar.data.model.Product
 import com.sysdos.kasirpintar.data.model.StockLog
 import com.sysdos.kasirpintar.data.model.Supplier
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
+import kotlinx.coroutines.Dispatchers // 🔥 Pastikan cuma satu ini
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
 
 class ProductListActivity : AppCompatActivity() {
 
@@ -98,16 +114,21 @@ class ProductListActivity : AppCompatActivity() {
     }
 
     // =================================================================
-    // 🔥 4. FUNGSI DOWNLOAD TEMPLATE KE HP
+    // 🔥 FUNGSI DOWNLOAD TEMPLATE (UPDATE: PAKAI NOTIFIKASI)
     // =================================================================
     private fun saveTemplateToDownloads() {
-        // Isi Template CSV
-        val csvContent = "Nama Produk,Kategori,Harga Modal,Harga Jual,Stok\nContoh Kopi,Minuman,5000,10000,50"
-        val fileName = "template_produk_sysdos.csv"
+        val header = "Nama Produk,Kategori,Harga Modal,Harga Jual,Stok,Barcode,Nama Induk (Khusus Varian)"
+        val row1 = "Nasi Goreng,Makanan,10000,15000,100,89911,"
+        val row2 = "Telur,Topping,2000,3000,50,,Nasi Goreng"
+
+        val csvContent = "$header\n$row1\n$row2"
+        val fileName = "template_produk_varian_sysdos.csv"
 
         try {
+            var fileUri: Uri? = null
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Cara Baru (Android 10 ke atas) - Tidak butuh izin storage
+                // --- ANDROID 10 KE ATAS ---
                 val resolver = contentResolver
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -120,43 +141,139 @@ class ProductListActivity : AppCompatActivity() {
                     resolver.openOutputStream(uri)?.use { outputStream ->
                         outputStream.write(csvContent.toByteArray())
                     }
-                    Toast.makeText(this, "✅ Template tersimpan di folder Download!", Toast.LENGTH_LONG).show()
+                    fileUri = uri // Simpan URI untuk notifikasi
                 }
             } else {
-                // Cara Lama (Android 9 ke bawah)
+                // --- ANDROID 9 KE BAWAH ---
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 val file = File(downloadsDir, fileName)
                 FileOutputStream(file).use { outputStream ->
                     outputStream.write(csvContent.toByteArray())
                 }
-                Toast.makeText(this, "✅ Template tersimpan di: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+
+                // Konversi File ke URI pakai FileProvider (Biar aman & bisa dibuka dari notif)
+                fileUri = FileProvider.getUriForFile(
+                    this,
+                    "${applicationContext.packageName}.provider",
+                    file
+                )
             }
+
+            // 🔥 TAMPILKAN NOTIFIKASI JIKA SUKSES
+            if (fileUri != null) {
+                showDownloadNotification(fileUri!!, fileName)
+                Toast.makeText(this, "✅ Template tersimpan! Cek Notifikasi diatas.", Toast.LENGTH_LONG).show()
+            }
+
         } catch (e: Exception) {
             Toast.makeText(this, "Gagal simpan template: ${e.message}", Toast.LENGTH_SHORT).show()
+            e.printStackTrace()
         }
     }
 
+
     // =================================================================
-    // 🔥 5. FUNGSI UPLOAD HELPER
+    // 🔥 5. FUNGSI UPLOAD CERDAS (SUPPORT VARIAN)
     // =================================================================
     private fun uploadCsvFromUri(uri: Uri) {
-        try {
-            Toast.makeText(this, "Memproses file...", Toast.LENGTH_SHORT).show()
+        // Tampilkan Loading
+        val progressDialog = android.app.ProgressDialog(this)
+        progressDialog.setMessage("Sedang mengimport data...")
+        progressDialog.setCancelable(false)
+        progressDialog.show()
 
-            val inputStream = contentResolver.openInputStream(uri)
-            val tempFile = File(cacheDir, "import_temp.csv")
-            val outputStream = FileOutputStream(tempFile)
+        // Jalankan di Background biar HP ga nge-lag
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val reader = BufferedReader(InputStreamReader(inputStream))
 
-            inputStream?.use { input ->
-                outputStream.use { output ->
-                    input.copyTo(output)
+                var line: String?
+                var successCount = 0
+                var failCount = 0
+
+                // --- BACA ISI CSV BARIS PER BARIS ---
+                while (reader.readLine().also { line = it } != null) {
+                    try {
+                        // Lewati baris header jika ada kata "Nama Produk"
+                        if (line!!.contains("Nama Produk") && line!!.contains("Harga")) continue
+
+                        // Pisahkan pakai Koma (Standar CSV)
+                        val tokens = line!!.split(",")
+
+                        // Pastikan kolomnya cukup (Minimal 6 kolom utama)
+                        if (tokens.size >= 5) { // Sesuaikan dengan template Anda
+                            val name = tokens[0].trim()
+
+                            // Skip jika nama kosong
+                            if (name.isEmpty()) continue
+
+                            // Parse Angka (Handle error jika bukan angka)
+                            val category = tokens[1].trim()
+                            val cost = tokens[2].trim().toDoubleOrNull() ?: 0.0
+                            val price = tokens[3].trim().toDoubleOrNull() ?: 0.0
+                            val stock = tokens[4].trim().toIntOrNull() ?: 0
+
+                            val barcode = if (tokens.size >= 6) tokens[5].trim() else ""
+
+                            // 🔥 KOLOM 7: NAMA INDUK (Untuk Varian)
+                            val parentName = if (tokens.size >= 7) tokens[6].trim() else ""
+
+                            // --- LOGIKA VARIAN ---
+                            var parentId = 0 // Default 0 = Induk
+
+                            if (parentName.isNotEmpty()) {
+                                // Kalau kolom Induk diisi, berarti ini VARIAN
+                                // Cari ID Bapaknya di database berdasarkan Nama
+                                val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this@ProductListActivity)
+                                val parentProduct = db.productDao().getProductByName(parentName)
+
+                                if (parentProduct != null) {
+                                    parentId = parentProduct.id
+                                } else {
+                                    // Bapaknya belum ada? Ya sudah jadi Induk sendiri aja
+                                    parentId = 0
+                                }
+                            }
+
+                            // Buat Objek Produk Baru
+                            val newProduct = Product(
+                                name = name,
+                                price = price,
+                                costPrice = cost,
+                                stock = stock,
+                                category = if (category.isEmpty()) "Umum" else category,
+                                barcode = barcode,
+                                parentId = parentId, // 0 = Induk, >0 = Varian
+                                imagePath = null
+                            )
+
+                            // Simpan ke Database
+                            viewModel.insert(newProduct)
+                            successCount++
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        failCount++
+                    }
+                }
+                reader.close()
+                inputStream?.close()
+
+                // Update UI setelah selesai
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    Toast.makeText(this@ProductListActivity,
+                        "✅ Selesai! Berhasil: $successCount, Gagal: $failCount",
+                        Toast.LENGTH_LONG).show()
+                }
+
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    Toast.makeText(this@ProductListActivity, "❌ Gagal Import: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-
-            viewModel.importCsv(tempFile)
-
-        } catch (e: Exception) {
-            Toast.makeText(this, "Gagal membaca file: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -237,5 +354,60 @@ class ProductListActivity : AppCompatActivity() {
             }
             .setNegativeButton("Batal", null)
             .show()
+    }
+    // =================================================================
+    // 🔥 6. FUNGSI MENAMPILKAN NOTIFIKASI DI STATUS BAR
+    // =================================================================
+    private fun showDownloadNotification(uri: Uri, fileName: String) {
+        val channelId = "download_channel_sysdos"
+        val notificationId = 101
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // 1. Buat Channel (Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "File Unduhan",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifikasi saat download template selesai"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // 2. Buat Intent
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "text/csv")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // 3. Rakit Notifikasi
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("Download Selesai")
+            .setContentText(fileName)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        // 🔥 4. CEK IZIN (SOLUSI MERAHNYA) 🔥
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // Kalau izin belum dikasih, kita skip dulu notifikasinya (biar gak crash)
+                // Atau idealnya kita minta izin disini, tapi skip dulu biar simpel.
+                return
+            }
+        }
+
+        // Sekarang baris ini tidak akan merah lagi
+        notificationManager.notify(notificationId, builder.build())
     }
 }

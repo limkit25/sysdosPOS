@@ -115,4 +115,5 @@ interface ProductDao {
     // 🔥 PERINTAH POTONG STOK
     @Query("UPDATE products SET stock = stock - :quantity WHERE id = :productId")
     suspend fun decreaseStock(productId: Int, quantity: Int)
+
 }

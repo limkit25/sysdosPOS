@@ -36,6 +36,7 @@ class DashboardActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
+        UpdateManager(this).checkForUpdate()
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
@@ -174,61 +175,77 @@ class DashboardActivity : AppCompatActivity() {
             startActivity(Intent(this, AboutActivity::class.java))
         }
 
-        // 🔥 FITUR LOGOUT (UPDATE: ADMIN/MANAGER BISA TUTUP SHIFT) 🔥
+        // 🔥 UPDATE: MENU LOGOUT DINAMIS (ADMIN/MANAGER)
         btnLogout.setOnClickListener {
-            // 1. Cek dulu status Lisensi
+            val userName = session.getString("username", "User") ?: "User"
+
+            // 1. Cek Status Shift Dulu
+            val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+            val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_$userName", false)
+
+            // 2. Cek Status Lisensi (Untuk Opsi Reset)
             val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
             val isFullVersion = licensePrefs.getBoolean("is_full_version", false)
 
             if (role == "kasir") {
-                // === KASIR (TETAP SEPERTI BIASA) ===
-                val options = arrayOf("💰 Tutup Kasir & Cetak Laporan", "🚪 Log Out Biasa")
+                // === KHUSUS KASIR (TETAP SAMA) ===
+                // Kasir biasanya wajib tutup shift, tapi kita cek juga biar rapi
+                val options = if (isShiftOpen) {
+                    arrayOf("💰 Tutup Kasir & Cetak Laporan", "🚪 Log Out Biasa")
+                } else {
+                    arrayOf("🚪 Log Out Biasa") // Kalau udh tutup, cuma bisa logout
+                }
+
                 AlertDialog.Builder(this)
                     .setTitle("Menu Keluar (Kasir)")
                     .setItems(options) { _, which ->
-                        when (which) {
-                            0 -> showCloseSessionDialog(session)
-                            1 -> performLogout(session, false)
+                        val selected = options[which]
+                        if (selected.contains("Tutup Kasir")) {
+                            showCloseSessionDialog(session)
+                        } else {
+                            performLogout(session, false)
                         }
                     }
                     .setNegativeButton("Batal", null)
                     .show()
+
             } else {
-                // === ADMIN / MANAGER (SEKARANG BISA TUTUP SHIFT JUGA) ===
+                // === KHUSUS ADMIN & MANAGER (YANG DIMINTA MAS HERU) ===
 
-                if (isFullVersion) {
-                    // ✅ JIKA SUDAH PREMIUM:
-                    // Tambahkan opsi Tutup Shift di sini
-                    val options = arrayOf("💰 Tutup Shift & Cetak", "🚪 Log Out Biasa")
+                // Gunakan List yang bisa berubah-ubah isinya
+                val menuList = mutableListOf<String>()
 
-                    AlertDialog.Builder(this)
-                        .setTitle("Menu Keluar ($role)") // Judul menyesuaikan role
-                        .setItems(options) { _, which ->
-                            when (which) {
-                                0 -> showCloseSessionDialog(session) // Admin bisa tutup shift
-                                1 -> performLogout(session, false)
-                            }
-                        }
-                        .setNegativeButton("Batal", null)
-                        .show()
-
-                } else {
-                    // ⏳ JIKA MASIH TRIAL:
-                    // Ada 3 Opsi: Tutup Shift, Logout Biasa, Reset Data
-                    val options = arrayOf("💰 Tutup Shift & Cetak", "🚪 Log Out Saja", "🗑️ Log Out & HAPUS SEMUA DATA (Reset)")
-
-                    AlertDialog.Builder(this)
-                        .setTitle("Menu Keluar (Mode Trial)")
-                        .setItems(options) { _, which ->
-                            when (which) {
-                                0 -> showCloseSessionDialog(session) // Admin bisa tutup shift
-                                1 -> performLogout(session, false)
-                                2 -> showResetConfirmation(session) // Hati-hati, hapus data
-                            }
-                        }
-                        .setNegativeButton("Batal", null)
-                        .show()
+                // 🔥 LOGIKA PINTAR:
+                // Cuma tambahkan menu "Tutup Shift" kalau shiftnya MEMANG LAGI BUKA.
+                if (isShiftOpen) {
+                    menuList.add("💰 Tutup Shift & Cetak")
                 }
+
+                // Menu Logout selalu ada
+                menuList.add("🚪 Log Out Biasa")
+
+                // Menu Reset (Khusus Trial)
+                if (!isFullVersion) {
+                    menuList.add("🗑️ Log Out & HAPUS DATA (Reset)")
+                }
+
+                // Ubah jadi Array biar bisa masuk ke Dialog
+                val optionsArray = menuList.toTypedArray()
+
+                AlertDialog.Builder(this)
+                    .setTitle("Menu Keluar ($role)")
+                    .setItems(optionsArray) { _, which ->
+                        val selectedMenu = optionsArray[which]
+
+                        // Kita pakai pengecekan TEXT (String) karena urutan nomornya bisa berubah
+                        when (selectedMenu) {
+                            "💰 Tutup Shift & Cetak" -> showCloseSessionDialog(session)
+                            "🚪 Log Out Biasa" -> performLogout(session, false)
+                            "🗑️ Log Out & HAPUS DATA (Reset)" -> showResetConfirmation(session)
+                        }
+                    }
+                    .setNegativeButton("Batal", null)
+                    .show()
             }
         }
 
@@ -419,7 +436,6 @@ class DashboardActivity : AppCompatActivity() {
         input.inputType = InputType.TYPE_CLASS_NUMBER
         input.hint = "Total uang fisik di laci"
 
-        // Format angka biar enak dilihat
         val fmtExpected = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(expectedCash)
 
         AlertDialog.Builder(this)
@@ -433,7 +449,7 @@ class DashboardActivity : AppCompatActivity() {
                 // 1. Simpan Log ke Database
                 viewModel.closeShift(userName, expectedCash, actualCash)
 
-                // 2. 🔥 CETAK STRUK LAPORAN SHIFT 🔥
+                // 2. Cetak Struk
                 printShiftReport(
                     kasirName = userName,
                     startTime = startTime,
@@ -448,7 +464,19 @@ class DashboardActivity : AppCompatActivity() {
 
                 Toast.makeText(this, "Shift Ditutup & Laporan Dicetak!", Toast.LENGTH_SHORT).show()
 
-                // 3. Logout
+                // ========================================================
+                // 🔥 3. RESET DATA SHIFT (PENTING! AGAR KEMBALI 0) 🔥
+                // ========================================================
+                val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+                shiftPrefs.edit().apply {
+                    remove("IS_OPEN_$userName")      // Hapus Status Buka
+                    remove("MODAL_AWAL_$userName")   // Hapus Modal
+                    remove("START_TIME_$userName")   // Hapus Jam Mulai (Biar reset)
+                    remove("CASH_SALES_TODAY_$userName")
+                    apply() // Simpan perubahan
+                }
+
+                // 4. LOGOUT (Data Aman)
                 performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), false)
             }
             .setNegativeButton("Batal", null)
