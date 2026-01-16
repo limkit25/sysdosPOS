@@ -282,4 +282,12 @@ class ProductRepository(
     suspend fun clearAllData() {
         AppDatabase.getDatabase(context).clearAllTables()
     }
+    // 🔥 WAJIB ADA DI REPOSITORY
+    suspend fun insertProductReturnId(product: Product): Long {
+        return productDao.insertProduct(product) // Pastikan DAO return Long
+    }
+
+    suspend fun insertVariants(variants: List<ProductVariant>) {
+        productDao.insertVariants(variants) // Pastikan DAO punya fungsi ini
+    }
 }

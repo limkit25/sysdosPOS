@@ -91,8 +91,24 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- CRUD ---
+    // --- CRUD PRODUK & VARIAN ---
     fun insert(product: Product) = viewModelScope.launch { repository.insert(product) }
+
+    // 🔥 FUNGSI BARU: Insert dengan Callback ID (WAJIB BUAT VARIAN)
+    fun insertProductWithCallback(product: Product, onResult: (Long) -> Unit) {
+        viewModelScope.launch {
+            val newId = repository.insertProductReturnId(product) // Panggil repo
+            onResult(newId)
+        }
+    }
+
+    // 🔥 FUNGSI BARU: Insert List Varian
+    fun insertVariants(variants: List<ProductVariant>) {
+        viewModelScope.launch {
+            repository.insertVariants(variants)
+        }
+    }
+
     fun update(product: Product) = viewModelScope.launch {
         repository.update(product)
         try { repository.updateProductToServer(product) } catch (e: Exception) {}
@@ -250,7 +266,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             profit = totalProfit,
             paymentMethod = paymentMethod,
             cashReceived = cashReceived, changeAmount = changeAmount,
-            userId = finalUserId
+            userId = finalUserId,
+            note = note // 🔥 Tambahkan field note jika di Transaction.kt sudah ada
         )
 
         val trxId = repository.insertTransaction(trx)

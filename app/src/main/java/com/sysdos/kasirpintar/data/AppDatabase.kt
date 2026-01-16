@@ -5,15 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.sysdos.kasirpintar.data.dao.* // Import semua DAO
-import com.sysdos.kasirpintar.data.model.* // Import semua Model (Termasuk StoreConfig)
+import com.sysdos.kasirpintar.data.dao.*
+import com.sysdos.kasirpintar.data.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-// [PERBAIKAN]
-// 1. Ditambahkan StoreConfig::class ke entities (WAJIB)
-// 2. Version dinaikkan ke 6 (agar aman refresh database)
 @Database(
     entities = [
         Product::class,
@@ -23,20 +20,22 @@ import kotlinx.coroutines.launch
         ShiftLog::class,
         Supplier::class,
         StockLog::class,
-        StoreConfig::class // 🔥 WAJIB ADA: Agar tabel setting toko dibuat
+        StoreConfig::class,
+        ProductVariant::class // 🔥 WAJIB DITAMBAHKAN DI SINI
     ],
-    version = 6, // 🔥 Naikkan versi jika mengubah struktur
+    version = 7, // 🔥 NAIKKAN VERSI (Misal dari 6 jadi 7) BIAR AMAN
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    // Daftarkan semua DAO yang Anda pakai
+    // Daftarkan semua DAO
     abstract fun productDao(): ProductDao
     abstract fun categoryDao(): CategoryDao
     abstract fun shiftDao(): ShiftDao
     abstract fun supplierDao(): SupplierDao
     abstract fun stockLogDao(): StockLogDao
-    abstract fun storeConfigDao(): StoreConfigDao // 🔥 Akses ke DAO Config
+    abstract fun storeConfigDao(): StoreConfigDao
+    abstract fun transactionDao(): TransactionDao // (Pastikan ini ada juga jika dipakai)
 
     companion object {
         @Volatile
@@ -49,7 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sysdos_pos_db"
                 )
-                    .fallbackToDestructiveMigration() // Reset data jika versi berubah
+                    .fallbackToDestructiveMigration() // Reset data jika struktur berubah
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
@@ -62,7 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
-                        // Isi data awal (Seed) jika perlu
+                        // Seed Data Awal
                         val categoryDao = database.categoryDao()
                         categoryDao.insertCategory(Category(name = "Makanan"))
                         categoryDao.insertCategory(Category(name = "Minuman"))

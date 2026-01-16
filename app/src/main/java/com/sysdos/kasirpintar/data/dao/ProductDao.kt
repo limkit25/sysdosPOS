@@ -8,9 +8,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProductDao {
 
-    // --- PRODUK (Tabel: products) ---
+    // --- PRODUK ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(product: Product): Long
+    suspend fun insertProduct(product: Product): Long // 🔥 Wajib return Long
 
     @Update
     suspend fun update(product: Product)
@@ -24,7 +24,20 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
     suspend fun getProductRaw(id: Int): Product?
 
-    // --- KATEGORI (Tabel: categories) ---
+    // 🔥 --- VARIAN (YANG TADI HILANG) --- 🔥
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVariant(variant: ProductVariant)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVariants(variants: List<ProductVariant>)
+
+    @Query("SELECT * FROM product_variants WHERE productId = :productId")
+    fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>>
+
+    @Query("DELETE FROM product_variants WHERE productId = :productId")
+    suspend fun deleteVariantsByProductId(productId: Int)
+
+    // --- KATEGORI ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: Category)
 
@@ -37,7 +50,7 @@ interface ProductDao {
     @Query("DELETE FROM categories")
     suspend fun deleteAllCategories()
 
-    // --- SUPPLIER (Tabel: suppliers) ---
+    // --- SUPPLIER ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSupplier(supplier: Supplier)
 
@@ -50,15 +63,14 @@ interface ProductDao {
     @Query("SELECT * FROM suppliers ORDER BY name ASC")
     fun getAllSuppliers(): Flow<List<Supplier>>
 
-    // --- TRANSAKSI (Tabel: transaction_table) ---
+    // --- TRANSAKSI ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    // 🔥 PERBAIKAN DI SINI (Ditambahkan parameter uid dan WHERE userId)
     @Query("SELECT * FROM transaction_table WHERE userId = :uid ORDER BY timestamp DESC")
     fun getAllTransactions(uid: Int): Flow<List<Transaction>>
 
-    // --- USER (Tabel: user_table) ---
+    // --- USER ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: User)
 
@@ -80,7 +92,7 @@ interface ProductDao {
     @Query("SELECT * FROM user_table WHERE username = :email LIMIT 1")
     suspend fun getUserByEmail(email: String): User?
 
-    // --- LOG STOK (Tabel: stock_logs) ---
+    // --- LOG STOK ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: StockLog)
 

@@ -2,6 +2,7 @@ package com.sysdos.kasirpintar
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -9,12 +10,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
-import android.widget.Button
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.Toast
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +25,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.sysdos.kasirpintar.data.model.Category
 import com.sysdos.kasirpintar.data.model.Product
+import com.sysdos.kasirpintar.data.model.ProductVariant
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -43,18 +42,23 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etName: TextInputEditText
     private lateinit var etPrice: TextInputEditText
     private lateinit var etCost: TextInputEditText
+    private lateinit var etStock: TextInputEditText // 🔥 NEW: Stok Awal
     private lateinit var etBarcode: TextInputEditText
     private lateinit var ivProduct: ImageView
     private lateinit var etCategory: AutoCompleteTextView
 
-    // LAUNCHER KAMERA
+    // 🔥 VARIANT UI
+    private lateinit var cbHasVariant: CheckBox
+    private lateinit var btnAddVariant: Button
+    private lateinit var llVariantContainer: LinearLayout
+
+    // LAUNCHERS
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             setPic()
         }
     }
 
-    // LAUNCHER SCANNER
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
             etBarcode.setText(result.contents)
@@ -68,57 +72,34 @@ class ProductEntryActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // BINDING VIEW
-        val btnBack = findViewById<ImageButton>(R.id.btnBack)
+        initViews()
+        setupListeners()
+        loadCategories()
+        checkEditMode()
+    }
 
+    private fun initViews() {
+        // BINDING VIEW
         etName = findViewById(R.id.etProductName)
         etPrice = findViewById(R.id.etProductPrice)
         etCost = findViewById(R.id.etProductCost)
+        etStock = findViewById(R.id.etProductStock) // 🔥 Bind Stok
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
         etCategory = findViewById(R.id.etProductCategory)
 
-        val btnTakePhoto = findViewById<Button>(R.id.btnTakePhoto)
-        val btnSave = findViewById<Button>(R.id.btnSaveProduct)
-        val btnScan = findViewById<ImageButton>(R.id.btnScanBarcode)
-        val btnAddCategory = findViewById<ImageButton>(R.id.btnAddCategoryLink)
+        // Varian Bind
+        cbHasVariant = findViewById(R.id.cbHasVariant)
+        btnAddVariant = findViewById(R.id.btnAddVariantRow)
+        llVariantContainer = findViewById(R.id.llVariantContainer)
+    }
 
-        btnBack.setOnClickListener { finish() }
+    private fun setupListeners() {
+        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
-        // ISI DROPDOWN KATEGORI
-        viewModel.allCategories.observe(this) { categories ->
-            val safeCategories: List<Category> = categories ?: emptyList()
-            val categoryNames = safeCategories.map { it.name }
-            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
-            etCategory.setAdapter(adapter)
-            etCategory.setOnClickListener { etCategory.showDropDown() }
-        }
+        findViewById<Button>(R.id.btnTakePhoto).setOnClickListener { checkCameraPermissionAndOpen() }
 
-        btnAddCategory.setOnClickListener {
-            startActivity(Intent(this, CategoryActivity::class.java))
-        }
-
-        // CEK MODE EDIT
-        if (intent.hasExtra("PRODUCT_TO_EDIT")) {
-            productToEdit = intent.getParcelableExtra("PRODUCT_TO_EDIT")
-            productToEdit?.let {
-                etName.setText(it.name)
-                etPrice.setText(it.price.toInt().toString())
-                etCost.setText(it.costPrice.toInt().toString())
-                etBarcode.setText(it.barcode)
-                etCategory.setText(it.category, false)
-
-                // Load Foto
-                currentPhotoPath = it.imagePath
-                if (currentPhotoPath != null) setPic()
-
-                btnSave.text = "UPDATE PRODUK"
-            }
-        }
-
-        btnTakePhoto.setOnClickListener { checkCameraPermissionAndOpen() }
-
-        btnScan.setOnClickListener {
+        findViewById<View>(R.id.btnScanBarcode).setOnClickListener {
             val options = ScanOptions()
             options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
             options.setBeepEnabled(true)
@@ -127,8 +108,79 @@ class ProductEntryActivity : AppCompatActivity() {
             scanLauncher.launch(options)
         }
 
-        btnSave.setOnClickListener {
+        findViewById<View>(R.id.btnAddCategoryLink).setOnClickListener {
+            startActivity(Intent(this, CategoryActivity::class.java))
+        }
+
+        // 🔥 LOGIKA CHECKBOX VARIAN
+        cbHasVariant.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                btnAddVariant.visibility = View.VISIBLE
+                llVariantContainer.visibility = View.VISIBLE
+
+                // Matikan Input Harga Induk (Karena pakai harga varian)
+                etPrice.isEnabled = false
+                etPrice.setText("0")
+                etPrice.hint = "Diatur di Varian"
+
+                // Tambah 1 baris default biar gak kosong
+                if (llVariantContainer.childCount == 0) addVariantRow()
+            } else {
+                btnAddVariant.visibility = View.GONE
+                llVariantContainer.visibility = View.GONE
+                llVariantContainer.removeAllViews()
+
+                // Nyalakan Input Harga Induk
+                etPrice.isEnabled = true
+                etPrice.hint = "Harga Jual"
+            }
+        }
+
+        btnAddVariant.setOnClickListener { addVariantRow() }
+
+        findViewById<Button>(R.id.btnSaveProduct).setOnClickListener {
             saveProduct()
+        }
+    }
+
+    private fun loadCategories() {
+        viewModel.allCategories.observe(this) { categories ->
+            val safeCategories = categories ?: emptyList()
+            val categoryNames = safeCategories.map { it.name }
+            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
+            etCategory.setAdapter(adapter)
+            etCategory.setOnClickListener { etCategory.showDropDown() }
+        }
+    }
+
+    // --- LOGIKA VARIAN ---
+    private fun addVariantRow() {
+        val view = LayoutInflater.from(this).inflate(R.layout.item_variant_entry, llVariantContainer, false)
+
+        val btnRemove = view.findViewById<ImageButton>(R.id.btnRemoveVariant)
+        btnRemove.setOnClickListener {
+            llVariantContainer.removeView(view)
+        }
+
+        llVariantContainer.addView(view)
+    }
+
+    private fun checkEditMode() {
+        if (intent.hasExtra("PRODUCT_TO_EDIT")) {
+            productToEdit = intent.getParcelableExtra("PRODUCT_TO_EDIT")
+            productToEdit?.let {
+                etName.setText(it.name)
+                etPrice.setText(it.price.toInt().toString())
+                etCost.setText(it.costPrice.toInt().toString())
+                etStock.setText(it.stock.toString()) // Stok Edit
+                etBarcode.setText(it.barcode)
+                etCategory.setText(it.category, false)
+
+                currentPhotoPath = it.imagePath
+                if (currentPhotoPath != null) setPic()
+
+                findViewById<Button>(R.id.btnSaveProduct).text = "UPDATE PRODUK"
+            }
         }
     }
 
@@ -136,58 +188,80 @@ class ProductEntryActivity : AppCompatActivity() {
         val name = etName.text.toString()
         val priceStr = etPrice.text.toString()
         val costStr = etCost.text.toString()
+        val stockStr = etStock.text.toString()
         val category = etCategory.text.toString()
         val barcode = etBarcode.text.toString()
 
-        // Validasi
-        if (name.isEmpty() || priceStr.isEmpty()) {
-            Toast.makeText(this, "Nama dan Harga wajib diisi!", Toast.LENGTH_SHORT).show()
+        if (name.isEmpty()) {
+            etName.error = "Wajib diisi"
             return
         }
 
-        val price = priceStr.toDouble()
-        val cost = if (costStr.isNotEmpty()) costStr.toDouble() else 0.0
-        val stock = productToEdit?.stock ?: 0 // Stok tidak diubah disini
+        // --- VALIDASI VARIAN ---
+        val variantsList = ArrayList<ProductVariant>()
+        if (cbHasVariant.isChecked) {
+            for (i in 0 until llVariantContainer.childCount) {
+                val row = llVariantContainer.getChildAt(i)
+                val etVName = row.findViewById<EditText>(R.id.etVariantName)
+                val etVPrice = row.findViewById<EditText>(R.id.etVariantPrice)
 
-        if (price < cost) {
-            AlertDialog.Builder(this)
-                .setTitle("⚠️ Potensi Rugi")
-                .setMessage("Harga Jual (Rp ${price.toInt()}) lebih murah dari Modal (Rp ${cost.toInt()}).\n\nYakin tetap simpan?")
-                .setPositiveButton("Ya, Simpan") { _, _ ->
-                    processSave(name, price, cost, stock, category, barcode)
+                val vName = etVName.text.toString().trim()
+                val vPrice = etVPrice.text.toString().toDoubleOrNull() ?: 0.0
+
+                if (vName.isNotEmpty() && vPrice > 0) {
+                    variantsList.add(ProductVariant(productId = 0, variantName = vName, variantPrice = vPrice))
                 }
-                .setNegativeButton("Perbaiki Harga", null)
-                .show()
-            return
+            }
+            if (variantsList.isEmpty()) {
+                Toast.makeText(this, "Isi minimal 1 varian!", Toast.LENGTH_SHORT).show()
+                return
+            }
+        } else {
+            // Kalau bukan varian, harga wajib isi
+            if (priceStr.isEmpty()) {
+                etPrice.error = "Wajib diisi"
+                return
+            }
         }
 
-        processSave(name, price, cost, stock, category, barcode)
-    }
+        val price = priceStr.toDoubleOrNull() ?: 0.0
+        val cost = costStr.toDoubleOrNull() ?: 0.0
+        val stock = stockStr.toIntOrNull() ?: 0
 
-    private fun processSave(
-        name: String, price: Double, cost: Double, stock: Int,
-        category: String, barcode: String
-    ) {
+        // Objek Produk Utama
         val newProduct = Product(
             id = productToEdit?.id ?: 0,
             name = name,
-            price = price,
+            price = if(cbHasVariant.isChecked) 0.0 else price,
             costPrice = cost,
             stock = stock,
             category = category.ifEmpty { "Lainnya" },
             barcode = barcode.ifEmpty { null },
-            imagePath = currentPhotoPath, // Foto tetap tersimpan
-            supplier = "-" // Supplier di-set otomatis "-" (dikelola via Restock)
+            imagePath = currentPhotoPath,
+            supplier = "-"
         )
 
+        // --- PROSES SIMPAN ---
         if (productToEdit == null) {
-            viewModel.insert(newProduct)
-            Toast.makeText(this, "✅ Produk Disimpan!", Toast.LENGTH_SHORT).show()
+            // INSERT BARU
+            viewModel.insertProductWithCallback(newProduct) { newId ->
+                // Jika ada varian, simpan variannya dengan ID baru
+                if (variantsList.isNotEmpty()) {
+                    val finalVariants = variantsList.map { it.copy(productId = newId.toInt()) }
+                    viewModel.insertVariants(finalVariants)
+                }
+
+                runOnUiThread {
+                    Toast.makeText(this, "✅ Produk Disimpan!", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
         } else {
+            // UPDATE
             viewModel.update(newProduct)
             Toast.makeText(this, "✅ Produk Diupdate!", Toast.LENGTH_SHORT).show()
+            finish()
         }
-        finish()
     }
 
     // --- LOGIKA KAMERA ---
@@ -202,17 +276,9 @@ class ProductEntryActivity : AppCompatActivity() {
     private fun dispatchTakePictureIntent() {
         Intent(MediaStore.ACTION_IMAGE_CAPTURE).also { takePictureIntent ->
             takePictureIntent.resolveActivity(packageManager)?.also {
-                val photoFile: File? = try {
-                    createImageFile()
-                } catch (ex: Exception) {
-                    null
-                }
+                val photoFile: File? = try { createImageFile() } catch (ex: Exception) { null }
                 photoFile?.also {
-                    val photoURI: Uri = FileProvider.getUriForFile(
-                        this,
-                        "${packageName}.provider",
-                        it
-                    )
+                    val photoURI: Uri = FileProvider.getUriForFile(this, "${packageName}.provider", it)
                     takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
                     takePictureLauncher.launch(takePictureIntent)
                 }
