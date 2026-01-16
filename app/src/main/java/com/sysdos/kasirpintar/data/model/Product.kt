@@ -12,11 +12,16 @@ data class Product(
     val id: Int = 0,
     val name: String,
     val price: Double,
-    val costPrice: Double = 0.0,    // Tambahan: Harga Modal
+    val costPrice: Double = 0.0,
     val stock: Int,
-    val category: String = "Lainnya", // Tambahan: Kategori
+    val category: String = "Lainnya",
     val barcode: String? = null,
     val imagePath: String? = null,
     val supplier: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+
+    // 🔥 KOLOM BARU: Penanda Induk
+    // Jika 0 = Produk Asli
+    // Jika >0 = Produk Varian (Isinya ID Produk Induk)
+    val parentId: Int = 0
 ) : Parcelable

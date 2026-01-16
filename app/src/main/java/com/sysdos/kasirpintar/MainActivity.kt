@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
     // Printer
     private lateinit var printerHelper: PrinterHelper
     private var selectedPrinterAddress: String? = null
-
+    private var cartDialog: android.app.Dialog? = null
     // PREFERENCE UNTUK SHIFT (MODAL & SESI)
     private lateinit var session: SharedPreferences
     private lateinit var shiftPrefs: SharedPreferences
@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         // Setup RecyclerView
         productAdapter = ProductAdapter(
             onItemClick = { product ->
-                viewModel.addToCart(product) { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+                handleProductClick(product)
             },
             onItemLongClick = { product -> showCartActionDialog(product) }
         )
@@ -129,6 +129,12 @@ class MainActivity : AppCompatActivity() {
             productAdapter.updateCartCounts(it)
             val itemCount = it.sumOf { item -> item.stock }
             tvCartCount.text = "$itemCount Item"
+            // 🔥 TAMBAHAN BARU:
+            // Jika Dialog Keranjang sedang terbuka, Refresh otomatis!
+            if (cartDialog?.isShowing == true) {
+                cartDialog?.dismiss() // Tutup yang lama
+                showCartPreview()     // Buka yang baru dengan data fresh
+            }
         }
         viewModel.totalPrice.observe(this) {
             tvCartTotal.text = formatRupiah(it)
@@ -533,16 +539,19 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val dialog = android.app.Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
-        dialog.setContentView(R.layout.dialog_cart_preview)
+        // 🔥 GANTI: Gunakan variabel global 'cartDialog'
+        cartDialog = android.app.Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
+        cartDialog?.setContentView(R.layout.dialog_cart_preview)
 
-        val container = dialog.findViewById<LinearLayout>(R.id.llCartItems)
-        val tvTotalTop = dialog.findViewById<TextView>(R.id.tvPreviewTotalTop)
-        val btnClose = dialog.findViewById<View>(R.id.btnCloseCart)
-        val btnAddMore = dialog.findViewById<Button>(R.id.btnAddMore)
-        val btnProceed = dialog.findViewById<Button>(R.id.btnProceedToPay)
+        val container = cartDialog?.findViewById<LinearLayout>(R.id.llCartItems)
+        val tvTotalTop = cartDialog?.findViewById<TextView>(R.id.tvPreviewTotalTop)
+        val btnClose = cartDialog?.findViewById<View>(R.id.btnCloseCart)
+        val btnAddMore = cartDialog?.findViewById<Button>(R.id.btnAddMore)
+        val btnProceed = cartDialog?.findViewById<Button>(R.id.btnProceedToPay)
 
-        tvTotalTop.text = formatRupiah(viewModel.totalPrice.value ?: 0.0)
+        tvTotalTop?.text = formatRupiah(viewModel.totalPrice.value ?: 0.0)
+
+        container?.removeAllViews()
 
         for (item in currentCart) {
             val itemView = LayoutInflater.from(this).inflate(R.layout.item_cart_row, null)
@@ -550,6 +559,7 @@ class MainActivity : AppCompatActivity() {
             val tvPrice = itemView.findViewById<TextView>(R.id.tvCartPrice)
             val tvQty = itemView.findViewById<TextView>(R.id.tvCartQty)
             val tvSubtotal = itemView.findViewById<TextView>(R.id.tvCartSubtotal)
+
             val btnMinus = itemView.findViewById<View>(R.id.btnMinus)
             val btnPlus = itemView.findViewById<View>(R.id.btnPlus)
             val btnRemove = itemView.findViewById<View>(R.id.btnRemoveItem)
@@ -559,40 +569,102 @@ class MainActivity : AppCompatActivity() {
             tvQty.text = item.stock.toString()
             tvSubtotal.text = formatRupiah(item.price * item.stock)
 
+            // TOMBOL PLUS (+)
             btnPlus.setOnClickListener {
-                val originalProduct = fullList.find { it.id == item.id }
-                if (originalProduct != null) {
-                    viewModel.addToCart(originalProduct) { }
-                    dialog.dismiss(); showCartPreview()
+                val masterProduct = if (item.id < 0) {
+                    fullList.find { it.id == item.parentId }
+                } else {
+                    fullList.find { it.id == item.id }
+                }
+
+                if (masterProduct != null) {
+                    val totalDiKeranjang = currentCart.filter {
+                        it.id == masterProduct.id || it.parentId == masterProduct.id
+                    }.sumOf { it.stock }
+
+                    if (totalDiKeranjang >= masterProduct.stock) {
+                        Toast.makeText(this, "❌ Stok Mentok! Sisa: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+
+                    // 🔥 CUKUP PANGGIL INI SAJA
+                    // Tidak perlu dialog.dismiss() atau showCartPreview()
+                    // Biarkan Observer di onCreate yang bekerja
+                    val productToSend = item.copy(stock = masterProduct.stock)
+                    viewModel.addToCart(productToSend) {}
+                } else {
+                    viewModel.addToCart(item) {}
                 }
             }
+
+            // TOMBOL MINUS (-)
             btnMinus.setOnClickListener {
+                // 🔥 Cukup panggil ViewModel, refresh otomatis via Observer
                 viewModel.decreaseCartItem(item)
-                dialog.dismiss(); showCartPreview()
             }
             (btnMinus as? ImageButton)?.setImageResource(android.R.drawable.btn_minus)
 
+            // TOMBOL HAPUS
             btnRemove.setOnClickListener {
+                // 🔥 Cukup panggil ViewModel
                 viewModel.removeCartItem(item)
-                dialog.dismiss(); showCartPreview()
             }
-            container.addView(itemView)
+
+            container?.addView(itemView)
         }
 
-        btnClose.setOnClickListener { dialog.dismiss() }
-        btnAddMore.setOnClickListener { dialog.dismiss() }
-        btnProceed.setOnClickListener { dialog.dismiss(); showPaymentDialog() }
-        dialog.show()
+        btnClose?.setOnClickListener { cartDialog?.dismiss() }
+        btnAddMore?.setOnClickListener { cartDialog?.dismiss() }
+        btnProceed?.setOnClickListener { cartDialog?.dismiss(); showPaymentDialog() }
+
+        cartDialog?.show()
     }
 
+    // 🔥 LOGIKA LONG CLICK (SMART SEARCH)
     private fun showCartActionDialog(product: Product) {
+        // 1. Cari item di keranjang yang berhubungan dengan produk ini
+        val currentCart = viewModel.cart.value ?: emptyList()
+
+        // Cari yang ID-nya SAMA (Produk Biasa) ATAU ParentID-nya SAMA (Varian/Topping)
+        val relatedItems = currentCart.filter { it.id == product.id || it.parentId == product.id }
+
+        if (relatedItems.isEmpty()) {
+            Toast.makeText(this, "Item ini belum ada di keranjang", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 2. KASUS A: Cuma ada 1 jenis item yang cocok (Misal: Cuma Nasi Goreng Telur)
+        if (relatedItems.size == 1) {
+            val targetItem = relatedItems[0]
+            showActionOptions(targetItem)
+        }
+        // 3. KASUS B: Ada banyak varian (Misal: Ada NG Telur DAN NG Ati di keranjang)
+        else {
+            // Tampilkan pilihan varian mana yang mau diedit
+            val names = relatedItems.map { "${it.name} (Qty: ${it.stock})" }.toTypedArray()
+
+            AlertDialog.Builder(this)
+                .setTitle("Pilih Item yang Mau Diedit")
+                .setItems(names) { _, which ->
+                    val selectedTarget = relatedItems[which]
+                    showActionOptions(selectedTarget)
+                }
+                .show()
+        }
+    }
+
+    // Helper biar kodingan rapi
+    private fun showActionOptions(targetItem: Product) {
         val options = arrayOf("➖ Kurangi 1", "❌ Batal Item")
-        AlertDialog.Builder(this).setTitle(product.name).setItems(options) { _, which ->
-            when (which) {
-                0 -> viewModel.decreaseCartItem(product)
-                1 -> viewModel.removeCartItem(product)
+        AlertDialog.Builder(this)
+            .setTitle(targetItem.name)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> viewModel.decreaseCartItem(targetItem)
+                    1 -> viewModel.removeCartItem(targetItem)
+                }
             }
-        }.show()
+            .show()
     }
 
     private fun setupCategoryButtons(categories: List<Category>) {
@@ -804,5 +876,150 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         try { printerHelper.close() } catch (e: Exception) {}
+    }
+    // 🔥 LOGIKA KLIK PRODUK (DENGAN PENGECEKAN STOK KETAT)
+    private fun handleProductClick(product: Product) {
+
+        // 1. Cek Stok Gudang (Database)
+        if (product.stock <= 0) {
+            Toast.makeText(this, "❌ Stok Gudang Kosong!", Toast.LENGTH_SHORT).show()
+            return // Stop! Jangan lanjut.
+        }
+
+        // 2. Cek Sisa Stok (Dikurangi yang sudah ada di Keranjang)
+        val currentCart = viewModel.cart.value ?: emptyList()
+        val qtyInCart = currentCart.filter {
+            it.id == product.id || it.parentId == product.id
+        }.sumOf { it.stock }
+
+        if (product.stock - qtyInCart <= 0) {
+            Toast.makeText(this, "❌ Stok Habis! (Semua sudah di keranjang)", Toast.LENGTH_SHORT).show()
+            return // Stop! Jangan lanjut.
+        }
+
+        // --- Lolos Pengecekan? Baru lanjut ke Varian/Cart ---
+
+        // Ambil Data Varian
+        val variantsLiveData = viewModel.getVariants(product.id)
+
+        var hasObserved = false
+        val observer = object : androidx.lifecycle.Observer<List<com.sysdos.kasirpintar.data.model.ProductVariant>> {
+            override fun onChanged(variants: List<com.sysdos.kasirpintar.data.model.ProductVariant>) {
+                if (hasObserved) return
+                hasObserved = true
+                variantsLiveData.removeObserver(this)
+
+                if (!variants.isNullOrEmpty()) {
+                    // ADA VARIAN -> Tampilkan Popup
+                    showVariantDialog(product, variants)
+                } else {
+                    // TIDAK ADA VARIAN -> Masuk Cart
+                    viewModel.addToCart(product) { msg ->
+                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        variantsLiveData.observe(this, observer)
+    }
+
+    // 🔥 POPUP PILIH VARIAN
+    // 1️⃣ TAMPILKAN POPUP VARIAN (MODE TOPPING / SATU BARIS)
+    private fun showVariantDialog(product: Product, variants: List<com.sysdos.kasirpintar.data.model.ProductVariant>) {
+        val variantNames = variants.map {
+            "${it.variantName}  (+${formatRupiah(it.variantPrice)})"
+        }.toTypedArray()
+
+        val checkedItems = BooleanArray(variants.size)
+
+        AlertDialog.Builder(this)
+            .setTitle("Pilih Tambahan / Topping: ${product.name}")
+            .setMultiChoiceItems(variantNames, checkedItems) { _, which, isChecked ->
+                checkedItems[which] = isChecked
+            }
+            .setPositiveButton("MASUKKAN KERANJANG") { _, _ ->
+                // Kumpulkan semua varian yang dicentang ke dalam list
+                val selectedVariants = ArrayList<com.sysdos.kasirpintar.data.model.ProductVariant>()
+                for (i in checkedItems.indices) {
+                    if (checkedItems[i]) selectedVariants.add(variants[i])
+                }
+
+                // Panggil fungsi penggabungan
+                addModifierToCart(product, selectedVariants)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+    private fun addVariantToCart(parentProduct: Product, variant: com.sysdos.kasirpintar.data.model.ProductVariant, showToast: Boolean = true) {
+        // Hitung Harga Total (Induk + Varian)
+        val totalHarga = parentProduct.price + variant.variantPrice
+
+        // Buat Produk Sementara dengan ID Minus
+        val virtualProduct = parentProduct.copy(
+            id = -variant.variantId, // ID Minus biar unik
+            name = "${parentProduct.name} - ${variant.variantName}",
+            price = totalHarga,
+            stock = 9999, // Bypass stok varian
+            parentId = parentProduct.id // 🔥 PENTING: Parent ID buat Badge Merah
+        )
+
+        // Cek Stok Induk (Strict Mode)
+        if (parentProduct.stock <= 0) {
+            if (showToast) Toast.makeText(this, "❌ Stok Induk Kosong!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        viewModel.addToCart(virtualProduct) { msg ->
+            // Tampilkan toast hanya jika diminta (single add)
+            if (showToast) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+    // 2️⃣ FUNGSI BARU: GABUNG SEMUA VARIAN JADI SATU PRODUK
+    private fun addModifierToCart(parentProduct: Product, selectedVariants: List<com.sysdos.kasirpintar.data.model.ProductVariant>) {
+        // Jika tidak ada yang dipilih, masukkan produk induk murni
+        if (selectedVariants.isEmpty()) {
+            viewModel.addToCart(parentProduct) { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+            return
+        }
+
+        // 1. Gabung Nama (Contoh: "Nasi Goreng - Telur, Ati, Pete")
+        val combinedNameBuilder = StringBuilder("${parentProduct.name} - ")
+        var additionalPrice = 0.0
+
+        for ((index, variant) in selectedVariants.withIndex()) {
+            combinedNameBuilder.append(variant.variantName)
+            // Tambahkan koma jika bukan item terakhir
+            if (index < selectedVariants.size - 1) combinedNameBuilder.append(", ")
+
+            // Jumlahkan Harga
+            additionalPrice += variant.variantPrice
+        }
+
+        val finalName = combinedNameBuilder.toString()
+        val finalPrice = parentProduct.price + additionalPrice
+
+        // 2. Bikin ID Unik (Biar kalau pesan menu SAMA PERSIS, qty nambah. Kalau beda dikit, baris baru)
+        // Kita pakai trik: HashCode dari nama gabungan -> dijadikan ID Negatif
+        var uniqueId = finalName.hashCode()
+        if (uniqueId > 0) uniqueId = -uniqueId
+        if (uniqueId == 0) uniqueId = -1
+
+        // 3. Buat Produk Virtual
+        val virtualProduct = parentProduct.copy(
+            id = uniqueId,
+            name = finalName,
+            price = finalPrice,
+            stock = 9999, // Bypass stok topping
+            parentId = parentProduct.id // Tetap link ke Induk (untuk Badge Merah)
+        )
+
+        // 4. Cek Stok Induk
+        if (parentProduct.stock <= 0) {
+            Toast.makeText(this, "❌ Stok Induk Kosong!", Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.addToCart(virtualProduct) { msg ->
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }

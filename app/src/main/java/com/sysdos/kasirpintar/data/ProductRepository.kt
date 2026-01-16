@@ -55,6 +55,16 @@ class ProductRepository(
     suspend fun update(product: Product) = productDao.update(product)
     suspend fun delete(product: Product) = productDao.delete(product)
 
+    // 🔥 FUNGSI BARU: Ambil Varian berdasarkan ID Produk
+    fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>> {
+        return productDao.getVariantsByProductId(productId)
+    }
+    // 🔥 FUNGSI BARU: Update Varian (Hapus Lama -> Simpan Baru)
+    suspend fun replaceVariants(productId: Int, variants: List<ProductVariant>) {
+        productDao.deleteVariantsByProductId(productId) // 1. Hapus varian lama
+        productDao.insertVariants(variants)             // 2. Masukkan varian baru dari layar
+    }
+
     // =================================================================
     // 📂 2. DATA PENDUKUNG (User, Kategori, Supplier)
     // =================================================================

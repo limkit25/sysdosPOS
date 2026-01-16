@@ -64,7 +64,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         syncData()
         startServerHealthCheck()
     }
-
+    // 🔥 FUNGSI BARU: LiveData untuk Varian
+    fun getVariants(productId: Int): LiveData<List<ProductVariant>> {
+        return repository.getVariantsByProductId(productId).asLiveData()
+    }
     fun loadCurrentUser() {
         viewModelScope.launch {
             val prefs = getApplication<Application>().getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
@@ -91,18 +94,18 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- CRUD PRODUK & VARIAN ---
+    // --- CRUD ---
     fun insert(product: Product) = viewModelScope.launch { repository.insert(product) }
 
-    // 🔥 FUNGSI BARU: Insert dengan Callback ID (WAJIB BUAT VARIAN)
+    // 🔥 PENTING: Untuk Insert Produk & Dapat ID (Buat Varian)
     fun insertProductWithCallback(product: Product, onResult: (Long) -> Unit) {
         viewModelScope.launch {
-            val newId = repository.insertProductReturnId(product) // Panggil repo
+            val newId = repository.insertProductReturnId(product)
             onResult(newId)
         }
     }
 
-    // 🔥 FUNGSI BARU: Insert List Varian
+    // 🔥 PENTING: Untuk Insert Varian
     fun insertVariants(variants: List<ProductVariant>) {
         viewModelScope.launch {
             repository.insertVariants(variants)
@@ -125,6 +128,12 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     fun insertUser(user: User) = viewModelScope.launch { repository.insertUser(user) }
     fun updateUser(user: User) = viewModelScope.launch { repository.updateUser(user) }
     fun deleteUser(user: User) = viewModelScope.launch { repository.deleteUser(user) }
+    // 🔥 Panggil fungsi replace dari repo
+    fun updateVariants(productId: Int, variants: List<ProductVariant>) {
+        viewModelScope.launch {
+            repository.replaceVariants(productId, variants)
+        }
+    }
 
     fun login(u: String, p: String, onResult: (User?) -> Unit) = viewModelScope.launch {
         val user = repository.login(u, p)
@@ -132,24 +141,32 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         onResult(user)
     }
 
-    // --- CART ---
+    // --- CART (KERANJANG) - VALIDASI STOK AKTIF ---
     fun addToCart(product: Product, onResult: (String) -> Unit) {
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
         val index = currentList.indexOfFirst { it.id == product.id }
-        val stokGudang = product.stock
+        val stokGudang = product.stock // 🔥 Ambil stok gudang
 
         if (index != -1) {
             val existingItem = currentList[index]
             val qtyBaru = existingItem.stock + 1
-            if (qtyBaru > stokGudang) { onResult("❌ Stok Habis! Sisa: $stokGudang"); return }
+
+            // 🔥 CEK STOK (Stok 0 = Gak boleh tambah)
+            if (qtyBaru > stokGudang) {
+                onResult("❌ Stok Habis! Sisa: $stokGudang")
+                return
+            }
+
             currentList[index] = existingItem.copy(stock = qtyBaru)
             onResult("Qty ditambah")
         } else {
+            // 🔥 CEK STOK BARANG BARU
             if (stokGudang > 0) {
                 currentList.add(product.copy(stock = 1))
                 onResult("Masuk keranjang")
             } else {
-                onResult("❌ Stok Kosong!"); return
+                onResult("❌ Stok Kosong!")
+                return
             }
         }
         _cart.value = currentList
@@ -267,7 +284,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             paymentMethod = paymentMethod,
             cashReceived = cashReceived, changeAmount = changeAmount,
             userId = finalUserId,
-            note = note // 🔥 Tambahkan field note jika di Transaction.kt sudah ada
+            note = note
         )
 
         val trxId = repository.insertTransaction(trx)
@@ -306,6 +323,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         repository.insertShiftLog(log)
     }
 
+    // --- PURCHASE / STOK MASUK ---
     fun recordPurchase(log: StockLog) = viewModelScope.launch { repository.recordPurchase(log) }
 
     fun getPurchaseDetails(purchaseId: Long, onResult: (List<StockLog>) -> Unit) = viewModelScope.launch {
@@ -313,7 +331,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         onResult(details)
     }
 
-    // 🔥 FITUR UPDATE INFO TOKO (KIRIM KE VPS)
+    // --- TOKO ---
     fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?) = viewModelScope.launch {
         val config = StoreConfig(1, name, address, phone, footer, printerMac)
         repository.saveStoreConfig(config)
@@ -336,7 +354,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
     }
 
-    // 🔥 FUNGSI KIRIM DATA PROMO (SALES LEAD) KE VPS
     fun sendDataToSalesSystem(user: User) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val storeConfig = repository.getStoreConfigDirect()
@@ -355,28 +372,16 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
             val api = ApiClient.webClient
             api.registerLead(request).execute()
-
-            Log.d("SalesCRM", "✅ Data LENGKAP dikirim ke VPS Sales")
         } catch (e: Exception) {
             Log.e("SalesCRM", "⚠️ Gagal lapor sales: ${e.message}")
         }
     }
 
-    // ======================================================
-    // 🔥 BAGIAN PENTING: CEK LISENSI DENGAN DEVICE ID & MODEL
-    // ======================================================
-
     fun checkServerLicense(email: String) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val api = ApiClient.webClient
-
-            // 1. AMBIL ID UNIK HP INI
             val deviceId = getDeviceId(getApplication())
-
-            // 2. 🔥 AMBIL MERK HP
             val deviceModel = getDeviceName()
-
-            // 3. 🔥 KIRIM 3 PARAMETER (Email + ID + Model)
             val response = api.checkLicense(email, deviceId, deviceModel).execute()
 
             if (response.isSuccessful && response.body() != null) {
@@ -408,37 +413,26 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
                 editor.apply()
-                Log.d("License", "Status: ${data.status} | Device: $deviceId")
             }
         } catch (e: Exception) {
             Log.e("License", "Gagal cek lisensi: ${e.message}")
         }
     }
 
-    // 🔥 UPDATE: CEK STATUS LENGKAP (AGAR BISA TOLAK YANG BLOCKED)
     fun checkUserOnCloud(email: String, onResult: (com.sysdos.kasirpintar.api.LicenseCheckResponse?) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val api = ApiClient.webClient
                 val deviceId = getDeviceId(getApplication())
                 val deviceModel = getDeviceName()
-
-                // Kirim data lengkap ke server
                 val response = api.checkLicense(email, deviceId, deviceModel).execute()
-
-                if (response.isSuccessful && response.body() != null) {
-                    // Balikkan Data Lengkap (Status, Pesan, dll)
-                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(response.body()) }
-                } else {
-                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
-                }
+                launch(kotlinx.coroutines.Dispatchers.Main) { onResult(if (response.isSuccessful) response.body() else null) }
             } catch (e: Exception) {
                 launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
             }
         }
     }
 
-    // 🔥 HELPER: Ambil ID HP (Android ID)
     private fun getDeviceId(context: Context): String {
         return android.provider.Settings.Secure.getString(
             context.contentResolver,
@@ -446,7 +440,6 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         ) ?: "UNKNOWN_DEVICE"
     }
 
-    // 🔥 HELPER BARU: AMBIL NAMA/MERK HP
     private fun getDeviceName(): String {
         val manufacturer = android.os.Build.MANUFACTURER
         val model = android.os.Build.MODEL
