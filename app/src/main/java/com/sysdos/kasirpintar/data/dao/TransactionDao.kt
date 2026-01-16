@@ -13,9 +13,13 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    // 🔥 PERBAIKAN DI SINI:
-    // 1. Tambahkan parameter (uid: Int) di dalam kurung fungsi
-    // 2. Tambahkan WHERE userId = :uid di dalam Query SQL
+    // Ambil Semua Data (Untuk List di Layar HP)
     @Query("SELECT * FROM transaction_table WHERE userId = :uid ORDER BY timestamp DESC")
     fun getAllTransactions(uid: Int): Flow<List<Transaction>>
+
+    // 🔥 TAMBAHAN BARU: UNTUK EXPORT LAPORAN
+    // Mengambil data berdasarkan User ID DAN Rentang Tanggal
+    @Query("SELECT * FROM transaction_table WHERE userId = :uid AND timestamp BETWEEN :startDate AND :endDate ORDER BY timestamp DESC")
+    suspend fun getTransactionsByDateRange(uid: Int, startDate: Long, endDate: Long): List<Transaction>
+
 }

@@ -18,13 +18,21 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     private val repository: ProductRepository
 
     init {
-        val database = AppDatabase.getDatabase(application)
+        val productDao = AppDatabase.getDatabase(application).productDao()
+        val shiftDao = AppDatabase.getDatabase(application).shiftDao()
+        val stockLogDao = AppDatabase.getDatabase(application).stockLogDao()
+        val storeConfigDao = AppDatabase.getDatabase(application).storeConfigDao()
+
+        // 🔥 TAMBAHAN BARU:
+        val transactionDao = AppDatabase.getDatabase(application).transactionDao()
+
         repository = ProductRepository(
             application,
-            database.productDao(),
-            database.shiftDao(),
-            database.stockLogDao(),
-            database.storeConfigDao()
+            productDao,
+            shiftDao,
+            stockLogDao,
+            storeConfigDao,
+            transactionDao // <--- 🔥 MASUKKAN INI DI PALING BELAKANG
         )
     }
 

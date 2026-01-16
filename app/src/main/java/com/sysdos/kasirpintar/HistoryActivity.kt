@@ -26,6 +26,10 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 class HistoryActivity : AppCompatActivity() {
 
@@ -69,7 +73,7 @@ class HistoryActivity : AppCompatActivity() {
             btnExport.visibility = View.GONE
         } else {
             btnExport.visibility = View.VISIBLE
-            btnExport.setOnClickListener { exportToCSV() }
+            btnExport.setOnClickListener { showExportDateDialog() }
         }
 
         // 4. OBSERVE DATA
@@ -128,25 +132,158 @@ class HistoryActivity : AppCompatActivity() {
         activeBtn.setTextColor(Color.WHITE)
     }
 
-    // --- FITUR EXPORT ---
-    private fun exportToCSV() {
-        val currentList = adapter.currentList
-        if (currentList.isEmpty()) { Toast.makeText(this, "Data kosong!", Toast.LENGTH_SHORT).show(); return }
+    // ... (kode onCreate dan listener lain biarkan sama) ...
+
+    // --- FITUR EXPORT (DENGAN PILIHAN TANGGAL) ---
+    private fun showExportDateDialog() {
+        // Load layout popup tanggal
+        val dialogView = layoutInflater.inflate(R.layout.dialog_export_date, null)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Export Laporan Transaksi")
+            .setView(dialogView)
+            .create()
+
+        val etStartDate = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etStartDate)
+        val etEndDate = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etEndDate)
+        val btnProcess = dialogView.findViewById<Button>(R.id.btnProcessExport)
+
+        // Setup Kalender & Format Tanggal
+        val calendar = Calendar.getInstance()
+        val displayFormat = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID"))
+
+        // Default: Hari Ini
+        etStartDate.setText(displayFormat.format(Date()))
+        etEndDate.setText(displayFormat.format(Date()))
+
+        // Variabel penampung Millis (Jam 00:00 s/d 23:59)
+        var startMillis: Long
+        var endMillis: Long
+
+        // Init default millis hari ini
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
+        }
+        val todayEnd = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
+        }
+        startMillis = todayStart.timeInMillis
+        endMillis = todayEnd.timeInMillis
+
+        // Listener Klik Tanggal Awal
+        etStartDate.setOnClickListener {
+            android.app.DatePickerDialog(this, { _, year, month, day ->
+                val cal = Calendar.getInstance()
+                cal.set(year, month, day, 0, 0, 0)
+                startMillis = cal.timeInMillis
+                etStartDate.setText(displayFormat.format(cal.time))
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        // Listener Klik Tanggal Akhir
+        etEndDate.setOnClickListener {
+            android.app.DatePickerDialog(this, { _, year, month, day ->
+                val cal = Calendar.getInstance()
+                cal.set(year, month, day, 23, 59, 59)
+                endMillis = cal.timeInMillis
+                etEndDate.setText(displayFormat.format(cal.time))
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        // Tombol Proses Export
+        btnProcess.setOnClickListener {
+            if (startMillis > endMillis) {
+                Toast.makeText(this, "❌ Tanggal Awal tidak boleh lebih besar dari Akhir", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            processExport(startMillis, endMillis)
+        }
+
+        dialog.show()
+    }
+
+    private fun processExport(start: Long, end: Long) {
+        Toast.makeText(this, "Sedang menyiapkan data...", Toast.LENGTH_SHORT).show()
+
+        // Ambil User ID dari Session
+        val prefs = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+        // Ambil User ID yang login, kalau admin pakai ID admin
+        val currentUserId = 1 // Default Admin (Sesuaikan jika Mas Heru simpan ID di session)
+
+        // Panggil Database di Background (Coroutine)
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this@HistoryActivity)
+
+            // Ini akan aman karena berjalan di dalam coroutine (launch)
+            val filteredData = db.transactionDao().getTransactionsByDateRange(currentUserId, start, end)
+
+            withContext(Dispatchers.Main) {
+                if (filteredData.isEmpty()) {
+                    Toast.makeText(this@HistoryActivity, "Tidak ada data di tanggal tersebut", Toast.LENGTH_SHORT).show()
+                } else {
+                    generateCSV(filteredData)
+                }
+            }
+        }
+    }
+
+    private fun generateCSV(dataList: List<Transaction>) {
         try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
-            val file = File(cacheDir, "Laporan_$timeStamp.csv")
+            val file = File(cacheDir, "Laporan_Transaksi_$timeStamp.csv")
             val writer = FileWriter(file)
-            writer.append("ID,Tanggal,Jam,Total,Metode,Laba\n")
-            for(t in currentList) {
+
+            // 🔥 1. UPDATE HEADER: Tambahkan "Diskon" dan "Pajak"
+            writer.append("ID Transaksi,Tanggal,Jam,Detail Menu (Item & Topping),Total Belanja,Diskon,Pajak,Metode Bayar,Keuntungan,Catatan\n")
+
+            for (t in dataList) {
                 val d = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(t.timestamp))
                 val tm = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(t.timestamp))
-                writer.append("#${t.id},$d,$tm,${t.totalAmount},${t.paymentMethod},${t.profit}\n")
+
+                // --- Logika Membedah Menu (Sama seperti sebelumnya) ---
+                val summaryParts = t.itemsSummary.split(" || ")
+                val rawItemsStr = summaryParts[0]
+                val rawItems = rawItemsStr.split(";")
+                val detailBuilder = StringBuilder()
+
+                for (itemStr in rawItems) {
+                    val parts = itemStr.split("|")
+                    if (parts.size >= 2) {
+                        val namaMenu = parts[0]
+                        val qty = parts[1]
+                        if (detailBuilder.isNotEmpty()) detailBuilder.append(" + ")
+                        detailBuilder.append("$namaMenu (x$qty)")
+                    }
+                }
+
+                // Bersihkan karakter koma agar CSV rapi
+                val cleanDetail = detailBuilder.toString().replace(",", " &")
+                val cleanNote = t.note.replace(",", " ").replace("\n", " ")
+
+                // -----------------------------------------------------
+
+                // 🔥 2. UPDATE ISI BARIS: Masukkan t.discount dan t.tax
+                // Urutannya: ID, Tgl, Jam, Detail, Total, DISKON, PAJAK, Metode, Profit, Note
+                writer.append("#${t.id},$d,$tm,\"$cleanDetail\",${t.totalAmount},${t.discount},${t.tax},${t.paymentMethod},${t.profit},\"$cleanNote\"\n")
             }
-            writer.flush(); writer.close()
+
+            writer.flush()
+            writer.close()
+
+            // Share File
             val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.provider", file)
-            val intent = Intent(Intent.ACTION_SEND).apply { type="text/csv"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            startActivity(Intent.createChooser(intent, "Kirim Excel..."))
-        } catch (e: Exception) { Toast.makeText(this, "Gagal: ${e.message}", Toast.LENGTH_SHORT).show() }
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Kirim Laporan via..."))
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal Export: ${e.message}", Toast.LENGTH_SHORT).show()
+            e.printStackTrace()
+        }
     }
 
     // --- DIALOG DETAIL ---

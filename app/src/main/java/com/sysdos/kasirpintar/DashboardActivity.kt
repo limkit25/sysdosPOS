@@ -312,51 +312,65 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     // 🔥 UPDATE: FITUR TUTUP SHIFT DENGAN RINCIAN PEMBAYARAN 🔥
+    // 🔥 UPDATE: AMBIL WAKTU MULAI SHIFT YANG BENAR 🔥
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        val userId = session.getInt("user_id", 0)
-        val userName = session.getString("name", "User")
+        val userName = session.getString("username", "User") ?: "User"
 
-        // 1. Ambil semua transaksi dari ViewModel
-        val allTrx = viewModel.allTransactions.value ?: emptyList()
+        // 1. AMBIL WAKTU MULAI SHIFT
+        val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+        // Ambil waktu start. Jika 0, set ke awal hari ini (jam 00:00)
+        val shiftStartTime = shiftPrefs.getLong("START_TIME_$userName", 0L)
 
-        // 2. Filter Transaksi: Milik User Ini & HARI INI
-        // (Kita anggap shift dimulai dari jam 00:00 hari ini)
-        val calendar = java.util.Calendar.getInstance()
-        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        calendar.set(java.util.Calendar.MINUTE, 0)
-        calendar.set(java.util.Calendar.SECOND, 0)
-        val startOfDay = calendar.timeInMillis
+        val startOfDay = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+        }.timeInMillis
 
-        val myTrx = allTrx.filter { it.userId == userId && it.timestamp >= startOfDay }
+        // Logika: Kalau user lupa buka shift (0), kita ambil transaksi dari pagi ini saja.
+        val filterTime = if (shiftStartTime > 0) shiftStartTime else startOfDay
 
-        // 3. Hitung Rincian Per Metode Pembayaran
+        val modalAwal = shiftPrefs.getFloat("MODAL_AWAL_$userName", 0f).toDouble()
+
+        // 2. 🔥 PERBAIKAN UTAMA: GUNAKAN VARIABEL GLOBAL allTrx 🔥
+        // (Variabel ini otomatis terisi oleh Observer di onCreate, jadi pasti ada datanya)
+        val sourceData = this.allTrx
+
+        // 3. 🔥 PERBAIKAN FILTER: HAPUS FILTER USER ID 🔥
+        // Biarkan semua transaksi di HP ini masuk laporan, biar tidak ada yang hilang.
+        val myTrx = sourceData.filter { it.timestamp >= filterTime }
+
+        // --- DEBUGGING (OPSIONAL: NANTI MUNCUL TOAST BIAR KETAHUAN) ---
+        // Toast.makeText(this, "Total Trx: ${sourceData.size}, Setelah Filter Waktu: ${myTrx.size}", Toast.LENGTH_LONG).show()
+
+        // 4. Hitung Rincian
         var totalTunai = 0.0
         var totalQris = 0.0
         var totalDebit = 0.0
         var totalTransfer = 0.0
 
         for (trx in myTrx) {
-            when (trx.paymentMethod.lowercase()) { // Pastikan huruf kecil biar cocok
+            // Gunakan lowercase biar aman dari typo (Tunai/tunai/TUNAI)
+            when (trx.paymentMethod.lowercase()) {
                 "tunai", "cash" -> totalTunai += trx.totalAmount
                 "qris" -> totalQris += trx.totalAmount
                 "debit" -> totalDebit += trx.totalAmount
                 "transfer" -> totalTransfer += trx.totalAmount
-                else -> totalTunai += trx.totalAmount // Default ke tunai jika ada metode aneh
+                else -> totalTunai += trx.totalAmount // Default ke Tunai
             }
         }
 
         val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer
 
-        // 4. Format Rupiah (Helper Kecil)
         fun fmt(d: Double): String {
-            val format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID"))
-            return format.format(d)
+            return java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(d)
         }
+        val dateStr = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(filterTime))
 
-        // 5. Susun Pesan Laporan
         val pesanLaporan = """
-            Halo, $userName! 👋
-            Berikut ringkasan penjualan sesi ini:
+            Halo, $userName!
+            Shift Mulai: $dateStr
+            (Ditemukan ${myTrx.size} Transaksi)
 
             💵 TUNAI      : ${fmt(totalTunai)}
             📱 QRIS       : ${fmt(totalQris)}
@@ -365,40 +379,77 @@ class DashboardActivity : AppCompatActivity() {
             -------------------------------------
             💎 TOTAL OMZET : ${fmt(totalOmzet)}
             
-            Apakah Anda yakin ingin menutup shift dan mencetak laporan?
+            Laci Kasir Harusnya: ${fmt(modalAwal + totalTunai)}
+            (Modal ${fmt(modalAwal)} + Tunai ${fmt(totalTunai)})
         """.trimIndent()
 
-        // 6. Tampilkan Dialog
         AlertDialog.Builder(this)
             .setTitle("💰 Ringkasan Tutup Shift")
             .setMessage(pesanLaporan)
-            .setPositiveButton("TUTUP & CETAK") { _, _ ->
-                // Hitung Uang Fisik (Hanya Tunai yang perlu dihitung manual)
-                showInputCashDialog(totalTunai, totalOmzet, userName ?: "Kasir")
+            .setPositiveButton("LANJUT HITUNG") { _, _ ->
+                showInputCashDialog(
+                    expectedCash = modalAwal + totalTunai,
+                    totalOmzet = totalOmzet,
+                    userName = userName,
+                    startTime = filterTime,
+                    modal = modalAwal,
+                    rincianTunai = totalTunai,
+                    rincianQris = totalQris,
+                    rincianTrf = totalTransfer,
+                    rincianDebit = totalDebit
+                )
             }
             .setNegativeButton("Batal", null)
             .show()
     }
 
-    // Dialog Input Uang Fisik (Untuk validasi selisih kas Tunai)
-    private fun showInputCashDialog(expectedCash: Double, totalOmzet: Double, userName: String) {
-        val input = android.widget.EditText(this)
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        input.hint = "Masukkan jumlah uang fisik di laci"
+    // 🔥 UPDATE: PANGGIL PRINT SHIFT REPORT DISINI 🔥
+    private fun showInputCashDialog(
+        expectedCash: Double,
+        totalOmzet: Double,
+        userName: String,
+        startTime: Long,
+        modal: Double,
+        rincianTunai: Double,
+        rincianQris: Double,
+        rincianTrf: Double,
+        rincianDebit: Double
+    ) {
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
+        input.hint = "Total uang fisik di laci"
+
+        // Format angka biar enak dilihat
+        val fmtExpected = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(expectedCash)
 
         AlertDialog.Builder(this)
-            .setTitle("Verifikasi Uang Tunai")
-            .setMessage("Sistem mencatat Penjualan Tunai: ${java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(expectedCash)}\n\nBerapa uang fisik yang ada di laci?")
+            .setTitle("Verifikasi Fisik Kas")
+            .setMessage("Sistem mencatat harusnya ada: $fmtExpected\n(Modal + Penjualan Tunai)\n\nMasukkan jumlah uang fisik riil:")
             .setView(input)
-            .setPositiveButton("SIMPAN") { _, _ ->
+            .setPositiveButton("TUTUP & PRINT") { _, _ ->
                 val actualCashStr = input.text.toString()
                 val actualCash = if (actualCashStr.isNotEmpty()) actualCashStr.toDouble() else 0.0
 
-                // Simpan Log Tutup Shift
+                // 1. Simpan Log ke Database
                 viewModel.closeShift(userName, expectedCash, actualCash)
 
-                // Reset Login (Keluar)
-                performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), true)
+                // 2. 🔥 CETAK STRUK LAPORAN SHIFT 🔥
+                printShiftReport(
+                    kasirName = userName,
+                    startTime = startTime,
+                    modal = modal,
+                    tunai = rincianTunai,
+                    qris = rincianQris,
+                    trf = rincianTrf,
+                    debit = rincianDebit,
+                    expected = expectedCash,
+                    actual = actualCash
+                )
+
+                Toast.makeText(this, "Shift Ditutup & Laporan Dicetak!", Toast.LENGTH_SHORT).show()
+
+                // 3. Logout
+                performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), false)
             }
             .setNegativeButton("Batal", null)
             .show()

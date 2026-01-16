@@ -20,7 +20,11 @@ class ProductRepository(
     private val productDao: ProductDao,
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao,
-    private val storeConfigDao: StoreConfigDao
+    private val storeConfigDao: StoreConfigDao,
+    // 🔥 TAMBAHAN: Kita butuh akses ke TransactionDao secara spesifik jika dipisah
+    // Tapi karena Mas Heru menggabungkan semuanya di ProductDao (sepertinya), kita pakai productDao saja.
+    // Jika Transaction ada di DAO terpisah, tambahkan di sini ya.
+    private val transactionDao: TransactionDao // Pastikan ini ada di constructor AppDatabase
 ) {
     // --- STORE CONFIG ---
     val storeConfig = storeConfigDao.getStoreConfig()
@@ -55,16 +59,18 @@ class ProductRepository(
     suspend fun update(product: Product) = productDao.update(product)
     suspend fun delete(product: Product) = productDao.delete(product)
 
-    // 🔥 FUNGSI BARU: Ambil Varian berdasarkan ID Produk
+    // Ambil Varian berdasarkan ID Produk
     fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>> {
         return productDao.getVariantsByProductId(productId)
     }
-    // 🔥 FUNGSI BARU: Update Varian (Hapus Lama -> Simpan Baru)
+
+    // Update Varian (Hapus Lama -> Simpan Baru)
     suspend fun replaceVariants(productId: Int, variants: List<ProductVariant>) {
-        productDao.deleteVariantsByProductId(productId) // 1. Hapus varian lama
-        productDao.insertVariants(variants)             // 2. Masukkan varian baru dari layar
+        productDao.deleteVariantsByProductId(productId)
+        productDao.insertVariants(variants)
     }
-    // 🔥 FUNGSI POTONG STOK
+
+    // FUNGSI POTONG STOK
     suspend fun decreaseStock(productId: Int, quantity: Int) {
         productDao.decreaseStock(productId, quantity)
     }
@@ -93,10 +99,17 @@ class ProductRepository(
     // 🛒 3. TRANSAKSI
     // =================================================================
     fun getTransactionsByUser(userId: Int): Flow<List<Transaction>> {
-        return productDao.getAllTransactions(userId)
+        // Karena Mas Heru memisah TransactionDao, panggil dari sana
+        return transactionDao.getAllTransactions(userId)
     }
+
     suspend fun insertTransaction(transaction: Transaction): Long {
-        return productDao.insertTransaction(transaction)
+        return transactionDao.insertTransaction(transaction)
+    }
+
+    // 🔥 FUNGSI BARU: EXPORT LAPORAN PER TANGGAL 🔥
+    suspend fun getTransactionsByDateRange(uid: Int, start: Long, end: Long): List<Transaction> {
+        return transactionDao.getTransactionsByDateRange(uid, start, end)
     }
 
     // =================================================================
@@ -110,14 +123,12 @@ class ProductRepository(
     }
 
     // =================================================================
-    // 📦 5. STOCK & PURCHASE (SUDAH DIPERBAIKI AGAR TIDAK DOUBLE)
+    // 📦 5. STOCK & PURCHASE
     // =================================================================
 
     val purchaseHistory: Flow<List<StockLog>> = stockLogDao.getPurchaseHistoryGroups()
     val allStockLogs: Flow<List<StockLog>> = stockLogDao.getAllStockLogs()
 
-    // 🔥 PERBAIKAN DISINI: Hapus logika update produk, cukup simpan log saja.
-    // Karena PurchaseActivity sudah melakukan update stok ke produk.
     suspend fun recordPurchase(log: StockLog) {
         stockLogDao.insertLog(log)
     }
@@ -130,21 +141,18 @@ class ProductRepository(
     suspend fun getProductByBarcode(barcode: String): Product? = productDao.getProductByBarcode(barcode)
 
     // =================================================================
-    // 🌐 6. SERVER SYNC & UPLOAD (LENGKAP SEPERTI SEMULA)
+    // 🌐 6. SERVER SYNC & UPLOAD
     // =================================================================
 
     suspend fun uploadCsvFile(file: File) {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("SysdosPOS", "Mulai Upload CSV: ${file.name}")
                 val requestFile = file.asRequestBody("text/csv".toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
                 val api = ApiClient.getLocalClient(context)
                 val response = api.importCsv(body).execute()
                 if (response.isSuccessful) refreshProductsFromApi()
-            } catch (e: Exception) {
-                Log.e("SysdosPOS", "Error Upload: ${e.message}")
-            }
+            } catch (e: Exception) { Log.e("SysdosPOS", "Error Upload: ${e.message}") }
         }
     }
 
@@ -176,13 +184,9 @@ class ProductRepository(
                         }
                     }
                 }
-
-                // Sync Kategori
                 val responseCat = api.getCategories(currentUser.id).execute()
                 if (responseCat.isSuccessful) {
-                    responseCat.body()?.forEach {
-                        productDao.insertCategory(Category(id = it.id, name = it.name))
-                    }
+                    responseCat.body()?.forEach { productDao.insertCategory(Category(id = it.id, name = it.name)) }
                 }
             } catch (e: Exception) { Log.e("SysdosRepo", "Error Sync: ${e.message}") }
         }
@@ -221,9 +225,7 @@ class ProductRepository(
 
     suspend fun syncUserToServer(user: User) {
         withContext(Dispatchers.IO) {
-            try {
-                ApiClient.getLocalClient(context).registerLocalUser(user).execute()
-            } catch (e: Exception) {}
+            try { ApiClient.getLocalClient(context).registerLocalUser(user).execute() } catch (e: Exception) {}
         }
     }
 
