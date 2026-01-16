@@ -27,12 +27,22 @@
             android:maxLines="2"
             android:ellipsize="end"/>
         <TextView
+            android:id="@+id/tvCartVariantDetail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+ Topping"
+            android:textSize="13sp"
+            android:textColor="#757575"
+            android:visibility="gone"
+            android:layout_marginTop="2dp"/>
+
+        <TextView
             android:id="@+id/tvCartPrice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@ 15.000"
-            android:textSize="11sp"
-            android:textColor="#757575"/>
+            android:text="@ Rp 10.000"
+            android:textColor="#1976D2"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout

@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.cardview.widget.CardView // Tambahkan ini jika pakai CardView untuk badge
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -20,7 +19,6 @@ class ProductAdapter(
     private val onItemLongClick: (Product) -> Unit
 ) : ListAdapter<Product, ProductAdapter.ProductViewHolder>(DiffCallback()) {
 
-    // 🔥 UBAH DISINI: Simpan List Utuh, bukan Map
     private var cartList: List<Product> = emptyList()
 
     fun updateCartCounts(cartItems: List<Product>) {
@@ -45,25 +43,29 @@ class ProductAdapter(
 
         // Badge Merah
         private val tvBadge: TextView = itemView.findViewById(R.id.tvCartBadge)
-        // Jika di XML badge dibungkus CardView, bind juga (opsional, sesuaikan XML)
-        // private val cvBadge: CardView? = itemView.findViewById(R.id.cvCartBadge)
+
+        // 🔥 1. DEFINISIKAN VIEW SKU (Pastikan ID ini ada di XML item_product.xml)
+        private val tvSku: TextView = itemView.findViewById(R.id.tvProductSku)
 
         fun bind(product: Product) {
             tvName.text = product.name
             tvPrice.text = String.format(Locale("id", "ID"), "Rp %,d", product.price.toLong())
 
-            // ============================================================
-            // 🔥 LOGIKA HITUNG JUMLAH (TERMASUK VARIAN) 🔥
-            // ============================================================
+            // 🔥 2. TAMPILKAN SKU / BARCODE
+            if (!product.barcode.isNullOrEmpty()) {
+                tvSku.text = "SKU: ${product.barcode}"
+                tvSku.visibility = View.VISIBLE
+            } else {
+                tvSku.visibility = View.GONE
+            }
 
-            // Kita cari di keranjang:
-            // 1. Item yang ID-nya sama dengan Produk ini (Produk Biasa)
-            // 2. ATAU Item yang ParentID-nya sama dengan Produk ini (Produk Varian)
+            // ============================================================
+            // 🔥 LOGIKA HITUNG JUMLAH (TERMASUK VARIAN)
+            // ============================================================
             val totalQtyInCart = cartList.filter {
                 it.id == product.id || it.parentId == product.id
             }.sumOf { it.stock }
 
-            // Hitung Stok Sisa untuk Tampilan
             val currentStock = product.stock - totalQtyInCart
             tvStock.text = "Stok: $currentStock"
 
@@ -75,19 +77,17 @@ class ProductAdapter(
             }
 
             // ============================================================
-            // 🔥 TAMPILKAN BADGE MERAH 🔥
+            // 🔥 TAMPILKAN BADGE MERAH
             // ============================================================
             if (totalQtyInCart > 0) {
                 tvBadge.visibility = View.VISIBLE
                 tvBadge.text = totalQtyInCart.toString()
-                // cvBadge?.visibility = View.VISIBLE // Uncoment jika pakai CardView wrapper
             } else {
                 tvBadge.visibility = View.GONE
-                // cvBadge?.visibility = View.GONE
             }
 
             // ============================================================
-            // 🖼️ LOAD GAMBAR (GLIDE)
+            // 🖼️ LOAD GAMBAR
             // ============================================================
             if (!product.imagePath.isNullOrEmpty()) {
                 Glide.with(itemView.context)

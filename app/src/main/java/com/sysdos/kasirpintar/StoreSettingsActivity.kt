@@ -40,6 +40,8 @@ class StoreSettingsActivity : AppCompatActivity() {
     private lateinit var etStoreAddress: EditText
     private lateinit var etStorePhone: EditText
     private lateinit var etStoreFooter: EditText
+    private lateinit var etStoreTax: EditText // 🔥 1. VARIABEL BARU
+
     private lateinit var btnSave: Button
     private lateinit var layoutSaveBtn: LinearLayout
 
@@ -97,6 +99,7 @@ class StoreSettingsActivity : AppCompatActivity() {
         etStoreAddress = findViewById(R.id.etStoreAddress)
         etStorePhone = findViewById(R.id.etStorePhone)
         etStoreFooter = findViewById(R.id.etStoreFooter)
+        etStoreTax = findViewById(R.id.etStoreTax) // 🔥 2. BIND VIEW PAJAK
 
         btnSave = findViewById(R.id.btnSaveStore)
         btnScanPrinter = findViewById(R.id.btnScanPrinter)
@@ -115,6 +118,10 @@ class StoreSettingsActivity : AppCompatActivity() {
                 etStoreAddress.setText(config.storeAddress)
                 etStorePhone.setText(config.storePhone)
                 etStoreFooter.setText(config.strukFooter)
+
+                // 🔥 3. LOAD DATA PAJAK DARI DB
+                // Hapus '.0' di belakang angka biar rapi (Misal 11.0 jadi 11)
+                etStoreTax.setText(config.taxPercentage.toString().removeSuffix(".0"))
             }
         }
 
@@ -323,6 +330,10 @@ class StoreSettingsActivity : AppCompatActivity() {
         val phone = etStorePhone.text.toString().trim()
         val footer = etStoreFooter.text.toString().trim()
 
+        // 🔥 4. AMBIL INPUT PAJAK
+        val taxStr = etStoreTax.text.toString().trim()
+        val tax = taxStr.toDoubleOrNull() ?: 0.0
+
         if (name.isEmpty()) {
             etStoreName.error = "Nama Toko Wajib Diisi"
             return
@@ -333,7 +344,8 @@ class StoreSettingsActivity : AppCompatActivity() {
         val printerMac = prefs.getString("printer_mac", "")
 
         // Simpan ke Database
-        viewModel.saveStoreSettings(name, address, phone, footer, printerMac)
+        // Pastikan parameter di ViewModel sudah diupdate juga ya!
+        viewModel.saveStoreSettings(name, address, phone, footer, printerMac, tax)
 
         if (isInitialSetup) {
             // 🔥 JIKA USER BARU DAFTAR -> MASUK DASHBOARD

@@ -64,6 +64,10 @@ class ProductRepository(
         productDao.deleteVariantsByProductId(productId) // 1. Hapus varian lama
         productDao.insertVariants(variants)             // 2. Masukkan varian baru dari layar
     }
+    // 🔥 FUNGSI POTONG STOK
+    suspend fun decreaseStock(productId: Int, quantity: Int) {
+        productDao.decreaseStock(productId, quantity)
+    }
 
     // =================================================================
     // 📂 2. DATA PENDUKUNG (User, Kategori, Supplier)

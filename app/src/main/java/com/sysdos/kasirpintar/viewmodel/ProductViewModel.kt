@@ -267,6 +267,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val summaryBuilder = StringBuilder()
         var totalProfit = 0.0
 
+        // 1. Siapkan Ringkasan & Hitung Profit
         for (item in cartItems) {
             summaryBuilder.append("${item.name}|${item.stock}|${item.price.toLong()}|${(item.price * item.stock).toLong()};")
             totalProfit += (item.price - item.costPrice) * item.stock
@@ -287,19 +288,46 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             note = note
         )
 
+        // 2. Simpan Transaksi
         val trxId = repository.insertTransaction(trx)
 
-        cartItems.forEach { cartItem ->
-            val masterItem = allProducts.value?.find { it.id == cartItem.id }
-            if (masterItem != null) repository.update(masterItem.copy(stock = masterItem.stock - cartItem.stock))
+        // ============================================================
+        // 🔥 PERBAIKAN STOK: GROUPING DULU BARU POTONG (ANTI TABRAKAN)
+        // ============================================================
+
+        // Map untuk menampung: ID Induk -> Total Qty yang harus dipotong
+        val stockDeductions = mutableMapOf<Int, Int>()
+
+        cartItems.forEach { item ->
+            // Cari ID Bapaknya (Kalau Varian) atau ID Sendiri (Kalau Produk Biasa)
+            val realId = if (item.id < 0) item.parentId else item.id
+
+            // Tambahkan jumlah qty ke penampungan
+            val currentTotal = stockDeductions.getOrDefault(realId, 0)
+            stockDeductions[realId] = currentTotal + item.stock
         }
 
+        // Eksekusi Pemotongan Stok (Sekali jalan per Produk Induk)
+        stockDeductions.forEach { (productId, totalQtyToDeduct) ->
+            // Ambil data produk terbaru dari list
+            val masterItem = allProducts.value?.find { it.id == productId }
+
+            if (masterItem != null) {
+                val newStock = masterItem.stock - totalQtyToDeduct
+                // Update Database
+                repository.update(masterItem.copy(stock = newStock))
+            }
+        }
+        // ============================================================
+
+        // 3. Reset Keranjang
         _cart.value = emptyList()
         _totalPrice.value = 0.0
 
         val finalTrx = trx.copy(id = trxId.toInt())
         onResult(finalTrx)
 
+        // 4. Upload Server
         viewModelScope.launch {
             try { repository.uploadTransactionToServer(finalTrx, itemsForUpload) } catch (e: Exception) {}
         }
@@ -332,15 +360,36 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- TOKO ---
-    fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?) = viewModelScope.launch {
-        val config = StoreConfig(1, name, address, phone, footer, printerMac)
+    // 🔥 UPDATE: Tambah Parameter 'tax' di ujung
+    fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?, tax: Double) = viewModelScope.launch {
+
+        // Membuat objek konfigurasi baru
+        val config = StoreConfig(
+            id = 1, // ID Selalu 1
+            storeName = name,
+            storeAddress = address,
+            storePhone = phone,
+            storeEmail = "", // Default kosong (karena tidak ada input di UI Settings)
+            strukFooter = footer, // 🔥 Pastikan ini 'strukFooter' sesuai file StoreConfig.kt Anda
+            printerMac = printerMac,
+            taxPercentage = tax // 🔥 Simpan Pajak
+        )
+
+        // Simpan ke Database via Repository
         repository.saveStoreConfig(config)
+
+        // (Opsional) Kirim update ke server sales jika user sedang login
+        // Ini kodingan bawaan lama, biarkan saja agar fitur sales tracking tetap jalan
         val uid = _currentUserId.value ?: 0
         if (uid > 0) {
-            val allUsers = repository.allUsers.first()
-            val currentUser = allUsers.find { it.id == uid }
-            if (currentUser != null) {
-                sendDataToSalesSystem(currentUser)
+            try {
+                val allUsers = repository.allUsers.first()
+                val currentUser = allUsers.find { it.id == uid }
+                if (currentUser != null) {
+                    sendDataToSalesSystem(currentUser)
+                }
+            } catch (e: Exception) {
+                // Abaikan jika gagal lapor sales
             }
         }
     }
