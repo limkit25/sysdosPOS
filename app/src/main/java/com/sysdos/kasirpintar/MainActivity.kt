@@ -896,10 +896,22 @@ class MainActivity : AppCompatActivity() {
                 for (itemStr in productList) {
                     val parts = itemStr.split("|")
                     // Format: Nama|Qty|Harga|Total
-                    // Cek size minimal 4 agar tidak crash
                     if (parts.size >= 4) {
-                        p.append("${parts[0]}\n")
-                        p.append(row("  ${parts[1]} x ${formatRupiah(parts[2].toDouble())}", parts[3].toDouble()))
+                        val fullName = parts[0]
+
+                        // 🔥 LOGIKA BARU: TURUNKAN VARIAN KE BAWAH BIAR RAPI 🔥
+                        if (fullName.contains(" - ")) {
+                            val nameParts = fullName.split(" - ", limit = 2)
+                            p.append("${nameParts[0]}\n")         // Baris 1: Nama Produk Utama
+                            p.append("  (${nameParts[1]})\n")     // Baris 2: Varian (Menjorok & Pakai Kurung)
+                        } else {
+                            p.append("$fullName\n")               // Produk Biasa
+                        }
+
+                        // Baris Harga & Qty
+                        // Tips: Kita replace "Rp " jadi kosong biar muat di kertas kecil
+                        val hargaSatuan = formatRupiah(parts[2].toDouble()).replace("Rp ", "")
+                        p.append(row("  ${parts[1]} x $hargaSatuan", parts[3].toDouble()))
                     }
                 }
 

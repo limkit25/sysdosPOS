@@ -16,8 +16,8 @@ android {
         applicationId = "com.sysdos.kasirpintar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.4.6"
+        versionCode = 4
+        versionName = "1.4.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

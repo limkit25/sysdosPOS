@@ -184,7 +184,7 @@ class HistoryActivity : AppCompatActivity() {
         }
         adapter.submitList(filteredList)
     }
-    
+
 
     // ... (kode onCreate dan listener lain biarkan sama) ...
 
@@ -541,11 +541,22 @@ class HistoryActivity : AppCompatActivity() {
                 // 4. DAFTAR BARANG (Looping yang benar)
                 for (itemStr in rawItems) {
                     val parts = itemStr.split("|")
-                    // Pastikan format valid: Nama|Qty|Harga|Total
+
                     if (parts.size == 4) {
-                        p.append("${parts[0]}\n") // Nama Barang
+                        val fullName = parts[0] // Nama Barang Lengkap
+
+                        // 🔥 UPDATE LOGIKA VARIAN KE BAWAH 🔥
+                        if (fullName.contains(" - ")) {
+                            val nameParts = fullName.split(" - ", limit = 2)
+                            p.append("${nameParts[0]}\n")      // Nama Produk
+                            p.append("  (${nameParts[1]})\n")  // Varian di bawah (dikurung & spasi)
+                        } else {
+                            p.append("$fullName\n")
+                        }
+
                         val pr = parts[2].toDoubleOrNull() ?: 0.0
                         val tot = parts[3].toDoubleOrNull() ?: 0.0
+
                         // Cetak baris: Qty x Harga .... Total
                         p.append(row("  ${parts[1]} x ${formatRupiah(pr).replace("Rp ","")}", tot))
                     }
