@@ -284,6 +284,52 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
     }
+    // =================================================================
+    // 👮‍♂️ FITUR SATPAM: CEK DEVELOPER MODE
+    // =================================================================
+
+    override fun onResume() {
+        super.onResume()
+        cekKeamananHP()
+    }
+
+    private fun cekKeamananHP() {
+        try {
+            // 1. Cek Apakah Opsi Pengembang (Developer Options) Aktif?
+            val isDevMode = android.provider.Settings.Global.getInt(
+                contentResolver,
+                android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
+            ) != 0
+
+            // 2. Cek Apakah USB Debugging (ADB) Aktif? (Opsional, tapi disarankan)
+            val isAdb = android.provider.Settings.Global.getInt(
+                contentResolver,
+                android.provider.Settings.Global.ADB_ENABLED, 0
+            ) != 0
+
+            // Jika SALAH SATU aktif, langsung blokir!
+            if (isDevMode || isAdb) {
+                tampilkanPeringatanKeamanan()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun tampilkanPeringatanKeamanan() {
+        // Cek apakah dialog sudah muncul (biar gak numpuk)
+        if (!isFinishing) {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("⛔ AKSES DITOLAK (KEAMANAN)")
+                .setMessage("Terdeteksi 'Developer Options' atau 'USB Debugging' sedang menyala di HP ini.\n\nDemi keamanan data dan transaksi, fitur tersebut WAJIB dimatikan.\n\nSilakan matikan di Pengaturan HP Anda lalu buka kembali aplikasi ini.")
+                .setCancelable(false) // Gabisa dicancel/klik luar
+                .setPositiveButton("KELUAR SEKARANG") { _, _ ->
+                    finishAffinity() // Tutup Semua Halaman
+                    System.exit(0)   // Matikan Proses Aplikasi
+                }
+                .show()
+        }
+    }
 
     // --- FUNGSI BUKA SHIFT ---
     private fun checkModalBeforePOS() {
@@ -312,14 +358,19 @@ class DashboardActivity : AppCompatActivity() {
                 val modalStr = input.text.toString()
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
-                    prefs.edit().apply {
-                        putBoolean("IS_OPEN_$username", true)
-                        putFloat("MODAL_AWAL_$username", modal.toFloat())
-                        putFloat("CASH_SALES_TODAY_$username", 0f)
-                        putLong("START_TIME_$username", System.currentTimeMillis())
-                        apply()
-                    }
+
+                    // 🔥 UBAH BAGIAN INI (GANTI apply() JADI commit()) 🔥
+                    // commit() = Simpan sekarang juga! (Lebih aman dari force close)
+                    val editor = prefs.edit()
+                    editor.putBoolean("IS_OPEN_$username", true)
+                    editor.putFloat("MODAL_AWAL_$username", modal.toFloat())
+                    editor.putFloat("CASH_SALES_TODAY_$username", 0f)
+                    editor.putLong("START_TIME_$username", System.currentTimeMillis())
+                    editor.commit() // <--- PAKAI COMMIT, JANGAN APPLY
+
+                    // Simpan ke Database
                     viewModel.openShift(username, modal)
+
                     Toast.makeText(this, "Shift Dibuka!", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, MainActivity::class.java))
                 }
