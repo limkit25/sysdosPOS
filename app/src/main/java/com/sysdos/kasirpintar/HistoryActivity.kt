@@ -44,46 +44,56 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var btnAll: Button
     private lateinit var btnExport: ImageButton
 
+    private lateinit var cardPiutang: androidx.cardview.widget.CardView
+    private lateinit var tvTotalPiutang: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_history)
 
-        // 1. SETUP RECYCLERVIEW
+        // 1. SETUP RECYCLERVIEW (SAMA)
         val rvHistory = findViewById<RecyclerView>(R.id.rvHistory)
         rvHistory.layoutManager = LinearLayoutManager(this)
         adapter = TransactionAdapter()
         rvHistory.adapter = adapter
 
-        // 2. SETUP VIEWMODEL
+        // 2. SETUP VIEWMODEL (SAMA)
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // 3. SETUP FILTER & EXPORT
+        // 3. SETUP FILTER UI
         btnToday = findViewById(R.id.btnFilterToday)
         btnWeek = findViewById(R.id.btnFilterWeek)
         btnMonth = findViewById(R.id.btnFilterMonth)
         btnAll = findViewById(R.id.btnFilterAll)
         btnExport = findViewById(R.id.btnExport)
 
+        // 🔥 INISIALISASI KARTU PIUTANG BARU
+        cardPiutang = findViewById(R.id.cardSummaryPiutang)
+        tvTotalPiutang = findViewById(R.id.tvTotalPiutangDashboard)
+
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
-        // Logic Tombol Export (Hanya untuk Admin)
+        // Logic Export (SAMA)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val role = session.getString("role", "kasir")
-        if (role == "kasir") {
-            btnExport.visibility = View.GONE
-        } else {
+        if (role == "kasir") btnExport.visibility = View.GONE else {
             btnExport.visibility = View.VISIBLE
             btnExport.setOnClickListener { showExportDateDialog() }
         }
 
-        // 4. OBSERVE DATA
+        // 4. OBSERVE DATA (UPDATE LOGIC)
         viewModel.allTransactions.observe(this) { transactions ->
             fullTransactionList = transactions
+
+            // 🔥 HITUNG TOTAL PIUTANG REAL-TIME
+            calculateTotalPiutang()
+
+            // Default Filter: Hari Ini
             filterList("TODAY")
             updateFilterUI(btnToday)
         }
 
-        // 5. SEARCH VIEW
+        // 5. SEARCH VIEW (SAMA)
         val svSearch = findViewById<androidx.appcompat.widget.SearchView>(R.id.svSearchHistory)
         svSearch.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean = false
@@ -98,15 +108,68 @@ class HistoryActivity : AppCompatActivity() {
             }
         })
 
-        // 6. KLIK FILTER
+        // 6. KLIK FILTER BIASA (SAMA)
         btnToday.setOnClickListener { updateFilterUI(btnToday); filterList("TODAY") }
         btnWeek.setOnClickListener { updateFilterUI(btnWeek); filterList("WEEK") }
         btnMonth.setOnClickListener { updateFilterUI(btnMonth); filterList("MONTH") }
         btnAll.setOnClickListener { updateFilterUI(btnAll); filterList("ALL") }
 
-        // 7. KLIK DETAIL & REPRINT
+        // 🔥 7. KLIK KARTU PIUTANG (FITUR BARU) 🔥
+        cardPiutang.setOnClickListener {
+            // Matikan warna semua tombol filter (biar user tau ini mode khusus)
+            updateFilterUI(null)
+
+            // Filter: Hanya yang Piutang DAN Belum Lunas
+            val debtList = fullTransactionList.filter { trx ->
+                val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
+                val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
+                isPiutang && !isLunas
+            }.sortedBy { it.timestamp } // Urutkan dari hutang terlama
+
+            if (debtList.isEmpty()) {
+                Toast.makeText(this, "Tidak ada piutang yang belum lunas! 🎉", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Menampilkan ${debtList.size} Transaksi Belum Lunas", Toast.LENGTH_SHORT).show()
+            }
+
+            adapter.submitList(debtList)
+        }
+
+        // 8. KLIK DETAIL & REPRINT (SAMA - Sudah terhubung ke showDetailDialog yang ada tombol LUNASI)
         adapter.setOnItemClickListener { showDetailDialog(it) }
         adapter.setOnReprintClickListener { doReprint(it) }
+    }
+
+    // 🔥 FUNGSI HITUNG PIUTANG 🔥
+    private fun calculateTotalPiutang() {
+        var totalDebt = 0.0
+        for (trx in fullTransactionList) {
+            val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
+            val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
+
+            // Kalau Piutang DAN Belum Lunas -> Tambahkan ke Tagihan
+            if (isPiutang && !isLunas) {
+                totalDebt += trx.totalAmount
+            }
+        }
+        tvTotalPiutang.text = formatRupiah(totalDebt)
+    }
+
+    // Update Filter UI (Modifikasi sedikit untuk handle null)
+    // HAPUS SEMUA VERSI updateFilterUI YANG ADA, GANTI DENGAN INI:
+    private fun updateFilterUI(activeBtn: Button?) {
+        val allBtns = listOf(btnToday, btnWeek, btnMonth, btnAll)
+        for (btn in allBtns) {
+            btn.setBackgroundColor(android.graphics.Color.WHITE)
+            btn.setTextColor(android.graphics.Color.GRAY)
+        }
+
+        // Kalau activeBtn null (saat klik kartu piutang), semua tombol jadi putih (netral)
+        // Kalau activeBtn ada isinya, warnai tombol tersebut jadi biru
+        activeBtn?.let {
+            it.setBackgroundColor(android.graphics.Color.parseColor("#1976D2"))
+            it.setTextColor(android.graphics.Color.WHITE)
+        }
     }
 
     private fun filterList(range: String) {
@@ -121,16 +184,7 @@ class HistoryActivity : AppCompatActivity() {
         }
         adapter.submitList(filteredList)
     }
-
-    private fun updateFilterUI(activeBtn: Button) {
-        val allBtns = listOf(btnToday, btnWeek, btnMonth, btnAll)
-        for (btn in allBtns) {
-            btn.setBackgroundColor(Color.WHITE)
-            btn.setTextColor(Color.GRAY)
-        }
-        activeBtn.setBackgroundColor(Color.parseColor("#1976D2")) // Biru
-        activeBtn.setTextColor(Color.WHITE)
-    }
+    
 
     // ... (kode onCreate dan listener lain biarkan sama) ...
 
@@ -296,10 +350,20 @@ class HistoryActivity : AppCompatActivity() {
         val btnReprint = dialogView.findViewById<Button>(R.id.btnReprint)
         val llItems = dialogView.findViewById<LinearLayout>(R.id.llDetailItems)
 
+        // TAMPILKAN DATA (SAMA SEPERTI SEBELUMNYA)
         dialogView.findViewById<TextView>(R.id.tvDetailId).text = "#TRX-${trx.id}"
         dialogView.findViewById<TextView>(R.id.tvDetailDate).text = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
         dialogView.findViewById<TextView>(R.id.tvDetailTotal).text = formatRupiah(trx.totalAmount)
-        dialogView.findViewById<TextView>(R.id.tvDetailMethod).text = if (trx.paymentMethod == "Tunai") "Tunai (Bayar: ${formatRupiah(trx.cashReceived)})" else "Metode: ${trx.paymentMethod}"
+
+        // Cek apakah ada status LUNAS di note
+        val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
+        val statusBayar = if (trx.paymentMethod.lowercase().contains("piutang")) {
+            if (isLunas) "PIUTANG (LUNAS ✅)" else "PIUTANG (BELUM LUNAS ⏳)"
+        } else {
+            if (trx.paymentMethod == "Tunai") "Tunai (Bayar: ${formatRupiah(trx.cashReceived)})" else "Metode: ${trx.paymentMethod}"
+        }
+        dialogView.findViewById<TextView>(R.id.tvDetailMethod).text = statusBayar
+
         dialogView.findViewById<TextView>(R.id.tvDetailSubtotal).text = formatRupiah(trx.subtotal)
 
         // Pajak & Diskon
@@ -316,6 +380,7 @@ class HistoryActivity : AppCompatActivity() {
             rowTax.visibility = View.VISIBLE
         } else rowTax.visibility = View.GONE
 
+        // Render Items (SAMA)
         llItems.removeAllViews()
         val rawItems = trx.itemsSummary.split(";")
         for (itemStr in rawItems) {
@@ -330,9 +395,72 @@ class HistoryActivity : AppCompatActivity() {
             }
             llItems.addView(rowLayout)
         }
+
+        // ====================================================================
+        // 🔥 LOGIKA BARU: TOMBOL PELUNASAN PIUTANG 🔥
+        // ====================================================================
+        val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
+
+        if (isPiutang && !isLunas) {
+            // Ubah tombol jadi opsi pelunasan
+            btnReprint.text = "💰 LUNASI / REPRINT"
+            btnReprint.setBackgroundColor(Color.parseColor("#FF9800")) // Warna Oranye biar beda (Opsional)
+
+            btnReprint.setOnClickListener {
+                // Munculkan Pilihan
+                val options = arrayOf("✅ Tandai LUNAS (Terima Uang)", "🖨️ Reprint Struk Saja")
+                AlertDialog.Builder(this)
+                    .setTitle("Kelola Piutang")
+                    .setItems(options) { _, which ->
+                        if (which == 0) {
+                            markAsPaid(trx, dialog) // Panggil fungsi pelunasan
+                        } else {
+                            doReprint(trx) // Print biasa
+                        }
+                    }
+                    .show()
+            }
+        } else {
+            // Transaksi Biasa (Tunai/Qris/Sudah Lunas)
+            btnReprint.text = "🖨️ Reprint Struk"
+            btnReprint.setBackgroundColor(Color.parseColor("#6200EE")) // Balikin warna ungu default (sesuaikan tema)
+            btnReprint.setOnClickListener { doReprint(trx) }
+        }
+
         btnClose.setOnClickListener { dialog.dismiss() }
-        btnReprint.setOnClickListener { doReprint(trx) }
         dialog.show()
+    }
+
+    // 🔥 WAJIB COPY FUNGSI INI JUGA DI BAWAHNYA 🔥
+    private fun markAsPaid(trx: Transaction, dialog: AlertDialog) {
+        AlertDialog.Builder(this)
+            .setTitle("Konfirmasi Pelunasan")
+            .setMessage("Terima pembayaran sebesar ${formatRupiah(trx.totalAmount)} sekarang?\n\nStatus transaksi akan berubah menjadi LUNAS.")
+            .setPositiveButton("YA, TERIMA") { _, _ ->
+                Thread {
+                    // 1. Update Note dengan timestamp pelunasan
+                    val tglLunas = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+                    val newNote = if (trx.note.isEmpty()) "LUNAS: $tglLunas" else "${trx.note} | LUNAS: $tglLunas"
+
+                    val updatedTrx = trx.copy(note = newNote)
+
+                    // 2. Simpan ke Database
+                    val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this)
+                    db.transactionDao().update(updatedTrx)
+
+                    runOnUiThread {
+                        Toast.makeText(this, "✅ Hutang Lunas!", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        // Refresh data di layar agar statusnya berubah
+                        viewModel.allTransactions.value?.let { currentList ->
+                            // Update list lokal secara manual biar gak nunggu reload database
+                            // (Atau biarkan LiveData bekerja kalau codingan ViewModel Mas Heru reaktif)
+                        }
+                    }
+                }.start()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     // --- 🔥 LOGIC REPRINT LENGKAP (FULL VERSION) 🔥 ---

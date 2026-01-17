@@ -1,5 +1,6 @@
 package com.sysdos.kasirpintar.viewmodel
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -41,13 +42,48 @@ class TransactionAdapter : ListAdapter<Transaction, TransactionAdapter.Transacti
             itemClickListener: ((Transaction) -> Unit)?,
             reprintClickListener: ((Transaction) -> Unit)?
         ) {
-            tvId.text = "#TRX-${trx.id}"
-
+            // 1. FORMAT TANGGAL & HARGA (STANDAR)
             val dateStr = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
             tvDate.text = dateStr
 
             val totalStr = String.format(Locale("id", "ID"), "Rp %,d", trx.totalAmount.toLong())
             tvTotal.text = totalStr
+
+            // ================================================================
+            // 🔥 LOGIKA STATUS WARNA-WARNI (BIAR KELIHATAN DI LIST) 🔥
+            // ================================================================
+
+            val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
+            val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
+
+            if (isPiutang) {
+                if (isLunas) {
+                    // SUDAH LUNAS -> HIJAU
+                    tvId.text = "#TRX-${trx.id} (LUNAS ✅)"
+                    tvId.setTextColor(Color.parseColor("#2E7D32")) // Hijau Gelap
+
+                    // Tombol Print Balik Normal
+                    btnPrint.text = "🖨️"
+                    btnPrint.setBackgroundColor(Color.parseColor("#6200EE")) // Ungu
+                } else {
+                    // MASIH HUTANG -> MERAH
+                    tvId.text = "#TRX-${trx.id} (BELUM LUNAS ⏳)"
+                    tvId.setTextColor(Color.RED)
+
+                    // Tombol Print Jadi Oranye (Kode visual buat user biar ngeh)
+                    btnPrint.text = "💰"
+                    btnPrint.setBackgroundColor(Color.parseColor("#FF9800")) // Oranye
+                }
+            } else {
+                // TRANSAKSI BIASA (TUNAI/QRIS) -> HITAM
+                tvId.text = "#TRX-${trx.id}"
+                tvId.setTextColor(Color.BLACK)
+
+                // Tombol Print Normal
+                btnPrint.text = "🖨️"
+                btnPrint.setBackgroundColor(Color.parseColor("#6200EE"))
+            }
+            // ================================================================
 
             // LOGIKA KLIK TOMBOL PRINTER (Kecil di kanan)
             btnPrint.setOnClickListener {
@@ -72,6 +108,8 @@ class TransactionAdapter : ListAdapter<Transaction, TransactionAdapter.Transacti
 
     class DiffCallback : DiffUtil.ItemCallback<Transaction>() {
         override fun areItemsTheSame(old: Transaction, new: Transaction) = old.id == new.id
-        override fun areContentsTheSame(old: Transaction, new: Transaction) = old == new
+        // Cek Note juga, supaya kalau note berubah (ada tulisan LUNAS), list-nya refresh otomatis
+        override fun areContentsTheSame(old: Transaction, new: Transaction) =
+            old == new && old.note == new.note
     }
 }

@@ -339,12 +339,27 @@ class StoreSettingsActivity : AppCompatActivity() {
             return
         }
 
-        // Ambil Mac Address Printer dari Prefs (agar tidak hilang)
+        // ============================================================
+        // 🛠️ PERBAIKAN UTAMA: SIMPAN JUGA KE SHARED PREFERENCES 🛠️
+        // Agar bisa dibaca oleh MainActivity & HistoryActivity saat nge-print
+        // ============================================================
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        val printerMac = prefs.getString("printer_mac", "")
+        val editor = prefs.edit()
 
-        // Simpan ke Database
-        // Pastikan parameter di ViewModel sudah diupdate juga ya!
+        // Kunci (Key) ini HARUS SAMA dengan yang dipanggil di PrintStruk MainActivity
+        editor.putString("name", name)       // Di printer panggilnya "name"
+        editor.putString("address", address) // Di printer panggilnya "address"
+        editor.putString("phone", phone)     // Di printer panggilnya "phone"
+        editor.putString("email", footer)    // Di printer panggilnya "email" (dipakai buat footer)
+
+        // Simpan Mac Address juga biar sekalian rapi (opsional, krn udah disave pas klik list)
+        val printerMac = prefs.getString("printer_mac", "")
+        editor.putString("printer_mac", printerMac)
+
+        editor.apply() // 🔥 WAJIB DI-APPLY BIAR KESIMPAN
+        // ============================================================
+
+        // Simpan ke Database (ViewModel) - Ini untuk backup data jangka panjang
         viewModel.saveStoreSettings(name, address, phone, footer, printerMac, tax)
 
         if (isInitialSetup) {

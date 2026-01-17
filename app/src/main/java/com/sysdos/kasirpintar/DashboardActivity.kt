@@ -333,71 +333,82 @@ class DashboardActivity : AppCompatActivity() {
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
         val userName = session.getString("username", "User") ?: "User"
 
-        // 1. AMBIL WAKTU MULAI SHIFT
+        // 1. AMBIL WAKTU & DATA (SAMA)
         val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        // Ambil waktu start. Jika 0, set ke awal hari ini (jam 00:00)
         val shiftStartTime = shiftPrefs.getLong("START_TIME_$userName", 0L)
-
         val startOfDay = java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
             set(java.util.Calendar.MINUTE, 0)
             set(java.util.Calendar.SECOND, 0)
         }.timeInMillis
-
-        // Logika: Kalau user lupa buka shift (0), kita ambil transaksi dari pagi ini saja.
         val filterTime = if (shiftStartTime > 0) shiftStartTime else startOfDay
-
         val modalAwal = shiftPrefs.getFloat("MODAL_AWAL_$userName", 0f).toDouble()
-
-        // 2. 🔥 PERBAIKAN UTAMA: GUNAKAN VARIABEL GLOBAL allTrx 🔥
-        // (Variabel ini otomatis terisi oleh Observer di onCreate, jadi pasti ada datanya)
         val sourceData = this.allTrx
-
-        // 3. 🔥 PERBAIKAN FILTER: HAPUS FILTER USER ID 🔥
-        // Biarkan semua transaksi di HP ini masuk laporan, biar tidak ada yang hilang.
         val myTrx = sourceData.filter { it.timestamp >= filterTime }
 
-        // --- DEBUGGING (OPSIONAL: NANTI MUNCUL TOAST BIAR KETAHUAN) ---
-        // Toast.makeText(this, "Total Trx: ${sourceData.size}, Setelah Filter Waktu: ${myTrx.size}", Toast.LENGTH_LONG).show()
-
-        // 4. Hitung Rincian
+        // 2. HITUNG RINCIAN
         var totalTunai = 0.0
         var totalQris = 0.0
         var totalDebit = 0.0
         var totalTransfer = 0.0
 
+        // PISAHKAN PIUTANG (Agar Laporan Akurat)
+        var piutangLunas = 0.0       // Uang Masuk Laci (Pelunasan)
+        var piutangBelumLunas = 0.0  // Uang Belum Masuk (Hutang)
+
         for (trx in myTrx) {
-            // Gunakan lowercase biar aman dari typo (Tunai/tunai/TUNAI)
-            when (trx.paymentMethod.lowercase()) {
-                "tunai", "cash" -> totalTunai += trx.totalAmount
-                "qris" -> totalQris += trx.totalAmount
-                "debit" -> totalDebit += trx.totalAmount
-                "transfer" -> totalTransfer += trx.totalAmount
-                else -> totalTunai += trx.totalAmount // Default ke Tunai
+            val method = trx.paymentMethod.lowercase()
+            // Cek status lunas dari Note
+            val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
+
+            when {
+                method.contains("tunai") || method.contains("cash") -> totalTunai += trx.totalAmount
+                method.contains("qris") -> totalQris += trx.totalAmount
+                method.contains("debit") -> totalDebit += trx.totalAmount
+                method.contains("transfer") -> totalTransfer += trx.totalAmount
+
+                // 🔥 LOGIKA BARU: PISAHKAN LUNAS VS BELUM
+                method.contains("piutang") || method.contains("tempo") -> {
+                    if (isLunas) {
+                        piutangLunas += trx.totalAmount
+                    } else {
+                        piutangBelumLunas += trx.totalAmount
+                    }
+                }
+
+                else -> totalTunai += trx.totalAmount
             }
         }
 
-        val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer
+        // 🔥 PERBAIKAN RUMUS:
+        // Total Omzet = Semua transaksi (Tunai + Transfer + Hutang Lunas + Hutang Belum)
+        val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer + piutangLunas + piutangBelumLunas
+
+        // Uang Fisik Harusnya = Modal + Penjualan Tunai + Pelunasan Hutang
+        val expectedCash = modalAwal + totalTunai + piutangLunas
 
         fun fmt(d: Double): String {
             return java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID")).format(d)
         }
         val dateStr = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(filterTime))
 
+        // 🔥 PERBAIKAN TAMPILAN PESAN:
         val pesanLaporan = """
             Halo, $userName!
             Shift Mulai: $dateStr
             (Ditemukan ${myTrx.size} Transaksi)
 
             💵 TUNAI      : ${fmt(totalTunai)}
+            💰 PIUTANG CAIR: ${fmt(piutangLunas)} (Masuk Laci)
             📱 QRIS       : ${fmt(totalQris)}
             💳 DEBIT      : ${fmt(totalDebit)}
             🏦 TRANSFER   : ${fmt(totalTransfer)}
+            ⏳ PIUTANG GANTUNG: ${fmt(piutangBelumLunas)} (Belum Lunas)
             -------------------------------------
             💎 TOTAL OMZET : ${fmt(totalOmzet)}
             
-            Laci Kasir Harusnya: ${fmt(modalAwal + totalTunai)}
-            (Modal ${fmt(modalAwal)} + Tunai ${fmt(totalTunai)})
+            Laci Kasir Harusnya: ${fmt(expectedCash)}
+            (Modal + Tunai + Pelunasan)
         """.trimIndent()
 
         AlertDialog.Builder(this)
@@ -405,7 +416,7 @@ class DashboardActivity : AppCompatActivity() {
             .setMessage(pesanLaporan)
             .setPositiveButton("LANJUT HITUNG") { _, _ ->
                 showInputCashDialog(
-                    expectedCash = modalAwal + totalTunai,
+                    expectedCash = expectedCash, // 🔥 Pakai rumus yang sudah ditambah pelunasan
                     totalOmzet = totalOmzet,
                     userName = userName,
                     startTime = filterTime,
@@ -413,7 +424,8 @@ class DashboardActivity : AppCompatActivity() {
                     rincianTunai = totalTunai,
                     rincianQris = totalQris,
                     rincianTrf = totalTransfer,
-                    rincianDebit = totalDebit
+                    rincianDebit = totalDebit,
+                    rincianPiutang = piutangBelumLunas // Yang dikirim ke printer sebaiknya Sisa Hutang saja
                 )
             }
             .setNegativeButton("Batal", null)
@@ -430,7 +442,8 @@ class DashboardActivity : AppCompatActivity() {
         rincianTunai: Double,
         rincianQris: Double,
         rincianTrf: Double,
-        rincianDebit: Double
+        rincianDebit: Double,
+        rincianPiutang: Double // 🔥 TAMBAHKAN PARAMETER INI
     ) {
         val input = EditText(this)
         input.inputType = InputType.TYPE_CLASS_NUMBER
@@ -449,7 +462,7 @@ class DashboardActivity : AppCompatActivity() {
                 // 1. Simpan Log ke Database
                 viewModel.closeShift(userName, expectedCash, actualCash)
 
-                // 2. Cetak Struk
+                // 2. Cetak Struk (Kirim data Piutang juga)
                 printShiftReport(
                     kasirName = userName,
                     startTime = startTime,
@@ -458,25 +471,24 @@ class DashboardActivity : AppCompatActivity() {
                     qris = rincianQris,
                     trf = rincianTrf,
                     debit = rincianDebit,
+                    piutang = rincianPiutang, // 🔥 KIRIM KE PRINTER
                     expected = expectedCash,
                     actual = actualCash
                 )
 
                 Toast.makeText(this, "Shift Ditutup & Laporan Dicetak!", Toast.LENGTH_SHORT).show()
 
-                // ========================================================
-                // 🔥 3. RESET DATA SHIFT (PENTING! AGAR KEMBALI 0) 🔥
-                // ========================================================
+                // 3. RESET DATA SHIFT
                 val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
                 shiftPrefs.edit().apply {
-                    remove("IS_OPEN_$userName")      // Hapus Status Buka
-                    remove("MODAL_AWAL_$userName")   // Hapus Modal
-                    remove("START_TIME_$userName")   // Hapus Jam Mulai (Biar reset)
+                    remove("IS_OPEN_$userName")
+                    remove("MODAL_AWAL_$userName")
+                    remove("START_TIME_$userName")
                     remove("CASH_SALES_TODAY_$userName")
-                    apply() // Simpan perubahan
+                    apply()
                 }
 
-                // 4. LOGOUT (Data Aman)
+                // 4. LOGOUT
                 performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), false)
             }
             .setNegativeButton("Batal", null)
@@ -520,7 +532,7 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun printShiftReport(
         kasirName: String, startTime: Long, modal: Double,
-        tunai: Double, qris: Double, trf: Double, debit: Double,
+        tunai: Double, qris: Double, trf: Double, debit: Double, piutang: Double, // 🔥 TAMBAH PARAMETER PIUTANG
         expected: Double, actual: Double
     ) {
         val storePrefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
@@ -529,12 +541,15 @@ class DashboardActivity : AppCompatActivity() {
 
         Thread {
             try {
+                // ... (Koneksi Bluetooth Sama) ...
                 val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
                 val device = bluetoothAdapter.getRemoteDevice(targetMac)
                 val socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                 socket.connect()
                 val os = socket.outputStream
+
+                // ... (Header Toko Sama) ...
                 val storeName = storePrefs.getString("name", "Toko Saya")
                 val now = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date())
                 val startStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(startTime))
@@ -549,25 +564,33 @@ class DashboardActivity : AppCompatActivity() {
                 p.append("Waktu  : $now\n")
                 p.append("Shift  : $startStr s/d Sekarang\n")
                 p.append("--------------------------------\n")
+
                 fun row(label: String, value: Double) {
                     val vStr = formatRupiah(value).replace("Rp ", "")
                     val space = 32 - label.length - vStr.length
                     p.append("$label${" ".repeat(if (space > 0) space else 1)}$vStr\n")
                 }
+
                 p.append("PENJUALAN:\n")
                 row("Tunai", tunai)
                 row("QRIS", qris)
                 row("Transfer", trf)
                 row("Debit", debit)
+                row("Piutang", piutang) // 🔥 CETAK PIUTANG DISINI
                 p.append("--------------------------------\n")
-                val totalOmzet = tunai + qris + trf + debit
+
+                // Total Omzet
+                val totalOmzet = tunai + qris + trf + debit + piutang // 🔥 TAMBAH PIUTANG
                 p.append("\u001B\u0045\u0001")
                 row("TOTAL OMZET", totalOmzet)
                 p.append("\u001B\u0045\u0000")
                 p.append("--------------------------------\n\n")
+
+                // ... (Rekonsiliasi Kas Sama Saja) ...
                 p.append("REKONSILIASI KAS (FISIK):\n")
                 row("Modal Awal", modal)
                 row("Tunai Masuk", tunai)
+                // Uang Piutang TIDAK masuk rekonsiliasi kas (karena uangnya belum diterima)
                 p.append("---------------- --\n")
                 row("Total Hrpn", expected)
                 row("Aktual Laci", actual)
@@ -578,6 +601,7 @@ class DashboardActivity : AppCompatActivity() {
                 p.append("--------------------------------\n")
                 p.append("\u001B\u0061\u0001")
                 p.append("\n\n\n")
+
                 os.write(p.toString().toByteArray())
                 os.flush()
                 Thread.sleep(2000)
