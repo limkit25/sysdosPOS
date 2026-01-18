@@ -114,7 +114,21 @@ class MainActivity : AppCompatActivity() {
             onItemLongClick = { product -> showCartActionDialog(product) }
         )
 
-        rvProducts.layoutManager = LinearLayoutManager(this)
+        // 1. Hitung Lebar Layar (Pixel ke DP)
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+
+        // 2. Tentukan Jumlah Kolom Berdasarkan Ukuran Layar
+        if (screenWidthDp >= 800) {
+            // TABLET BESAR / 2K (2560px) -> Pakai GRID 4 Kolom
+            rvProducts.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 4)
+        } else if (screenWidthDp >= 600) {
+            // TABLET KECIL -> Pakai GRID 3 Kolom
+            rvProducts.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 3)
+        } else {
+            // HP BIASA -> Tetap LIST KE BAWAH (1 Kolom)
+            rvProducts.layoutManager = LinearLayoutManager(this)
+        }
         rvProducts.adapter = productAdapter
 
         // 4. OBSERVE DATA

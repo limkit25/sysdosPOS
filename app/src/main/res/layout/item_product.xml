@@ -3,16 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    android:layout_marginHorizontal="4dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    android:layout_margin="6dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="10dp"
         android:gravity="center_vertical">
 
         <androidx.cardview.widget.CardView
@@ -42,10 +41,9 @@
                 android:text="Nama Produk"
                 android:textStyle="bold"
                 android:textColor="#000000"
-                android:textSize="16sp"
-                android:maxLines="1"
+                android:textSize="15sp"
+                android:maxLines="2"
                 android:ellipsize="end"/>
-
             <TextView
                 android:id="@+id/tvProductPrice"
                 android:layout_width="wrap_content"
@@ -60,11 +58,11 @@
                 android:id="@+id/tvProductSku"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SKU: 12345678"
-                android:textSize="12sp"
-                android:textColor="#FF5722"
+                android:text="SKU: -"
+                android:textSize="10sp"
+                android:textColor="#9E9E9E"
                 android:visibility="gone"
-                android:layout_marginTop="2dp"/>
+                android:layout_marginTop="1dp"/>
         </LinearLayout>
 
         <LinearLayout
@@ -84,19 +82,19 @@
                 android:id="@+id/tvStock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="150"
-                android:textSize="14sp"
+                android:text="99"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"/>
-
+                android:textColor="#1976D2"/>
             <TextView
                 android:id="@+id/tvCartBadge"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
                 android:background="@drawable/bg_circle_red"
                 android:text="1"
                 android:textColor="#FFFFFF"
-                android:textSize="10sp"
+                android:textStyle="bold"
+                android:textSize="11sp"
                 android:gravity="center"
                 android:visibility="gone"
                 android:layout_marginTop="4dp"/>

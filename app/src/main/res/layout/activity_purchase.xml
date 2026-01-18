@@ -9,18 +9,20 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="?attr/actionBarSize"
         android:background="#1976D2"
-        android:padding="16dp"
+        android:paddingHorizontal="16dp"
         android:gravity="center_vertical"
         android:elevation="4dp">
         <ImageButton
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:src="@drawable/ic_back_arrow"
             android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="#FFFFFF"/>
+            app:tint="#FFFFFF"
+            android:padding="12dp"
+            android:scaleType="fitCenter"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -28,7 +30,7 @@
             android:textColor="#FFFFFF"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginStart="12dp"/>
+            android:layout_marginStart="16dp"/>
     </LinearLayout>
 
     <LinearLayout
@@ -36,35 +38,37 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#FFFFFF"
-        android:padding="4dp"
+        android:padding="8dp"
         android:elevation="2dp">
 
         <Button
             android:id="@+id/btnTabInput"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="48dp"
+            android:layout_height="56dp"
             android:text="📝 INPUT BARU"
             android:backgroundTint="#1976D2"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="14sp"
+            android:textStyle="bold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            app:cornerRadius="4dp"
-            android:layout_marginEnd="4dp"/>
+            app:cornerRadius="8dp"
+            android:layout_marginEnd="8dp"/>
 
         <Button
             android:id="@+id/btnTabHistory"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="48dp"
+            android:layout_height="56dp"
             android:text="📜 RIWAYAT"
             android:backgroundTint="#E0E0E0"
-            android:textColor="#757575"
-            android:textSize="12sp"
+            android:textColor="#616161"
+            android:textSize="14sp"
+            android:textStyle="bold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            app:cornerRadius="4dp"/>
+            app:cornerRadius="8dp"/>
     </LinearLayout>
 
     <FrameLayout
@@ -81,19 +85,20 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="12dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="2dp">
+                android:layout_margin="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="16dp">
+
                     <TextView
                         android:text="Pilih Supplier:"
-                        android:textColor="#757575"
-                        android:textSize="12sp"
-                        android:layout_marginBottom="4dp"
+                        android:textColor="#616161"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="6dp"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"/>
 
@@ -101,44 +106,51 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
+                        android:layout_marginBottom="16dp"
+                        android:gravity="center_vertical">
 
                         <Spinner
                             android:id="@+id/spSupplier"
                             android:layout_width="0dp"
                             android:layout_weight="1"
-                            android:layout_height="48dp"
-                            android:background="@drawable/bg_rounded_white"/>
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_rounded_white"
+                            android:paddingHorizontal="8dp"/>
 
                         <ImageButton
                             android:id="@+id/btnAddSupplier"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
                             android:src="@android:drawable/ic_input_add"
                             android:background="@drawable/bg_rounded_green"
                             app:tint="#FFFFFF"
-                            android:layout_marginStart="8dp"/>
+                            android:layout_marginStart="12dp"
+                            android:elevation="2dp"/>
                     </LinearLayout>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical">
+
                         <ImageButton
                             android:id="@+id/btnScanBarcode"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
                             android:background="@drawable/bg_rounded_green"
                             android:src="@android:drawable/ic_menu_camera"
                             app:tint="#FFFFFF"
-                            android:padding="12dp"
-                            android:layout_marginEnd="8dp"/>
+                            android:padding="14dp"
+                            android:layout_marginEnd="12dp"
+                            android:elevation="2dp"/>
+
                         <androidx.appcompat.widget.SearchView
                             android:id="@+id/svSearchProduct"
                             android:layout_width="match_parent"
-                            android:layout_height="48dp"
+                            android:layout_height="56dp"
                             android:background="@drawable/bg_rounded_white"
-                            app:queryHint="Cari Barang..."
+                            app:queryHint="Cari Nama Barang / SKU..."
                             app:iconifiedByDefault="false"
                             app:queryBackground="@android:color/transparent"/>
                     </LinearLayout>
@@ -150,8 +162,9 @@
                 android:layout_height="wrap_content"
                 android:text="Keranjang Belanja"
                 android:textStyle="bold"
-                android:textColor="#333"
-                android:layout_marginHorizontal="16dp"
+                android:textSize="16sp"
+                android:textColor="#424242"
+                android:layout_marginHorizontal="20dp"
                 android:layout_marginBottom="8dp"/>
 
             <androidx.recyclerview.widget.RecyclerView
@@ -159,7 +172,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="16dp"
                 android:clipToPadding="false"/>
 
             <LinearLayout
@@ -167,25 +180,43 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="#FFFFFF"
-                android:padding="16dp"
+                android:padding="20dp"
                 android:elevation="16dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-                    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Total Belanja:" android:textSize="16sp"/>
-                    <TextView android:id="@+id/tvTotalPurchase" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rp 0" android:textSize="20sp" android:textStyle="bold" android:textColor="#1976D2"/>
+                    android:layout_marginBottom="16dp"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="Total Belanja:"
+                        android:textColor="#616161"
+                        android:textSize="16sp"/>
+
+                    <TextView
+                        android:id="@+id/tvTotalPurchase"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Rp 0"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="#1976D2"/>
                 </LinearLayout>
+
                 <Button
                     android:id="@+id/btnSavePurchase"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="60dp"
                     android:text="SIMPAN STOK MASUK ✅"
-                    android:textSize="16sp"
+                    android:textSize="18sp"
                     android:textStyle="bold"
                     android:backgroundTint="#2E7D32"
-                    app:cornerRadius="8dp"/>
+                    app:cornerRadius="12dp"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -200,14 +231,15 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="12dp"
-                app:cardCornerRadius="8dp"
+                android:layout_margin="16dp"
+                app:cardCornerRadius="12dp"
                 app:cardElevation="2dp">
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Riwayat Barang Masuk (Restock)"
-                    android:padding="12dp"
+                    android:padding="16dp"
+                    android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="#1976D2"/>
             </androidx.cardview.widget.CardView>
@@ -216,7 +248,7 @@
                 android:id="@+id/rvHistoryLog"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp"
+                android:padding="12dp"
                 android:clipToPadding="false"/>
         </LinearLayout>
 

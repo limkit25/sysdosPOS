@@ -11,6 +11,9 @@ plugins {
 android {
     namespace = "com.sysdos.kasirpintar"
     compileSdk = 36
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "com.sysdos.kasirpintar"

@@ -79,17 +79,41 @@ class PurchaseActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerViews() {
+        // === 1. RecyclerView untuk LIST BARANG MASUK (Input Mode) ===
         val rvInput = findViewById<RecyclerView>(R.id.rvPurchaseItems)
         adapterInput = PurchaseInputAdapter(purchaseList,
             onDelete = { removeItem(it) },
-            onEdit = { showAddToCartDialog(it.product, it) } // Edit pakai Dialog Canggih juga
+            onEdit = { showAddToCartDialog(it.product, it) }
         )
-        rvInput.layoutManager = LinearLayoutManager(this)
+
+        // 🔥 LOGIKA RESPONSIVE: HP (List) vs TABLET (Grid)
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+
+        if (screenWidthDp >= 600) {
+            // TABLET: Gunakan Grid 2 Kolom biar tidak terlalu lebar kosong
+            rvInput.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 2)
+        } else {
+            // HP: Tetap List ke Bawah
+            rvInput.layoutManager = LinearLayoutManager(this)
+        }
+
         rvInput.adapter = adapterInput
 
+
+        // === 2. RecyclerView untuk HISTORY (Riwayat Faktur) ===
         val rvHistory = findViewById<RecyclerView>(R.id.rvHistoryLog)
         adapterHistory = HistoryGroupAdapter { purchaseId -> showPurchaseDetailDialog(purchaseId) }
-        rvHistory.layoutManager = LinearLayoutManager(this)
+
+        // 🔥 LOGIKA RESPONSIVE HISTORY JUGA
+        if (screenWidthDp >= 600) {
+            // TABLET: Grid 2 Kolom
+            rvHistory.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 2)
+        } else {
+            // HP: List
+            rvHistory.layoutManager = LinearLayoutManager(this)
+        }
+
         rvHistory.adapter = adapterHistory
     }
 

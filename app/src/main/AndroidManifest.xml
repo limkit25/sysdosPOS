@@ -5,20 +5,15 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
-
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-
-
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
 
     <application
         android:allowBackup="true"
@@ -45,6 +40,7 @@
         <activity
             android:name=".SplashActivity"
             android:exported="true"
+
             android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,47 +48,53 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".LoginActivity" android:exported="false"/>
-        <activity android:name=".DashboardActivity" />
+        <activity android:name=".LoginActivity" android:exported="false" android:screenOrientation="portrait"/>
 
-        <activity android:name=".MainActivity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
-        <activity android:name=".ScanActivity" android:exported="false"/>
+        <activity
+            android:name=".DashboardActivity"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
 
-        <activity android:name=".ProductListActivity" android:exported="false" android:label="Manajemen Gudang"/>
-        <activity android:name=".ProductEntryActivity" android:exported="false" android:label="Input Produk"/>
-        <activity android:name=".CategoryActivity" android:exported="false" android:label="Kelola Kategori"/>
-
-        <activity android:name=".SalesReportActivity" android:exported="false" android:label="Laporan Penjualan"/>
-        <activity android:name=".ShiftHistoryActivity" android:exported="false" android:screenOrientation="portrait"/>
-        <activity android:name=".UserListActivity" android:exported="false" android:label="Kelola User"/>
-        <activity android:name=".StoreSettingsActivity" android:exported="false" android:label="Pengaturan Toko"/>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
 
         <activity
             android:name=".PurchaseActivity"
             android:exported="false"
             android:label="Pembelian Stok"
-            android:screenOrientation="portrait"/>
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ShiftHistoryActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".HistoryActivity"
             android:exported="false"
             android:label="Riwayat Transaksi"
-            android:screenOrientation="portrait"/>
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
 
-        <activity
-            android:name=".TopProductsActivity"
-            android:exported="false"
-            android:label="Produk Terlaris"
-            android:screenOrientation="portrait"/>
-        <activity
-            android:name=".WelcomeActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity android:name=".AboutActivity" android:exported="false" android:label="Tentang Aplikasi"/>
-        <activity android:name=".PaymentActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
-        <activity android:name=".LogReportActivity" />
+        <activity android:name=".ProductListActivity" android:exported="false" android:label="Manajemen Gudang" android:screenOrientation="fullSensor"/>
+        <activity android:name=".ProductEntryActivity" android:exported="false" android:label="Input Produk" android:screenOrientation="fullSensor"/>
+        <activity android:name=".SalesReportActivity" android:exported="false" android:label="Laporan Penjualan" android:screenOrientation="fullSensor"/>
+        <activity android:name=".TopProductsActivity" android:exported="false" android:label="Produk Terlaris" android:screenOrientation="fullSensor"/>
+        <activity android:name=".LogReportActivity" android:screenOrientation="fullSensor"/>
+
+        <activity android:name=".ScanActivity" android:exported="false" />
+        <activity android:name=".CategoryActivity" android:exported="false" android:label="Kelola Kategori" />
+        <activity android:name=".UserListActivity" android:exported="false" android:label="Kelola User" />
+        <activity android:name=".StoreSettingsActivity" android:exported="false" android:label="Pengaturan Toko" />
+        <activity android:name=".WelcomeActivity" android:exported="false"  />
+        <activity android:name=".AboutActivity" android:exported="false" android:label="Tentang Aplikasi" />
+        <activity android:name=".PaymentActivity" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
     </application>
-
 </manifest>

@@ -103,9 +103,33 @@ class DashboardActivity : AppCompatActivity() {
             authorizedCards.add(cardPrinter)
         }
         authorizedCards.add(cardAbout)
+        // 1. HITUNG LEBAR LAYAR (Convert Pixel ke DP)
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+
+        // 2. ATUR JUMLAH KOLOM OTOMATIS
+        if (screenWidthDp >= 800) {
+            // Tablet Besar / Resolusi 2K (2560px) -> 4 KOLOM
+            mainGrid.columnCount = 4
+        } else if (screenWidthDp >= 600) {
+            // Tablet Kecil -> 3 KOLOM
+            mainGrid.columnCount = 3
+        } else {
+            // HP Biasa -> 2 KOLOM (Default)
+            mainGrid.columnCount = 2
+        }
+
+        // 3. MASUKKAN KARTU KE GRID
         for (card in authorizedCards) {
             mainGrid.addView(card)
             card.visibility = View.VISIBLE
+
+            // 🔥 PENTING: Atur agar kartu melebar proporsional (Weight 1)
+            // Ini mencegah kartu jadi kecil/kurus di layar lebar
+            val params = card.layoutParams as GridLayout.LayoutParams
+            params.width = 0 // 0 artinya lebar diatur oleh weight
+            params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f) // Bobot 1 (Bagi rata)
+            card.layoutParams = params
         }
 
         // --- OBSERVE DATA ---
@@ -322,20 +346,29 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun cekKeamananHP() {
+        // 🔥 1. BYPASS KHUSUS DEVELOPER (TAMBAHKAN INI) 🔥
+        // Jika aplikasi sedang dalam mode DEBUG (Run dari Android Studio),
+        // maka fungsi ini akan BERHENTI DISINI (Return).
+        // Jadi Emulator tidak akan kena blokir.
+        if (BuildConfig.DEBUG) {
+            return
+        }
+
         try {
-            // 1. Cek Apakah Opsi Pengembang (Developer Options) Aktif?
+            // 2. Cek Apakah Opsi Pengembang (Developer Options) Aktif?
             val isDevMode = android.provider.Settings.Global.getInt(
                 contentResolver,
                 android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
             ) != 0
 
-            // 2. Cek Apakah USB Debugging (ADB) Aktif? (Opsional, tapi disarankan)
+            // 3. Cek Apakah USB Debugging (ADB) Aktif?
             val isAdb = android.provider.Settings.Global.getInt(
                 contentResolver,
                 android.provider.Settings.Global.ADB_ENABLED, 0
             ) != 0
 
             // Jika SALAH SATU aktif, langsung blokir!
+            // (Kode ini hanya akan jalan kalau Build-nya RELEASE / APK Siap Pakai)
             if (isDevMode || isAdb) {
                 tampilkanPeringatanKeamanan()
             }
