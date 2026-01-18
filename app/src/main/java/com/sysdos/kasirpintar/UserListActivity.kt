@@ -169,6 +169,25 @@ class UserListActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(user: User) {
+        // 🔥 1. AMBIL USERNAME YANG SEDANG LOGIN
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val myUsername = session.getString("username", "")
+
+        // 🔥 2. CEK: APAKAH INI AKUN SAYA SENDIRI?
+        if (user.username == myUsername) {
+            // ⛔ JIKA YA, TOLAK!
+            Toast.makeText(this, "⛔ Eits! Tidak bisa menghapus akun sendiri (Sedang Login)!", Toast.LENGTH_LONG).show()
+            return // Stop, jangan lanjut ke dialog hapus
+        }
+
+        // 🔥 3. (OPSIONAL) CEK APAKAH USER ID = 1 (OWNER PERTAMA)
+        // Biar ID 1 gak bisa dihapus sama sekali walau oleh admin lain (Proteksi Ganda)
+        if (user.id == 1) {
+            Toast.makeText(this, "⛔ Akun Utama (Owner) tidak bisa dihapus!", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // KALAU LOLOS CEK DI ATAS, BARU TAMPILKAN DIALOG
         AlertDialog.Builder(this)
             .setTitle("Hapus User?")
             .setMessage("Yakin hapus user: ${user.name} (${user.username})?")

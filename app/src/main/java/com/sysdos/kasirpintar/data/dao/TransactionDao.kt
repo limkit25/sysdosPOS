@@ -1,10 +1,11 @@
 package com.sysdos.kasirpintar.data.dao
 
 import androidx.room.Dao
+import androidx.room.Delete // <--- IMPORT INI
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update // <--- JANGAN LUPA IMPORT INI
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import com.sysdos.kasirpintar.data.model.Transaction
 
@@ -14,16 +15,22 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    // Ambil Semua Data (Untuk List di Layar HP)
+    // 1. BUAT KASIR (Hanya lihat punya sendiri) - BIARKAN INI
     @Query("SELECT * FROM transaction_table WHERE userId = :uid ORDER BY timestamp DESC")
     fun getAllTransactions(uid: Int): Flow<List<Transaction>>
 
-    // Untuk Export Laporan
+    // 🔥 2. BUAT ADMIN (TAMBAHAN BARU - LIHAT SEMUA) 🔥
+    // Perhatikan: Tidak ada "WHERE userId = ..."
+    @Query("SELECT * FROM transaction_table ORDER BY timestamp DESC")
+    fun getAllTransactionsGlobal(): Flow<List<Transaction>>
+
+    // ... (Sisanya ke bawah biarkan sama) ...
     @Query("SELECT * FROM transaction_table WHERE userId = :uid AND timestamp BETWEEN :startDate AND :endDate ORDER BY timestamp DESC")
     suspend fun getTransactionsByDateRange(uid: Int, startDate: Long, endDate: Long): List<Transaction>
 
-    // 🔥 WAJIB DITAMBAHKAN UNTUK FITUR PELUNASAN:
     @Update
-    fun update(transaction: Transaction)
+    suspend fun update(transaction: Transaction)
 
+    @Delete
+    suspend fun delete(transaction: Transaction)
 }

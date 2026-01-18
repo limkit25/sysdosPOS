@@ -2,7 +2,11 @@ package com.sysdos.kasirpintar
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
@@ -28,13 +32,12 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
         val fab = view.findViewById<FloatingActionButton>(R.id.btnAddProduct)
         val sv = view.findViewById<SearchView>(R.id.svProduct)
 
-        // Adapter simpel, hanya butuh logika klik item & long click (opsional)
+        // Adapter
         adapter = ProductAdapter(
             onItemClick = { showMenuDialog(it) },
             onItemLongClick = { showMenuDialog(it) }
         )
 
-        // Menggunakan Linear Layout (List ke bawah)
         rv.layoutManager = LinearLayoutManager(context)
         rv.adapter = adapter
 
@@ -57,10 +60,9 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
         })
     }
 
-    // 🔥 MENU DIALOG (RESTOCK SUDAH DIHAPUS) 🔥
+    // 🔥 1. MENU DIALOG UTAMA (DITAMBAHKAN OPSI RETUR)
     private fun showMenuDialog(product: Product) {
-        // Opsi tinggal 2: Edit & Hapus
-        val options = arrayOf("✏️ Edit Barang", "🗑️ Hapus Barang")
+        val options = arrayOf("✏️ Edit Barang", "📦 Retur / Stok Keluar", "🗑️ Hapus Barang")
 
         AlertDialog.Builder(requireContext())
             .setTitle(product.name)
@@ -71,11 +73,64 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
                         intent.putExtra("PRODUCT_TO_EDIT", product)
                         startActivity(intent)
                     }
-                    1 -> { // HAPUS (Index geser jadi 1)
+                    1 -> { // 🔥 RETUR (FITUR BARU)
+                        showReturnDialog(product)
+                    }
+                    2 -> { // HAPUS
                         confirmDeleteProduct(product)
                     }
                 }
             }
+            .show()
+    }
+
+    // 🔥 2. DIALOG INPUT RETUR
+    private fun showReturnDialog(product: Product) {
+        val context = requireContext()
+        val layout = LinearLayout(context)
+        layout.orientation = LinearLayout.VERTICAL
+        layout.setPadding(50, 40, 50, 10)
+
+        // Input Jumlah
+        val etQty = EditText(context)
+        etQty.hint = "Jumlah Retur (ex: 5)"
+        etQty.inputType = InputType.TYPE_CLASS_NUMBER
+        layout.addView(etQty)
+
+        // Input Alasan
+        val etReason = EditText(context)
+        etReason.hint = "Alasan (ex: Busuk / Expired)"
+        layout.addView(etReason)
+
+        AlertDialog.Builder(context)
+            .setTitle("📦 Retur Barang")
+            .setMessage("Produk: ${product.name}\nStok Saat Ini: ${product.stock}")
+            .setView(layout)
+            .setPositiveButton("PROSES RETUR") { _, _ ->
+                val qtyStr = etQty.text.toString()
+                val reason = etReason.text.toString()
+
+                if (qtyStr.isNotEmpty()) {
+                    val qty = qtyStr.toInt()
+
+                    // Cek stok cukup gak?
+                    if (qty > product.stock) {
+                        Toast.makeText(context, "❌ Stok tidak cukup untuk diretur!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Panggil ViewModel (Fungsi yang baru kita perbaiki tadi)
+                        viewModel.returnStockToSupplier(
+                            product = product,
+                            qtyToReturn = qty,
+                            reason = reason.ifEmpty { "Rusak/Expired" },
+                            supplierName = product.supplier ?: "Supplier Umum"
+                        )
+                        Toast.makeText(context, "✅ Retur Berhasil Dicatat!", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Jumlah wajib diisi!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Batal", null)
             .show()
     }
 

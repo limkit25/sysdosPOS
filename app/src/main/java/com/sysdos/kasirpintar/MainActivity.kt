@@ -195,8 +195,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 8. CEK STATUS SHIFT
-        checkShiftStatus()
 
         // 9. TES KONEKSI
         com.sysdos.kasirpintar.api.ApiClient.getLocalClient(this).getProducts(0).enqueue(object : retrofit2.Callback<List<com.sysdos.kasirpintar.api.ProductResponse>> {
@@ -209,55 +207,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-
-    // ==========================================
-    // 🔥 LOGIKA SHIFT SYSTEM (PER USER)
-    // ==========================================
-
-    private fun checkShiftStatus() {
-        val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_$currentUserKey", false)
-        if (!isShiftOpen) {
-            showOpenShiftDialog()
-        }
-    }
-
-    private fun showOpenShiftDialog() {
-        val layout = LinearLayout(this)
-        layout.orientation = LinearLayout.VERTICAL
-        layout.setPadding(64, 40, 64, 10)
-
-        val etModal = EditText(this)
-        etModal.hint = "Rp 0"
-        etModal.inputType = InputType.TYPE_CLASS_NUMBER
-        layout.addView(etModal)
-
-        AlertDialog.Builder(this)
-            .setTitle("☀️ Buka Shift (Input Modal)")
-            .setMessage("Halo $currentUserKey! Masukkan modal awal:")
-            .setView(layout)
-            .setCancelable(false)
-            .setPositiveButton("BUKA KASIR") { _, _ ->
-                val modalStr = etModal.text.toString()
-                if (modalStr.isNotEmpty()) {
-                    val modal = modalStr.toDouble()
-
-                    shiftPrefs.edit()
-                        .putBoolean("IS_OPEN_$currentUserKey", true)
-                        .putFloat("MODAL_AWAL_$currentUserKey", modal.toFloat())
-                        .putLong("START_TIME_$currentUserKey", System.currentTimeMillis())
-                        .putFloat("CASH_SALES_TODAY_$currentUserKey", 0f)
-                        .apply()
-
-                    viewModel.openShift(currentUserKey, modal)
-                    Toast.makeText(this, "Shift Dibuka! Semangat 🚀", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Isi 0 jika tanpa modal", Toast.LENGTH_SHORT).show()
-                    showOpenShiftDialog()
-                }
-            }
-            .setNegativeButton("Keluar App") { _, _ -> finish() }
-            .show()
-    }
 
     // ==========================================
     // 💰 PEMBAYARAN & CHECKOUT (UPDATE: LOGIKA PIUTANG)
@@ -634,6 +583,11 @@ class MainActivity : AppCompatActivity() {
 
             // TOMBOL PLUS (+) - Logika Satpam Stok Mas Heru (TETAP SAMA)
             btnPlus.setOnClickListener {
+                // 1. AMBIL SETTINGAN STOK DULU
+                val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default ON
+
+                // Cari Data Produk Asli (Induk) di Daftar Produk
                 val masterProduct = if (item.id < 0) {
                     fullList.find { it.id == item.parentId }
                 } else {
@@ -641,19 +595,28 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (masterProduct != null) {
-                    val totalDiKeranjang = currentCart.filter {
-                        it.id == masterProduct.id || it.parentId == masterProduct.id
-                    }.sumOf { it.stock }
+                    // 2. CEK STOK HANYA JIKA SISTEM AKTIF (SAKLAR NYALA)
+                    if (isStockSystemActive) {
+                        val totalDiKeranjang = currentCart.filter {
+                            it.id == masterProduct.id || it.parentId == masterProduct.id
+                        }.sumOf { it.stock }
 
-                    if (totalDiKeranjang >= masterProduct.stock) {
-                        Toast.makeText(this, "❌ Stok Mentok! Sisa: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
-                        return@setOnClickListener
+                        if (totalDiKeranjang >= masterProduct.stock) {
+                            Toast.makeText(this, "❌ Stok Mentok! Sisa: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
                     }
 
-                    // Tambah Item (Refresh via Observer)
+                    // 🔥 PERBAIKAN UTAMA DISINI 🔥
+                    // Kita harus menyalin item keranjang, TAPI stok-nya kita ganti dengan Stok Gudang Asli
+                    // Agar ViewModel tau batas stok sebenarnya.
                     val productToSend = item.copy(stock = masterProduct.stock)
+
+                    // Kirim data yang sudah diperbaiki
                     viewModel.addToCart(productToSend) {}
+
                 } else {
+                    // Jaga-jaga kalau data induk gak ketemu
                     viewModel.addToCart(item) {}
                 }
             }
@@ -816,7 +779,9 @@ class MainActivity : AppCompatActivity() {
                 val storeName = prefs.getString("name", "Toko Saya")
                 val storeAddress = prefs.getString("address", "Indonesia")
                 val storePhone = prefs.getString("phone", "")
-                val kasirName = session.getString("username", "Admin")
+                val username = session.getString("username", "Admin")
+                val kasirName = session.getString("fullname", username)
+
                 val dateStr = java.text.SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(java.util.Date(trx.timestamp))
 
                 // ==========================================
@@ -934,6 +899,7 @@ class MainActivity : AppCompatActivity() {
 
                 p.append("\u001B\u0061\u0001--------------------------------\n")
                 p.append("${prefs.getString("email", "Terima Kasih!")}\n\n\n")
+                p.append("Powered by Sysdos POS\n\n\n") // Feed lines
 
                 outputStream.write(p.toString().toByteArray())
                 outputStream.flush()
@@ -948,25 +914,34 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         try { printerHelper.close() } catch (e: Exception) {}
     }
-    // 🔥 LOGIKA KLIK PRODUK (DENGAN PENGECEKAN STOK KETAT)
+    // 🔥 LOGIKA KLIK PRODUK (SUDAH SUPPORT STOK LOS)
     private fun handleProductClick(product: Product) {
 
-        // 1. Cek Stok Gudang (Database)
-        if (product.stock <= 0) {
-            Toast.makeText(this, "❌ Stok Gudang Kosong!", Toast.LENGTH_SHORT).show()
-            return // Stop! Jangan lanjut.
-        }
+        // 1. AMBIL SETTINGAN STOK DULU
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default ON
 
-        // 2. Cek Sisa Stok (Dikurangi yang sudah ada di Keranjang)
-        val currentCart = viewModel.cart.value ?: emptyList()
-        val qtyInCart = currentCart.filter {
-            it.id == product.id || it.parentId == product.id
-        }.sumOf { it.stock }
+        // 2. HANYA CEK STOK JIKA SISTEM AKTIF (SAKLAR NYALA)
+        if (isStockSystemActive) {
 
-        if (product.stock - qtyInCart <= 0) {
-            Toast.makeText(this, "❌ Stok Habis! (Semua sudah di keranjang)", Toast.LENGTH_SHORT).show()
-            return // Stop! Jangan lanjut.
+            // Cek Stok Gudang (Database)
+            if (product.stock <= 0) {
+                Toast.makeText(this, "❌ Stok Gudang Kosong!", Toast.LENGTH_SHORT).show()
+                return // Stop!
+            }
+
+            // Cek Sisa Stok (Dikurangi yang sudah ada di Keranjang)
+            val currentCart = viewModel.cart.value ?: emptyList()
+            val qtyInCart = currentCart.filter {
+                it.id == product.id || it.parentId == product.id
+            }.sumOf { it.stock }
+
+            if (product.stock - qtyInCart <= 0) {
+                Toast.makeText(this, "❌ Stok Habis! (Semua sudah di keranjang)", Toast.LENGTH_SHORT).show()
+                return // Stop!
+            }
         }
+        // JIKA SAKLAR OFF (LOS), LANGSUNG LEWAT SINI TANPA DICEGAT
 
         // --- Lolos Pengecekan? Baru lanjut ke Varian/Cart ---
 
@@ -1045,7 +1020,7 @@ class MainActivity : AppCompatActivity() {
             if (showToast) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
     }
-    // 2️⃣ FUNGSI BARU: GABUNG SEMUA VARIAN JADI SATU PRODUK (DENGAN HARGA)
+    // 2️⃣ FUNGSI BARU: GABUNG SEMUA VARIAN JADI SATU PRODUK
     private fun addModifierToCart(parentProduct: Product, selectedVariants: List<com.sysdos.kasirpintar.data.model.ProductVariant>) {
         if (selectedVariants.isEmpty()) {
             viewModel.addToCart(parentProduct) { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
@@ -1053,30 +1028,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 1. Gabung Nama dengan Harga
-        // Contoh Hasil: "Nasi Goreng - Telur (+Rp 3.000), Ati (+Rp 5.000)"
         val combinedNameBuilder = StringBuilder("${parentProduct.name} - ")
         var additionalPrice = 0.0
 
         for ((index, variant) in selectedVariants.withIndex()) {
-            // Tulis Nama Varian
             combinedNameBuilder.append(variant.variantName)
-
-            // 🔥 TAMBAHAN: Tulis Harga Varian (Jika ada harganya)
             if (variant.variantPrice > 0) {
                 combinedNameBuilder.append(" (+${formatRupiah(variant.variantPrice)})")
             }
-
-            // Tambahkan koma jika bukan item terakhir
             if (index < selectedVariants.size - 1) combinedNameBuilder.append(", ")
-
-            // Jumlahkan Harga Total
             additionalPrice += variant.variantPrice
         }
 
         val finalName = combinedNameBuilder.toString()
         val finalPrice = parentProduct.price + additionalPrice
 
-        // 2. Bikin ID Unik (HashCode dari string gabungan)
+        // 2. Bikin ID Unik
         var uniqueId = finalName.hashCode()
         if (uniqueId > 0) uniqueId = -uniqueId
         if (uniqueId == 0) uniqueId = -1
@@ -1090,10 +1057,15 @@ class MainActivity : AppCompatActivity() {
             parentId = parentProduct.id
         )
 
-        // 4. Cek Stok Induk
-        if (parentProduct.stock <= 0) {
+        // 4. CEK STOK INDUK (DENGAN LOGIKA STOK LOS)
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
+
+        // Blokir hanya jika Saklar ON DAN Stok Habis
+        if (isStockSystemActive && parentProduct.stock <= 0) {
             Toast.makeText(this, "❌ Stok Induk Kosong!", Toast.LENGTH_SHORT).show()
         } else {
+            // Kalau Saklar OFF, Hajar terus masuk keranjang
             viewModel.addToCart(virtualProduct) { msg ->
                 Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
             }

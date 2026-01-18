@@ -20,15 +20,21 @@ class TransactionAdapter : ListAdapter<Transaction, TransactionAdapter.Transacti
     // Variabel Penampung Aksi Klik
     private var onItemClick: ((Transaction) -> Unit)? = null
     private var onReprintClick: ((Transaction) -> Unit)? = null
+    // 🔥 1. TAMBAHAN VARIABEL LONG CLICK
+    private var onItemLongClick: ((Transaction) -> Unit)? = null
 
-    // Fungsi Setter untuk Klik Baris (Detail)
+    // Fungsi Setter
     fun setOnItemClickListener(listener: (Transaction) -> Unit) {
         onItemClick = listener
     }
 
-    // Fungsi Setter untuk Klik Tombol Print (Reprint Langsung)
     fun setOnReprintClickListener(listener: (Transaction) -> Unit) {
         onReprintClick = listener
+    }
+
+    // 🔥 2. FUNGSI SETTER BARU (YANG DICARI ERROR TADI)
+    fun setOnItemLongClickListener(listener: (Transaction) -> Unit) {
+        onItemLongClick = listener
     }
 
     class TransactionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -40,59 +46,50 @@ class TransactionAdapter : ListAdapter<Transaction, TransactionAdapter.Transacti
         fun bind(
             trx: Transaction,
             itemClickListener: ((Transaction) -> Unit)?,
-            reprintClickListener: ((Transaction) -> Unit)?
+            reprintClickListener: ((Transaction) -> Unit)?,
+            // 🔥 3. TAMBAHKAN PARAMETER DI BIND
+            itemLongClickListener: ((Transaction) -> Unit)?
         ) {
-            // 1. FORMAT TANGGAL & HARGA (STANDAR)
+            // FORMAT TANGGAL & HARGA
             val dateStr = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(trx.timestamp))
             tvDate.text = dateStr
 
             val totalStr = String.format(Locale("id", "ID"), "Rp %,d", trx.totalAmount.toLong())
             tvTotal.text = totalStr
 
-            // ================================================================
-            // 🔥 LOGIKA STATUS WARNA-WARNI (BIAR KELIHATAN DI LIST) 🔥
-            // ================================================================
-
+            // LOGIKA WARNA STATUS
             val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
             val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
 
             if (isPiutang) {
                 if (isLunas) {
-                    // SUDAH LUNAS -> HIJAU
                     tvId.text = "#TRX-${trx.id} (LUNAS ✅)"
-                    tvId.setTextColor(Color.parseColor("#2E7D32")) // Hijau Gelap
-
-                    // Tombol Print Balik Normal
+                    tvId.setTextColor(Color.parseColor("#2E7D32"))
                     btnPrint.text = "🖨️"
-                    btnPrint.setBackgroundColor(Color.parseColor("#6200EE")) // Ungu
+                    btnPrint.setBackgroundColor(Color.parseColor("#6200EE"))
                 } else {
-                    // MASIH HUTANG -> MERAH
                     tvId.text = "#TRX-${trx.id} (BELUM LUNAS ⏳)"
                     tvId.setTextColor(Color.RED)
-
-                    // Tombol Print Jadi Oranye (Kode visual buat user biar ngeh)
                     btnPrint.text = "💰"
-                    btnPrint.setBackgroundColor(Color.parseColor("#FF9800")) // Oranye
+                    btnPrint.setBackgroundColor(Color.parseColor("#FF9800"))
                 }
             } else {
-                // TRANSAKSI BIASA (TUNAI/QRIS) -> HITAM
                 tvId.text = "#TRX-${trx.id}"
                 tvId.setTextColor(Color.BLACK)
-
-                // Tombol Print Normal
                 btnPrint.text = "🖨️"
                 btnPrint.setBackgroundColor(Color.parseColor("#6200EE"))
             }
-            // ================================================================
 
-            // LOGIKA KLIK TOMBOL PRINTER (Kecil di kanan)
-            btnPrint.setOnClickListener {
-                reprintClickListener?.invoke(trx)
-            }
+            // KLIK PRINT
+            btnPrint.setOnClickListener { reprintClickListener?.invoke(trx) }
 
-            // LOGIKA KLIK BARIS (Lihat Detail)
-            itemView.setOnClickListener {
-                itemClickListener?.invoke(trx)
+            // KLIK BARIS (DETAIL)
+            itemView.setOnClickListener { itemClickListener?.invoke(trx) }
+
+            // 🔥 4. PASANG LONG CLICK LISTENER (TEKAN LAMA)
+            itemView.setOnLongClickListener {
+                itemLongClickListener?.invoke(trx)
+                true // Return true artinya event sudah ditangani
             }
         }
     }
@@ -103,12 +100,12 @@ class TransactionAdapter : ListAdapter<Transaction, TransactionAdapter.Transacti
     }
 
     override fun onBindViewHolder(holder: TransactionViewHolder, position: Int) {
-        holder.bind(getItem(position), onItemClick, onReprintClick)
+        // 🔥 5. LEMPAR LISTENER KE HOLDER
+        holder.bind(getItem(position), onItemClick, onReprintClick, onItemLongClick)
     }
 
     class DiffCallback : DiffUtil.ItemCallback<Transaction>() {
         override fun areItemsTheSame(old: Transaction, new: Transaction) = old.id == new.id
-        // Cek Note juga, supaya kalau note berubah (ada tulisan LUNAS), list-nya refresh otomatis
         override fun areContentsTheSame(old: Transaction, new: Transaction) =
             old == new && old.note == new.note
     }

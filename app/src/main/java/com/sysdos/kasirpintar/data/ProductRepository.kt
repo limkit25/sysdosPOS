@@ -21,21 +21,12 @@ class ProductRepository(
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao,
     private val storeConfigDao: StoreConfigDao,
-    // 🔥 TAMBAHAN: Kita butuh akses ke TransactionDao secara spesifik jika dipisah
-    // Tapi karena Mas Heru menggabungkan semuanya di ProductDao (sepertinya), kita pakai productDao saja.
-    // Jika Transaction ada di DAO terpisah, tambahkan di sini ya.
-    private val transactionDao: TransactionDao // Pastikan ini ada di constructor AppDatabase
+    private val transactionDao: TransactionDao
 ) {
     // --- STORE CONFIG ---
     val storeConfig = storeConfigDao.getStoreConfig()
-
-    suspend fun saveStoreConfig(config: StoreConfig) {
-        storeConfigDao.saveConfig(config)
-    }
-
-    suspend fun getStoreConfigDirect(): StoreConfig? {
-        return storeConfigDao.getStoreConfigOneShot()
-    }
+    suspend fun saveStoreConfig(config: StoreConfig) = storeConfigDao.saveConfig(config)
+    suspend fun getStoreConfigDirect(): StoreConfig? = storeConfigDao.getStoreConfigOneShot()
 
     // =================================================================
     // 📦 1. PRODUK & VARIAN
@@ -43,107 +34,74 @@ class ProductRepository(
 
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
 
-    // Insert Standar
     suspend fun insert(product: Product) = productDao.insertProduct(product)
-
-    // Insert Return ID (PENTING BUAT VARIAN)
-    suspend fun insertProductReturnId(product: Product): Long {
-        return productDao.insertProduct(product)
-    }
-
-    // Insert Varian
-    suspend fun insertVariants(variants: List<ProductVariant>) {
-        productDao.insertVariants(variants)
-    }
-
+    suspend fun insertProductReturnId(product: Product): Long = productDao.insertProduct(product)
+    suspend fun insertVariants(variants: List<ProductVariant>) = productDao.insertVariants(variants)
     suspend fun update(product: Product) = productDao.update(product)
     suspend fun delete(product: Product) = productDao.delete(product)
 
-    // Ambil Varian berdasarkan ID Produk
-    fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>> {
-        return productDao.getVariantsByProductId(productId)
-    }
+    fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>> = productDao.getVariantsByProductId(productId)
 
-    // Update Varian (Hapus Lama -> Simpan Baru)
     suspend fun replaceVariants(productId: Int, variants: List<ProductVariant>) {
         productDao.deleteVariantsByProductId(productId)
         productDao.insertVariants(variants)
     }
 
-    // FUNGSI POTONG STOK
-    suspend fun decreaseStock(productId: Int, quantity: Int) {
-        productDao.decreaseStock(productId, quantity)
-    }
+    suspend fun decreaseStock(productId: Int, quantity: Int) = productDao.decreaseStock(productId, quantity)
 
-    // =================================================================
-    // 📂 2. DATA PENDUKUNG (User, Kategori, Supplier)
-    // =================================================================
-
-    val allCategories: Flow<List<Category>> = productDao.getAllCategories()
-    suspend fun insertCategory(category: Category) = productDao.insertCategory(category)
-    suspend fun deleteCategory(category: Category) = productDao.deleteCategory(category)
-
-    val allSuppliers: Flow<List<Supplier>> = productDao.getAllSuppliers()
-    suspend fun insertSupplier(supplier: Supplier) = productDao.insertSupplier(supplier)
-    suspend fun deleteSupplier(supplier: Supplier) = productDao.deleteSupplier(supplier)
-    suspend fun updateSupplier(supplier: Supplier) = productDao.updateSupplier(supplier)
-
-    val allUsers: Flow<List<User>> = productDao.getAllUsers()
-    suspend fun insertUser(user: User) = productDao.insertUser(user)
-    suspend fun updateUser(user: User) = productDao.updateUser(user)
-    suspend fun deleteUser(user: User) = productDao.deleteUser(user)
-    suspend fun login(u: String, p: String): User? = productDao.login(u, p)
-    suspend fun getUserByEmail(email: String): User? = productDao.getUserByEmail(email)
-
-    // =================================================================
-    // 🛒 3. TRANSAKSI
-    // =================================================================
-    fun getTransactionsByUser(userId: Int): Flow<List<Transaction>> {
-        // Karena Mas Heru memisah TransactionDao, panggil dari sana
-        return transactionDao.getAllTransactions(userId)
-    }
-
-    suspend fun insertTransaction(transaction: Transaction): Long {
-        return transactionDao.insertTransaction(transaction)
-    }
-
-    // 🔥 FUNGSI BARU: EXPORT LAPORAN PER TANGGAL 🔥
-    suspend fun getTransactionsByDateRange(uid: Int, start: Long, end: Long): List<Transaction> {
-        return transactionDao.getTransactionsByDateRange(uid, start, end)
-    }
-
-    // =================================================================
-    // 📅 4. SHIFT (LOG KASIR)
-    // =================================================================
-    fun getShiftLogsByUser(userId: Int): Flow<List<ShiftLog>> {
-        return shiftDao.getAllLogs(userId)
-    }
-    suspend fun insertShiftLog(log: ShiftLog) {
-        shiftDao.insertLog(log)
-    }
-
-    // =================================================================
-    // 📦 5. STOCK & PURCHASE
-    // =================================================================
-
-    val purchaseHistory: Flow<List<StockLog>> = stockLogDao.getPurchaseHistoryGroups()
-    val allStockLogs: Flow<List<StockLog>> = stockLogDao.getAllStockLogs()
-
-    suspend fun recordPurchase(log: StockLog) {
-        stockLogDao.insertLog(log)
-    }
-
-    suspend fun getPurchaseDetails(pId: Long): List<StockLog> {
-        return stockLogDao.getPurchaseDetails(pId)
+    // 🔥 TAMBAHAN UNTUK VOID: AMBIL PRODUK BY NAME 🔥
+    suspend fun getProductByName(name: String): Product? {
+        return productDao.getProductByName(name)
     }
 
     suspend fun getProductById(id: Int): Product? = productDao.getProductById(id)
     suspend fun getProductByBarcode(barcode: String): Product? = productDao.getProductByBarcode(barcode)
 
     // =================================================================
-    // 🌐 6. SERVER SYNC & UPLOAD
+    // 🛒 TRANSAKSI
     // =================================================================
 
+    // 🔥🔥 WAJIB TAMBAH BARIS INI (SUPAYA VIEWMODEL TIDAK ERROR) 🔥🔥
+    val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactionsGlobal()
+
+    // Kode lama di bawahnya biarkan saja:
+    fun getTransactionsByUser(userId: Int): Flow<List<Transaction>> = transactionDao.getAllTransactions(userId)
+    suspend fun insertTransaction(transaction: Transaction): Long = transactionDao.insertTransaction(transaction)
+    suspend fun getTransactionsByDateRange(uid: Int, start: Long, end: Long): List<Transaction> = transactionDao.getTransactionsByDateRange(uid, start, end)
+
+    // 🔥 TAMBAHAN UNTUK VOID: HAPUS TRANSAKSI 🔥
+    suspend fun deleteTransaction(transaction: Transaction) {
+        transactionDao.delete(transaction)
+    }
+
+    // =================================================================
+    // DATA LAINNYA (Biarkan Tetap Sama)
+    // =================================================================
+    val allCategories = productDao.getAllCategories()
+    suspend fun insertCategory(c: Category) = productDao.insertCategory(c)
+    suspend fun deleteCategory(c: Category) = productDao.deleteCategory(c)
+
+    val allSuppliers = productDao.getAllSuppliers()
+    suspend fun insertSupplier(s: Supplier) = productDao.insertSupplier(s)
+    suspend fun deleteSupplier(s: Supplier) = productDao.deleteSupplier(s)
+    suspend fun updateSupplier(s: Supplier) = productDao.updateSupplier(s)
+
+    val allUsers = productDao.getAllUsers()
+    suspend fun insertUser(u: User) = productDao.insertUser(u)
+    suspend fun updateUser(u: User) = productDao.updateUser(u)
+    suspend fun deleteUser(u: User) = productDao.deleteUser(u)
+    suspend fun login(u: String, p: String) = productDao.login(u, p)
+    suspend fun getUserByEmail(email: String) = productDao.getUserByEmail(email)
+
+    fun getShiftLogsByUser(userId: Int) = shiftDao.getAllLogs(userId)
+    suspend fun insertShiftLog(log: ShiftLog) = shiftDao.insertLog(log)
+
+    val purchaseHistory = stockLogDao.getPurchaseHistoryGroups()
+    val allStockLogs = stockLogDao.getAllStockLogs()
+    suspend fun recordPurchase(log: StockLog) = stockLogDao.insertLog(log)
+    suspend fun getPurchaseDetails(pId: Long) = stockLogDao.getPurchaseDetails(pId)
+
+    // SERVER SYNC
     suspend fun uploadCsvFile(file: File) {
         withContext(Dispatchers.IO) {
             try {
@@ -162,7 +120,6 @@ class ProductRepository(
                 val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
                 val email = prefs.getString("username", "") ?: ""
                 val currentUser = productDao.getUserByEmail(email) ?: return@withContext
-
                 val api = ApiClient.getLocalClient(context)
                 val session = SessionManager(context)
                 val dynamicBaseUrl = session.getServerUrl()
@@ -185,9 +142,7 @@ class ProductRepository(
                     }
                 }
                 val responseCat = api.getCategories(currentUser.id).execute()
-                if (responseCat.isSuccessful) {
-                    responseCat.body()?.forEach { productDao.insertCategory(Category(id = it.id, name = it.name)) }
-                }
+                if (responseCat.isSuccessful) responseCat.body()?.forEach { productDao.insertCategory(Category(id = it.id, name = it.name)) }
             } catch (e: Exception) { Log.e("SysdosRepo", "Error Sync: ${e.message}") }
         }
     }
@@ -198,10 +153,7 @@ class ProductRepository(
                 val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
                 val email = prefs.getString("username", "") ?: ""
                 val currentUser = productDao.getUserByEmail(email) ?: return@withContext
-
-                val itemList = cartItems.map {
-                    com.sysdos.kasirpintar.api.TransactionItemRequest(it.id, it.stock)
-                }
+                val itemList = cartItems.map { com.sysdos.kasirpintar.api.TransactionItemRequest(it.id, it.stock) }
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
                     trx.totalAmount, trx.profit, trx.itemsSummary, currentUser.id, itemList
                 )
@@ -213,23 +165,15 @@ class ProductRepository(
     suspend fun updateProductToServer(product: Product) {
         withContext(Dispatchers.IO) {
             try {
-                val dataKirim = ProductResponse(
-                    id = product.id, name = product.name, category = product.category,
-                    price = product.price.toInt(), cost_price = product.costPrice.toInt(),
-                    stock = product.stock, image_path = null
-                )
+                val dataKirim = ProductResponse(id = product.id, name = product.name, category = product.category, price = product.price.toInt(), cost_price = product.costPrice.toInt(), stock = product.stock, image_path = null)
                 ApiClient.getLocalClient(context).updateProduct(dataKirim).execute()
             } catch (e: Exception) {}
         }
     }
 
     suspend fun syncUserToServer(user: User) {
-        withContext(Dispatchers.IO) {
-            try { ApiClient.getLocalClient(context).registerLocalUser(user).execute() } catch (e: Exception) {}
-        }
+        withContext(Dispatchers.IO) { try { ApiClient.getLocalClient(context).registerLocalUser(user).execute() } catch (e: Exception) {} }
     }
 
-    suspend fun clearAllData() {
-        AppDatabase.getDatabase(context).clearAllTables()
-    }
+    suspend fun clearAllData() = AppDatabase.getDatabase(context).clearAllTables()
 }

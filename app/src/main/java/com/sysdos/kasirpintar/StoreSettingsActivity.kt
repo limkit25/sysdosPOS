@@ -399,24 +399,50 @@ class StoreSettingsActivity : AppCompatActivity() {
         }
     }
 
+    // 🔥 PERBAIKAN: PENGECEKAN LEBIH LENGKAP 🔥
     private fun checkPermission(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            // Android 12+: Wajib Connect DAN Scan
+            val connect = ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            val scan = ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            return connect && scan
         } else {
+            // Android 11 ke bawah: Wajib Location
             return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestBTPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), 101)
+            ActivityCompat.requestPermissions(this, arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ), 101)
         } else {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 102)
+            ActivityCompat.requestPermissions(this, arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN
+            ), 102)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try { unregisterReceiver(receiver) } catch (e: Exception) {}
+    }
+    // 🔥 WAJIB TAMBAH INI BIAR GAK CRASH 🔥
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == 101 || requestCode == 102) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Izin diberikan, coba load devices
+                Toast.makeText(this, "Izin Diberikan! ✅", Toast.LENGTH_SHORT).show()
+                showPairedDevices()
+            } else {
+                Toast.makeText(this, "Izin Ditolak! Tidak bisa scan printer.", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

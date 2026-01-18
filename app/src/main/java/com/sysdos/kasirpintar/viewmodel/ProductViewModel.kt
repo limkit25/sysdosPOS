@@ -44,13 +44,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     val allSuppliers: LiveData<List<Supplier>> = repository.allSuppliers.asLiveData()
     val storeConfig: LiveData<StoreConfig?> = repository.storeConfig.asLiveData()
 
-    val allUsers: LiveData<List<User>> = _currentUserId.switchMap { uid ->
-        repository.allUsers.asLiveData().map { users -> users.filter { it.id == uid } }
-    }
+    val allUsers: LiveData<List<User>> = repository.allUsers.asLiveData()
 
-    val allTransactions: LiveData<List<Transaction>> = _currentUserId.switchMap { uid ->
-        repository.getTransactionsByUser(uid).asLiveData()
-    }
+    val allTransactions: LiveData<List<Transaction>> = repository.allTransactions.asLiveData()
 
     val allShiftLogs: LiveData<List<ShiftLog>> = _currentUserId.switchMap { uid ->
         repository.getShiftLogsByUser(uid).asLiveData()
@@ -143,40 +139,62 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // --- LOGIN MANUAL (EMAIL & PASSWORD) ---
     fun login(u: String, p: String, onResult: (User?) -> Unit) = viewModelScope.launch {
-        val user = repository.login(u, p)
-        if (user != null) _currentUserId.postValue(user.id)
+        // 🔥 PERBAIKAN: Gunakan repository.login(u, p)
+        // JANGAN pakai repository.getUserByEmail(u) !!!
+
+        val user = repository.login(u, p) // <--- Ini akan cek Email DAN Password
+
+        if (user != null) {
+            _currentUserId.postValue(user.id)
+        }
         onResult(user)
     }
 
-    // --- CART (KERANJANG) - VALIDASI STOK AKTIF ---
+    // --- CART (KERANJANG) - VALIDASI DENGAN FITUR STOK LOS ---
     fun addToCart(product: Product, onResult: (String) -> Unit) {
+
+        // 1. AMBIL SETTINGAN TOKO (SAKLAR)
+        val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: ON (Wajib Cek)
+
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
         val index = currentList.indexOfFirst { it.id == product.id }
-        val stokGudang = product.stock // 🔥 Ambil stok gudang
+        val stokGudang = product.stock // Stok asli di database
 
         if (index != -1) {
+            // BARANG SUDAH ADA, MAU TAMBAH QTY
             val existingItem = currentList[index]
             val qtyBaru = existingItem.stock + 1
 
-            // 🔥 CEK STOK (Stok 0 = Gak boleh tambah)
-            if (qtyBaru > stokGudang) {
-                onResult("❌ Stok Habis! Sisa: $stokGudang")
-                return
+            // 🔥 CEK STOK HANYA JIKA SAKLAR ON 🔥
+            if (isStockSystemActive) {
+                if (qtyBaru > stokGudang) {
+                    onResult("❌ Stok Habis! Sisa: $stokGudang")
+                    return
+                }
             }
+            // Jika Saklar OFF (Los), dia akan langsung lewat ke sini (Boleh tambah terus)
 
             currentList[index] = existingItem.copy(stock = qtyBaru)
             onResult("Qty ditambah")
         } else {
-            // 🔥 CEK STOK BARANG BARU
-            if (stokGudang > 0) {
-                currentList.add(product.copy(stock = 1))
-                onResult("Masuk keranjang")
-            } else {
-                onResult("❌ Stok Kosong!")
-                return
+            // BARANG BARU MAU MASUK KERANJANG
+
+            // 🔥 CEK STOK HANYA JIKA SAKLAR ON 🔥
+            if (isStockSystemActive) {
+                if (stokGudang <= 0) {
+                    onResult("❌ Stok Kosong!")
+                    return
+                }
             }
+            // Jika Saklar OFF (Los), biarpun stok 0 atau minus, TETAP BOLEH MASUK
+
+            currentList.add(product.copy(stock = 1))
+            onResult("Masuk keranjang")
         }
+
         _cart.value = currentList
         calculateTotal()
     }
@@ -522,5 +540,105 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         if (s.isNullOrEmpty()) return ""
         val first = s[0]
         return if (Character.isUpperCase(first)) s else Character.toUpperCase(first) + s.substring(1)
+    }
+    // ==========================================
+    // 🔥 FITUR VOID (DENGAN PENCATATAN LOG LAPORAN)
+    // ==========================================
+    fun voidTransaction(trx: Transaction, onSuccess: () -> Unit) = viewModelScope.launch {
+
+        // 1. KEMBALIKAN STOK & CATAT LOG
+        val rawItems = trx.itemsSummary.split(" || ")[0]
+        val items = rawItems.split(";")
+
+        for (itemStr in items) {
+            val parts = itemStr.split("|")
+            if (parts.size >= 2) {
+                val fullName = parts[0]
+                val qty = parts[1].toIntOrNull() ?: 0
+
+                // Logika ambil nama asli (buang varian)
+                val realName = if (fullName.contains(" - ")) fullName.split(" - ")[0].trim() else fullName.trim()
+
+                var product = repository.getProductByName(realName)
+                if (product == null) product = repository.getProductByName(fullName)
+
+                if (product != null) {
+                    // A. KEMBALIKAN STOK
+                    val newStock = product.stock + qty
+                    repository.update(product.copy(stock = newStock))
+
+                    // B. 🔥 CATAT KE LAPORAN VOID (StockLog) 🔥
+                    val log = StockLog(
+                        purchaseId = System.currentTimeMillis(), // ID Unik
+                        timestamp = System.currentTimeMillis(),
+                        productName = "$fullName (VOID TRX #${trx.id})", // Keterangan
+                        supplierName = "VOID / BATAL", // Kategori Laporan
+                        quantity = qty,
+                        costPrice = product.costPrice,
+                        totalCost = product.costPrice * qty,
+                        type = "VOID" // Tipe Khusus
+                    )
+                    repository.recordPurchase(log)
+                }
+            }
+        }
+
+        // 2. HAPUS TRANSAKSI
+        repository.deleteTransaction(trx)
+
+        launch(kotlinx.coroutines.Dispatchers.Main) {
+            onSuccess()
+        }
+    }
+
+    // 🔥 PERBAIKAN: GANTI FUNGSI INI AGAR TIDAK ERROR IMPORT
+    fun getLogReport(targetType: String): androidx.lifecycle.LiveData<List<StockLog>> {
+        val result = androidx.lifecycle.MediatorLiveData<List<StockLog>>()
+
+        result.addSource(stockLogs) { logs ->
+            // Filter manual
+            if (logs != null) {
+                val filtered = logs.filter { it.type == targetType }
+                result.value = filtered
+            }
+        }
+        return result
+    }
+    // ==========================================
+    // 📦 FITUR RETUR STOK (VERSI FIX SESUAI DB ANDA)
+    // ==========================================
+    fun returnStockToSupplier(product: Product, qtyToReturn: Int, reason: String, supplierName: String) = viewModelScope.launch {
+
+        // 1. Kurangi Stok Produk
+        val newStock = product.stock - qtyToReturn
+        repository.update(product.copy(stock = newStock))
+
+        // 2. Catat di Log (Sesuaikan dengan format StockLog Purchase Anda)
+        val log = StockLog(
+            // Gunakan Timestamp sebagai Purchase ID unik
+            purchaseId = System.currentTimeMillis(),
+            timestamp = System.currentTimeMillis(),
+            productName = product.name,
+
+            // 🔥 Trik: Masukkan ALASAN RETUR ke nama supplier agar terbaca di laporan
+            supplierName = "$supplierName (RETUR: $reason)",
+
+            quantity = qtyToReturn,
+            costPrice = product.costPrice,
+
+            // Total Cost (Nilai barang yang diretur/dibuang)
+            totalCost = product.costPrice * qtyToReturn,
+
+            // Type "OUT" menandakan barang keluar
+            type = "OUT"
+        )
+
+        // 3. Simpan Log (Pakai fungsi recordPurchase yang sudah ada di Repo)
+        repository.recordPurchase(log)
+    }
+    // Di ProductViewModel.kt
+    fun getUserByEmail(email: String, onResult: (User?) -> Unit) = viewModelScope.launch {
+        val user = repository.getUserByEmail(email)
+        onResult(user)
     }
 }

@@ -63,9 +63,10 @@ class DashboardActivity : AppCompatActivity() {
 
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "Admin")
+        val realName = session.getString("fullname", username)
         val role = session.getString("role", "kasir")
 
-        tvGreeting.text = "Halo, $username"
+        tvGreeting.text = "Halo, $realName"
         tvRole.text = "Role: ${role?.uppercase()}"
 
         if (role == "kasir") {
@@ -137,12 +138,19 @@ class DashboardActivity : AppCompatActivity() {
             }
         }
 
-        // --- CLICK LISTENERS ---
         cardPOS.setOnClickListener {
             val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+
+            // 1. AMBIL KEDUA STATUS
+            val isFullVersion = licensePrefs.getBoolean("is_full_version", false)
             val isExpired = licensePrefs.getBoolean("is_expired", false)
 
-            if (isExpired) {
+            // 2. LOGIKA CERDAS:
+            // Kita hanya blokir jika: (Sudah Expired) DAN (BUKAN Full Version)
+            // Jadi kalau Full Version = True, biarpun isExpired = True, dia tetap LOLOS.
+
+            if (isExpired && !isFullVersion) {
+                // ⛔ BLOKIR (Hanya untuk User Gratisan yang habis masa trial)
                 AlertDialog.Builder(this)
                     .setTitle("⚠️ MASA TRIAL HABIS")
                     .setMessage("Masa percobaan 7 hari telah berakhir.\n\nSilakan hubungi Admin Sysdos untuk upgrade ke Full Version.")
@@ -157,13 +165,33 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Tutup", null)
                     .show()
             } else {
+                // ✅ LOLOS (Premium atau Masih Trial)
                 checkModalBeforePOS()
             }
         }
 
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
         cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) }
-        cardReport.setOnClickListener { startActivity(Intent(this, SalesReportActivity::class.java)) }
+        // 🔥 GANTI CARD REPORT BIAR BISA PILIH JENIS LAPORAN 🔥
+        cardReport.setOnClickListener {
+            val options = arrayOf("📊 Laporan Penjualan (Omzet)", "⚠️ Riwayat Void & Retur")
+
+            AlertDialog.Builder(this)
+                .setTitle("Pilih Jenis Laporan")
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> {
+                            // Masuk ke Laporan Omzet (Yang Lama)
+                            startActivity(Intent(this, SalesReportActivity::class.java))
+                        }
+                        1 -> {
+                            // Masuk ke Laporan Void & Retur (Yang Baru)
+                            startActivity(Intent(this, LogReportActivity::class.java))
+                        }
+                    }
+                }
+                .show()
+        }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
         cardStore.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "STORE") }) }
         cardPrinter.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "PRINTER") }) }
@@ -181,7 +209,7 @@ class DashboardActivity : AppCompatActivity() {
 
             // 1. Cek Status Shift Dulu
             val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-            val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_$userName", false)
+            val isShiftOpen = shiftPrefs.getBoolean("IS_OPEN_GLOBAL_SESSION", false)
 
             // 2. Cek Status Lisensi (Untuk Opsi Reset)
             val licensePrefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
@@ -337,9 +365,18 @@ class DashboardActivity : AppCompatActivity() {
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val username = session.getString("username", "default") ?: "default"
 
-        if (!prefs.getBoolean("IS_OPEN_$username", false)) {
+        // 🔥 GANTI DI SINI:
+        // Jangan pakai nama user. Pakai nama kunci "GLOBAL" yang tetap.
+        // Jadi siapapun yang login (Admin/Kasir), kuncinya SAMA.
+
+        val GLOBAL_KEY = "IS_OPEN_GLOBAL_SESSION"
+
+        if (!prefs.getBoolean(GLOBAL_KEY, false)) {
+            // Kalau Belum Buka -> Minta Modal
+            // Pastikan fungsi showInputModalDialogForPOS juga menyimpan ke GLOBAL_KEY ya!
             showInputModalDialogForPOS(prefs, username)
         } else {
+            // Sudah Buka -> Langsung Masuk
             startActivity(Intent(this, MainActivity::class.java))
         }
     }
@@ -359,19 +396,24 @@ class DashboardActivity : AppCompatActivity() {
                 if (modalStr.isNotEmpty()) {
                     val modal = modalStr.toDouble()
 
-                    // 🔥 UBAH BAGIAN INI (GANTI apply() JADI commit()) 🔥
-                    // commit() = Simpan sekarang juga! (Lebih aman dari force close)
                     val editor = prefs.edit()
-                    editor.putBoolean("IS_OPEN_$username", true)
-                    editor.putFloat("MODAL_AWAL_$username", modal.toFloat())
-                    editor.putFloat("CASH_SALES_TODAY_$username", 0f)
-                    editor.putLong("START_TIME_$username", System.currentTimeMillis())
-                    editor.commit() // <--- PAKAI COMMIT, JANGAN APPLY
+
+                    // 🔥 PERBAIKAN DISINI: GUNAKAN KUNCI GLOBAL 🔥
+                    // Supaya Admin yg buka, Kasir juga kebagian status "Buka"-nya.
+
+                    editor.putBoolean("IS_OPEN_GLOBAL_SESSION", true)
+                    editor.putFloat("MODAL_AWAL_GLOBAL", modal.toFloat())
+                    editor.putLong("START_TIME_GLOBAL", System.currentTimeMillis())
+
+                    // Hapus data sampah lama (opsional)
+                    // editor.remove("IS_OPEN_$username")
+
+                    editor.commit()
 
                     // Simpan ke Database
                     viewModel.openShift(username, modal)
 
-                    Toast.makeText(this, "Shift Dibuka!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Shift Toko Dibuka!", Toast.LENGTH_SHORT).show()
                     startActivity(Intent(this, MainActivity::class.java))
                 }
             }
@@ -386,14 +428,15 @@ class DashboardActivity : AppCompatActivity() {
 
         // 1. AMBIL WAKTU & DATA (SAMA)
         val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val shiftStartTime = shiftPrefs.getLong("START_TIME_$userName", 0L)
+        val shiftStartTime = shiftPrefs.getLong("START_TIME_GLOBAL", 0L)
+        val modalAwal = shiftPrefs.getFloat("MODAL_AWAL_GLOBAL", 0f).toDouble()
         val startOfDay = java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0)
             set(java.util.Calendar.MINUTE, 0)
             set(java.util.Calendar.SECOND, 0)
         }.timeInMillis
         val filterTime = if (shiftStartTime > 0) shiftStartTime else startOfDay
-        val modalAwal = shiftPrefs.getFloat("MODAL_AWAL_$userName", 0f).toDouble()
+
         val sourceData = this.allTrx
         val myTrx = sourceData.filter { it.timestamp >= filterTime }
 
@@ -513,7 +556,7 @@ class DashboardActivity : AppCompatActivity() {
                 // 1. Simpan Log ke Database
                 viewModel.closeShift(userName, expectedCash, actualCash)
 
-                // 2. Cetak Struk (Kirim data Piutang juga)
+                // 2. Cetak Struk
                 printShiftReport(
                     kasirName = userName,
                     startTime = startTime,
@@ -522,20 +565,19 @@ class DashboardActivity : AppCompatActivity() {
                     qris = rincianQris,
                     trf = rincianTrf,
                     debit = rincianDebit,
-                    piutang = rincianPiutang, // 🔥 KIRIM KE PRINTER
+                    piutang = rincianPiutang,
                     expected = expectedCash,
                     actual = actualCash
                 )
 
                 Toast.makeText(this, "Shift Ditutup & Laporan Dicetak!", Toast.LENGTH_SHORT).show()
 
-                // 3. RESET DATA SHIFT
+                // 🔥 3. PERBAIKAN: HAPUS KUNCI GLOBAL 🔥
                 val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
                 shiftPrefs.edit().apply {
-                    remove("IS_OPEN_$userName")
-                    remove("MODAL_AWAL_$userName")
-                    remove("START_TIME_$userName")
-                    remove("CASH_SALES_TODAY_$userName")
+                    remove("IS_OPEN_GLOBAL_SESSION")
+                    remove("MODAL_AWAL_GLOBAL")
+                    remove("START_TIME_GLOBAL")
                     apply()
                 }
 
@@ -558,14 +600,25 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun performLogout(session: android.content.SharedPreferences, resetData: Boolean) {
+        // 1. Hapus Sesi Login (Wajib agar user keluar)
         session.edit().clear().apply()
-        val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        shiftPrefs.edit().clear().apply()
 
+        // ❌ HAPUS KODE LAMA YANG INI:
+        // val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+        // shiftPrefs.edit().clear().apply()
+        // (Kode di atas lah penyebab kenapa modal hilang terus)
+
+        // ✅ GANTI DENGAN LOGIKA BARU:
         if (resetData) {
+            // Hanya hapus data Shift jika user memilih "HAPUS DATA / RESET"
+            val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
+            shiftPrefs.edit().clear().apply()
+
             Toast.makeText(this, "Sedang menghapus data...", Toast.LENGTH_SHORT).show()
             viewModel.logoutAndReset { signOutGoogleAndExit() }
         } else {
+            // Kalau Log Out Biasa, data shift JANGAN dihapus.
+            // Biarkan tetap tersimpan di HP.
             signOutGoogleAndExit()
         }
     }

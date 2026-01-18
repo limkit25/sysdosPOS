@@ -82,55 +82,59 @@ class LoginActivity : AppCompatActivity() {
             tvAppVersion.text = "Ver ${pInfo.versionName}"
         } catch (e: Exception) {}
 
-        // 1. LOGIN MANUAL (YANG SUDAH DIPERBAIKI)
         btnLogin.setOnClickListener {
             val u = etUser.text.toString().trim()
             val p = etPass.text.toString().trim()
 
             if (u.isNotEmpty() && p.isNotEmpty()) {
 
-                // LANGKAH 1: Cek di Database HP (Lokal)
-                viewModel.login(u, p) { user ->
-                    if (user != null) {
-                        // KASUS A: User masih ada di HP -> Langsung Masuk
-                        processLoginSuccess(user)
-                    } else {
-                        // KASUS B: Data di HP Kosong -> Cek ke Server
+                // 🔍 LANGKAH 1: Cek apakah User (Email) ini sudah ada di Database HP?
+                viewModel.getUserByEmail(u) { existingUser ->
+
+                    if (existingUser != null) {
+                        // 🟢 KASUS A: USER SUDAH ADA DI HP
+                        // Kita WAJIB validasi password di sini secara ketat.
+
+                        if (existingUser.password == p) {
+                            // ✅ Password Benar -> Masuk
+                            processLoginSuccess(existingUser)
+                        } else {
+                            // ❌ Password Salah -> STOP! JANGAN KE SERVER!
+                            Toast.makeText(this, "❌ Password Salah!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    else {
+                        // 🔴 KASUS B: USER TIDAK ADA DI HP (DATABASE KOSONG / HP BARU)
+                        // Baru kita izinkan cek ke Server untuk proses Restore/Pemulihan.
+
                         val loading = android.app.ProgressDialog(this)
-                        loading.setMessage("Memeriksa status akun...")
+                        loading.setMessage("Database kosong/User baru. Memeriksa ke server...")
                         loading.show()
 
-                        // 🔥 UPDATE: TERIMA DATA RESPONS YANG LEBIH LENGKAP
                         viewModel.checkUserOnCloud(u) { response ->
                             loading.dismiss()
 
                             if (response != null) {
-                                // 🛑 CEK STATUS DULU SEBELUM MEMBOLEHKAN MASUK
                                 if (response.status == "BLOCKED") {
-                                    // ❌ TOLAK MENTAH-MENTAH
-                                    showErrorDialog("Akses Ditolak!", "Akun ini terkunci di HP lain:\n\n📱 ${response.message}\n\nSilakan minta Admin untuk RESET DEVICE jika ingin pindah HP.")
+                                    showErrorDialog("Akses Ditolak", "Akun terkunci di device lain: ${response.message}")
                                 }
                                 else if (response.message.lowercase().contains("tidak ditemukan")) {
-                                    // ❌ MEMANG TIDAK ADA
-                                    Toast.makeText(this, "Akun tidak ditemukan. Silakan daftar.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this, "Akun belum terdaftar.", Toast.LENGTH_LONG).show()
                                 }
                                 else {
-                                    // ✅ LOLOS CEK (PREMIUM / TRIAL / EXPIRED)
-                                    // Baru boleh dipulihkan (Restore)
-
+                                    // ✅ RESTORE BERHASIL (Hanya jika user di HP memang kosong)
                                     val restoredUser = User(
                                         name = "Owner Toko",
                                         username = u,
-                                        password = p,
+                                        password = p, // Password baru ini akan disimpan sebagai password login
                                         role = "admin"
                                     )
                                     viewModel.insertUser(restoredUser)
 
-                                    // Simpan status lisensi terbaru ke memori HP
                                     val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
                                     prefs.edit().putBoolean("is_full_version", response.status == "PREMIUM").apply()
 
-                                    Toast.makeText(this, "Login Berhasil! (${response.status})", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this, "Akun Dipulihkan di HP ini!", Toast.LENGTH_LONG).show()
                                     processLoginSuccess(restoredUser)
                                 }
                             } else {
@@ -286,17 +290,24 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun processLoginSuccess(user: User) {
-        // Cek apakah data toko masih default/kosong?
-        // Kalau kosong (baru daftar), arahkan ke Setup Toko
-        // Kalau sudah ada, arahkan ke Dashboard
 
-        viewModel.sendDataToSalesSystem(user)
-        viewModel.checkServerLicense(user.username)
+        // 🔥 PERBAIKAN PENTING DISINI 🔥
+        // Cek Lisensi ke Server HANYA JIKA yang login adalah ADMIN (Owner)
+        // Kasir & Manager "menumpang" lisensi Owner yang tersimpan di HP.
+
+        if (user.role == "admin") {
+            viewModel.checkServerLicense(user.username)
+        } else {
+            // Kalau Kasir/Manager, TIDAK USAH cek ke server.
+            // Biarkan dia pakai status lisensi terakhir yang ada di HP.
+        }
+
         saveSession(user)
 
-        // Cek sederhana: apakah user ini baru saja dibuat? (Biasanya kalau baru, role masih admin default dan belum ada transaksi)
-        // Atau kita bisa selalu arahkan ke Dashboard, nanti Dashboard yang cek kelengkapan data.
-        // Untuk aman, kita langsung ke Dashboard saja.
+        // Kirim data user ke sistem sales (opsional, boleh di-if juga kalau mau hemat kuota)
+        if (user.role == "admin") {
+            viewModel.sendDataToSalesSystem(user)
+        }
 
         Toast.makeText(this, "Selamat Datang, ${user.name}!", Toast.LENGTH_SHORT).show()
         startActivity(Intent(this, DashboardActivity::class.java))
@@ -422,9 +433,19 @@ class LoginActivity : AppCompatActivity() {
     private fun saveSession(user: User) {
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val editor = session.edit()
+
+        // Simpan Data Standar
         editor.putString("username", user.username)
         editor.putString("role", user.role)
         editor.putBoolean("is_logged_in", true)
+
+        // 🔥 INI TAMBAHAN PENTINGNYA 🔥
+        // Kita cek, kalau namanya kosong, pakai username. Kalau ada, pakai nama asli.
+        val namaLengkap = if (user.name.isNullOrEmpty()) user.username else user.name
+
+        // Simpan dengan kunci "fullname"
+        editor.putString("fullname", namaLengkap)
+
         editor.apply()
     }
 

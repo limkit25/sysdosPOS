@@ -36,6 +36,7 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: TransactionAdapter
     private var fullTransactionList: List<Transaction> = emptyList()
+    private var listSemuaPegawai: List<com.sysdos.kasirpintar.data.model.User> = emptyList()
 
     // Tombol UI
     private lateinit var btnToday: Button
@@ -59,6 +60,9 @@ class HistoryActivity : AppCompatActivity() {
 
         // 2. SETUP VIEWMODEL (SAMA)
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+        viewModel.allUsers.observe(this) { users ->
+            listSemuaPegawai = users
+        }
 
         // 3. SETUP FILTER UI
         btnToday = findViewById(R.id.btnFilterToday)
@@ -138,6 +142,23 @@ class HistoryActivity : AppCompatActivity() {
         // 8. KLIK DETAIL & REPRINT (SAMA - Sudah terhubung ke showDetailDialog yang ada tombol LUNASI)
         adapter.setOnItemClickListener { showDetailDialog(it) }
         adapter.setOnReprintClickListener { doReprint(it) }
+        // 🔥🔥🔥 FITUR VOID (TEKAN LAMA UNTUK BATALKAN) 🔥🔥🔥
+        adapter.setOnItemLongClickListener { trx ->
+            AlertDialog.Builder(this)
+                .setTitle("⚠️ Batalkan Transaksi?")
+                .setMessage("ID: #${trx.id}\nTotal: ${formatRupiah(trx.totalAmount)}\n\nStok barang akan dikembalikan ke gudang dan transaksi dihapus permanen.")
+                .setPositiveButton("YA, VOID") { _, _ ->
+                    // Panggil fungsi void di ViewModel
+                    viewModel.voidTransaction(trx) {
+                        Toast.makeText(this, "Transaksi Dibatalkan & Stok Kembali!", Toast.LENGTH_SHORT).show()
+
+                        // Refresh data hitungan piutang
+                        calculateTotalPiutang()
+                    }
+                }
+                .setNegativeButton("Batal", null)
+                .show()
+        }
     }
 
     // 🔥 FUNGSI HITUNG PIUTANG 🔥
@@ -431,13 +452,16 @@ class HistoryActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // 🔥 WAJIB COPY FUNGSI INI JUGA DI BAWAHNYA 🔥
+    // 🔥 PERBAIKAN: Ganti Thread dengan lifecycleScope
     private fun markAsPaid(trx: Transaction, dialog: AlertDialog) {
         AlertDialog.Builder(this)
             .setTitle("Konfirmasi Pelunasan")
             .setMessage("Terima pembayaran sebesar ${formatRupiah(trx.totalAmount)} sekarang?\n\nStatus transaksi akan berubah menjadi LUNAS.")
             .setPositiveButton("YA, TERIMA") { _, _ ->
-                Thread {
+
+                // GUNAKAN COROUTINE, BUKAN THREAD BIASA
+                lifecycleScope.launch(Dispatchers.IO) {
+
                     // 1. Update Note dengan timestamp pelunasan
                     val tglLunas = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
                     val newNote = if (trx.note.isEmpty()) "LUNAS: $tglLunas" else "${trx.note} | LUNAS: $tglLunas"
@@ -445,19 +469,16 @@ class HistoryActivity : AppCompatActivity() {
                     val updatedTrx = trx.copy(note = newNote)
 
                     // 2. Simpan ke Database
-                    val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this)
+                    val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this@HistoryActivity)
                     db.transactionDao().update(updatedTrx)
 
-                    runOnUiThread {
-                        Toast.makeText(this, "✅ Hutang Lunas!", Toast.LENGTH_SHORT).show()
+                    // 3. Update UI di Main Thread
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@HistoryActivity, "✅ Hutang Lunas!", Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
-                        // Refresh data di layar agar statusnya berubah
-                        viewModel.allTransactions.value?.let { currentList ->
-                            // Update list lokal secara manual biar gak nunggu reload database
-                            // (Atau biarkan LiveData bekerja kalau codingan ViewModel Mas Heru reaktif)
-                        }
+                        // Refresh Data (Opsional, karena LiveData akan auto-update)
                     }
-                }.start()
+                }
             }
             .setNegativeButton("Batal", null)
             .show()
@@ -526,7 +547,15 @@ class HistoryActivity : AppCompatActivity() {
                 p.append("\u001B\u0061\u0000") // Align Left
                 p.append("ID: #${trx.id}\n")
                 p.append("Tgl: ${SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(trx.timestamp))}\n")
-                p.append("Kasir: ${session.getString("username","Admin")}\n")
+
+                // 🔥 3. GANTI LOGIKA NAMA KASIR DISINI 🔥
+                // Cari user yang ID-nya sama dengan ID pembuat transaksi (trx.userId)
+                val pegawaiAsli = listSemuaPegawai.find { it.id == trx.userId }
+
+                // Ambil namanya. Kalau user sudah dihapus, tampilkan ID-nya saja.
+                val namaKasirStruk = pegawaiAsli?.name ?: "Kasir #${trx.userId}"
+
+                p.append("Kasir: $namaKasirStruk\n")
 
                 // 🔥 CETAK MEJA & PELANGGAN DI SINI 🔥
                 if (infoPelanggan.isNotEmpty()) {
