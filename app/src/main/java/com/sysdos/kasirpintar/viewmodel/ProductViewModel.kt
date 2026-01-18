@@ -268,15 +268,18 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         cashReceived: Double, changeAmount: Double, note: String = "", userId: Int = 0,
         onResult: (Transaction?) -> Unit
     ) = viewModelScope.launch {
+
+        // 1. Validasi Keranjang
         val cartItems = _cart.value ?: emptyList()
         if (cartItems.isEmpty()) { onResult(null); return@launch }
 
+        // 2. Siapkan Data Transaksi (Header & Summary)
         val itemsForUpload = ArrayList(cartItems)
         val summaryBuilder = StringBuilder()
         var totalProfit = 0.0
 
-        // 1. Siapkan Ringkasan & Hitung Profit
         for (item in cartItems) {
+            // Format: Nama|Qty|Harga|Total
             summaryBuilder.append("${item.name}|${item.stock}|${item.price.toLong()}|${(item.price * item.stock).toLong()};")
             totalProfit += (item.price - item.costPrice) * item.stock
         }
@@ -296,46 +299,54 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             note = note
         )
 
-        // 2. Simpan Transaksi
+        // 3. Simpan Transaksi ke Database
         val trxId = repository.insertTransaction(trx)
 
         // ============================================================
-        // 🔥 PERBAIKAN STOK: GROUPING DULU BARU POTONG (ANTI TABRAKAN)
+        // 🔥 LOGIKA PINTAR: CEK "SAKLAR STOK" DULU SEBELUM POTONG 🔥
         // ============================================================
 
-        // Map untuk menampung: ID Induk -> Total Qty yang harus dipotong
-        val stockDeductions = mutableMapOf<Int, Int>()
+        // Ambil Settingan Toko
+        val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: ON (Wajib Cek)
 
-        cartItems.forEach { item ->
-            // Cari ID Bapaknya (Kalau Varian) atau ID Sendiri (Kalau Produk Biasa)
-            val realId = if (item.id < 0) item.parentId else item.id
+        // HANYA KURANGI STOK JIKA SAKLAR ON
+        if (isStockSystemActive) {
 
-            // Tambahkan jumlah qty ke penampungan
-            val currentTotal = stockDeductions.getOrDefault(realId, 0)
-            stockDeductions[realId] = currentTotal + item.stock
-        }
+            // Grouping Item (Agar varian & produk induk dihitung satu kesatuan)
+            val stockDeductions = mutableMapOf<Int, Int>()
 
-        // Eksekusi Pemotongan Stok (Sekali jalan per Produk Induk)
-        stockDeductions.forEach { (productId, totalQtyToDeduct) ->
-            // Ambil data produk terbaru dari list
-            val masterItem = allProducts.value?.find { it.id == productId }
+            cartItems.forEach { item ->
+                // Jika ID item < 0 (Varian), pakai parentId. Jika positif, pakai ID sendiri.
+                val realId = if (item.id < 0) item.parentId else item.id
+                val currentTotal = stockDeductions.getOrDefault(realId, 0)
+                stockDeductions[realId] = currentTotal + item.stock
+            }
 
-            if (masterItem != null) {
-                val newStock = masterItem.stock - totalQtyToDeduct
-                // Update Database
-                repository.update(masterItem.copy(stock = newStock))
+            // Eksekusi Potong Stok di Database
+            stockDeductions.forEach { (productId, totalQtyToDeduct) ->
+                // Ambil data produk TERBARU dari Database (Penting agar tidak minus error)
+                val masterItem = repository.getProductById(productId)
+
+                if (masterItem != null) {
+                    val newStock = masterItem.stock - totalQtyToDeduct
+                    repository.update(masterItem.copy(stock = newStock))
+                }
             }
         }
+        // JIKA SAKLAR OFF (STOK LOS) -> KITA LEWATI PROSES DI ATAS.
+        // STOK DI DATABASE TIDAK BERUBAH SAMA SEKALI.
+
         // ============================================================
 
-        // 3. Reset Keranjang
+        // 4. Reset Keranjang & Selesai
         _cart.value = emptyList()
         _totalPrice.value = 0.0
 
         val finalTrx = trx.copy(id = trxId.toInt())
         onResult(finalTrx)
 
-        // 4. Upload Server
+        // 5. Upload ke Server (Background)
         viewModelScope.launch {
             try { repository.uploadTransactionToServer(finalTrx, itemsForUpload) } catch (e: Exception) {}
         }

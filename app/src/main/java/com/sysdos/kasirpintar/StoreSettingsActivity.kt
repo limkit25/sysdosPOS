@@ -40,7 +40,10 @@ class StoreSettingsActivity : AppCompatActivity() {
     private lateinit var etStoreAddress: EditText
     private lateinit var etStorePhone: EditText
     private lateinit var etStoreFooter: EditText
-    private lateinit var etStoreTax: EditText // 🔥 1. VARIABEL BARU
+    private lateinit var etStoreTax: EditText
+
+    // 🔥 1. VARIABEL BARU: SWITCH STOK 🔥
+    private lateinit var switchStock: androidx.appcompat.widget.SwitchCompat
 
     private lateinit var btnSave: Button
     private lateinit var layoutSaveBtn: LinearLayout
@@ -99,7 +102,10 @@ class StoreSettingsActivity : AppCompatActivity() {
         etStoreAddress = findViewById(R.id.etStoreAddress)
         etStorePhone = findViewById(R.id.etStorePhone)
         etStoreFooter = findViewById(R.id.etStoreFooter)
-        etStoreTax = findViewById(R.id.etStoreTax) // 🔥 2. BIND VIEW PAJAK
+        etStoreTax = findViewById(R.id.etStoreTax)
+
+        // 🔥 2. BIND VIEW SWITCH 🔥
+        switchStock = findViewById(R.id.switchStockSystem)
 
         btnSave = findViewById(R.id.btnSaveStore)
         btnScanPrinter = findViewById(R.id.btnScanPrinter)
@@ -111,25 +117,27 @@ class StoreSettingsActivity : AppCompatActivity() {
         tvLicenseStatus = findViewById(R.id.tvLicenseStatus)
         btnActivate = findViewById(R.id.btnActivateLicense)
 
-        // 4. LOAD DATA EXISTING (Jika ada)
+        // 4. LOAD DATA EXISTING
         viewModel.storeConfig.observe(this) { config ->
             if (config != null) {
                 etStoreName.setText(config.storeName)
                 etStoreAddress.setText(config.storeAddress)
                 etStorePhone.setText(config.storePhone)
                 etStoreFooter.setText(config.strukFooter)
-
-                // 🔥 3. LOAD DATA PAJAK DARI DB
-                // Hapus '.0' di belakang angka biar rapi (Misal 11.0 jadi 11)
                 etStoreTax.setText(config.taxPercentage.toString().removeSuffix(".0"))
             }
         }
+
+        // 🔥 3. LOAD PENGATURAN STOK DARI PREFERENCES 🔥
+        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockActive = prefs.getBoolean("use_stock_system", true) // Default TRUE (Wajib Cek Stok)
+        switchStock.isChecked = isStockActive
 
         // 5. SETUP ADAPTER & UI
         listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
 
-        setupUI(target) // Atur tampilan berdasarkan mode (Setup Awal / Setting Biasa)
+        setupUI(target)
         checkLicenseStatus()
 
         // 6. LISTENERS
@@ -149,57 +157,45 @@ class StoreSettingsActivity : AppCompatActivity() {
             val rawName = deviceList[position].split("\n")[0].replace(" [✅ AKTIF]", "")
 
             // Simpan Printer Mac ke Prefs
-            val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
             prefs.edit().putString("printer_mac", selectedMac).apply()
 
             Toast.makeText(this, "Printer Utama: $rawName", Toast.LENGTH_SHORT).show()
             showPairedDevices()
         }
 
-        // Setup Backup/Restore
         setupBackupRestoreLogic()
 
-        // Register Bluetooth Receiver
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(receiver, filter)
 
-        // Jika mode hanya setting printer, langsung load device
         if (target == "PRINTER" && checkPermission()) showPairedDevices()
     }
 
-    // --- LOGIKA TAMPILAN UI ---
     private fun setupUI(target: String?) {
         if (isInitialSetup) {
-            // MODE: SETUP AWAL SETELAH REGISTER
             tvTitle.text = "Lengkapi Profil Toko"
-            btnBack.visibility = View.GONE // Tidak boleh kembali, wajib isi
+            btnBack.visibility = View.GONE
             cardSectionPrinter.visibility = View.GONE
             cardSectionLicense.visibility = View.GONE
-
             btnSave.text = "SIMPAN & MASUK APLIKASI"
-
-            // Sembunyikan Backup, Tampilkan Restore (Kali aja mau restore data lama)
             btnBackup.visibility = View.GONE
             btnRestore.visibility = View.VISIBLE
         }
         else if (target == "PRINTER") {
-            // MODE: HANYA SETTING PRINTER
             tvTitle.text = "Koneksi Printer"
             cardSectionStore.visibility = View.GONE
             cardSectionLicense.visibility = View.GONE
-            layoutSaveBtn.visibility = View.GONE // Tidak perlu tombol simpan besar
+            layoutSaveBtn.visibility = View.GONE
             btnBackup.visibility = View.GONE
             btnRestore.visibility = View.GONE
         }
         else {
-            // MODE: SETTING NORMAL DARI DASHBOARD
             tvTitle.text = "Pengaturan Toko"
-            cardSectionPrinter.visibility = View.GONE // Printer ada menu sendiri biasanya
+            cardSectionPrinter.visibility = View.GONE
             cardSectionLicense.visibility = View.VISIBLE
         }
     }
 
-    // --- LOGIKA LISENSI ---
     private fun checkLicenseStatus() {
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
         val isFull = prefs.getBoolean("is_full_version", false)
@@ -208,7 +204,6 @@ class StoreSettingsActivity : AppCompatActivity() {
             tvLicenseStatus.text = "Status: FULL VERSION (Premium) ✅"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
             btnActivate.visibility = View.GONE
-
             btnBackup.isEnabled = true
             btnBackup.alpha = 1.0f
             btnBackup.text = "BACKUP DATABASE"
@@ -216,8 +211,6 @@ class StoreSettingsActivity : AppCompatActivity() {
             tvLicenseStatus.text = "Status: TRIAL (Terbatas) ⏳"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#E65100"))
             btnActivate.visibility = View.VISIBLE
-
-            // Backup dikunci jika trial
             btnBackup.isEnabled = false
             btnBackup.alpha = 0.5f
             btnBackup.text = "BACKUP 🔒 (Premium)"
@@ -236,7 +229,7 @@ class StoreSettingsActivity : AppCompatActivity() {
             .setView(input)
             .setPositiveButton("Aktifkan") { _, _ ->
                 val tokenInput = input.text.toString().trim()
-                val validToken = (requestCode + 11111).toString() // Logika sederhana
+                val validToken = (requestCode + 11111).toString()
 
                 if (tokenInput == validToken) {
                     val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
@@ -251,7 +244,6 @@ class StoreSettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- LOGIKA BACKUP & RESTORE ---
     private fun setupBackupRestoreLogic() {
         val backupLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/x-sqlite3")) { uri ->
             if (uri != null) {
@@ -280,8 +272,6 @@ class StoreSettingsActivity : AppCompatActivity() {
                     .setPositiveButton("Ya, Timpa Data") { _, _ ->
                         try {
                             val dbFile = getDatabasePath(DB_NAME)
-
-                            // Hapus file WAL & SHM (Temporary file SQLite) agar bersih
                             val dbWal = File(dbFile.parent, "$DB_NAME-wal")
                             val dbShm = File(dbFile.parent, "$DB_NAME-shm")
                             if (dbWal.exists()) dbWal.delete()
@@ -294,10 +284,7 @@ class StoreSettingsActivity : AppCompatActivity() {
                                 inputStream.copyTo(outputStream)
                                 inputStream.close()
                                 outputStream.close()
-
                                 Toast.makeText(this, "Restore Berhasil! Restarting...", Toast.LENGTH_LONG).show()
-
-                                // Restart Aplikasi
                                 val intent = packageManager.getLaunchIntentForPackage(packageName)
                                 intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                 startActivity(intent)
@@ -311,9 +298,7 @@ class StoreSettingsActivity : AppCompatActivity() {
         }
 
         btnBackup.setOnClickListener {
-            // Checkpoint DB dulu agar semua data masuk ke file utama .db
             AppDatabase.getDatabase(this).openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
-
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
             backupLauncher.launch("Backup_Kasir_$timeStamp.db")
         }
@@ -323,14 +308,11 @@ class StoreSettingsActivity : AppCompatActivity() {
         }
     }
 
-    // 🔥 LOGIKA SIMPAN & REDIRECT DASHBOARD 🔥
     private fun saveStoreSettings() {
         val name = etStoreName.text.toString().trim()
         val address = etStoreAddress.text.toString().trim()
         val phone = etStorePhone.text.toString().trim()
         val footer = etStoreFooter.text.toString().trim()
-
-        // 🔥 4. AMBIL INPUT PAJAK
         val taxStr = etStoreTax.text.toString().trim()
         val tax = taxStr.toDoubleOrNull() ?: 0.0
 
@@ -339,45 +321,35 @@ class StoreSettingsActivity : AppCompatActivity() {
             return
         }
 
-        // ============================================================
-        // 🛠️ PERBAIKAN UTAMA: SIMPAN JUGA KE SHARED PREFERENCES 🛠️
-        // Agar bisa dibaca oleh MainActivity & HistoryActivity saat nge-print
-        // ============================================================
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val editor = prefs.edit()
+        editor.putString("name", name)
+        editor.putString("address", address)
+        editor.putString("phone", phone)
+        editor.putString("email", footer)
 
-        // Kunci (Key) ini HARUS SAMA dengan yang dipanggil di PrintStruk MainActivity
-        editor.putString("name", name)       // Di printer panggilnya "name"
-        editor.putString("address", address) // Di printer panggilnya "address"
-        editor.putString("phone", phone)     // Di printer panggilnya "phone"
-        editor.putString("email", footer)    // Di printer panggilnya "email" (dipakai buat footer)
+        // 🔥 4. SIMPAN STATUS SWITCH KE SHARED PREFERENCES 🔥
+        editor.putBoolean("use_stock_system", switchStock.isChecked)
 
-        // Simpan Mac Address juga biar sekalian rapi (opsional, krn udah disave pas klik list)
         val printerMac = prefs.getString("printer_mac", "")
         editor.putString("printer_mac", printerMac)
 
-        editor.apply() // 🔥 WAJIB DI-APPLY BIAR KESIMPAN
-        // ============================================================
+        editor.apply()
 
-        // Simpan ke Database (ViewModel) - Ini untuk backup data jangka panjang
         viewModel.saveStoreSettings(name, address, phone, footer, printerMac, tax)
 
         if (isInitialSetup) {
-            // 🔥 JIKA USER BARU DAFTAR -> MASUK DASHBOARD
             Toast.makeText(this, "Setup Selesai! Selamat Datang.", Toast.LENGTH_SHORT).show()
-
             val intent = Intent(this, DashboardActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
             finish()
         } else {
-            // JIKA HANYA EDIT SETTING BIASA -> TUTUP HALAMAN
             Toast.makeText(this, "Pengaturan Disimpan!", Toast.LENGTH_SHORT).show()
             finish()
         }
     }
 
-    // --- BLUETOOTH HELPER ---
     private fun showPairedDevices() {
         if (!checkPermission()) return
         deviceList.clear()
@@ -390,14 +362,13 @@ class StoreSettingsActivity : AppCompatActivity() {
             for (device in pairedDevices) {
                 val name = device.name ?: "Unknown"
                 val mac = device.address
-
                 val displayName = if (mac == activeMac) "$name [✅ AKTIF]" else name
                 deviceList.add("$displayName\n$mac")
                 deviceMacs.add(mac)
             }
         } else {
             deviceList.add("Tidak ada perangkat Bluetooth tersimpan")
-            deviceMacs.add("") // Dummy
+            deviceMacs.add("")
         }
         listAdapter.notifyDataSetChanged()
     }

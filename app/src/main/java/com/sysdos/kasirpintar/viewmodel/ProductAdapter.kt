@@ -51,7 +51,7 @@ class ProductAdapter(
             tvName.text = product.name
             tvPrice.text = String.format(Locale("id", "ID"), "Rp %,d", product.price.toLong())
 
-            // 🔥 2. TAMPILKAN SKU / BARCODE
+            // TAMPILKAN SKU
             if (!product.barcode.isNullOrEmpty()) {
                 tvSku.text = "SKU: ${product.barcode}"
                 tvSku.visibility = View.VISIBLE
@@ -60,25 +60,37 @@ class ProductAdapter(
             }
 
             // ============================================================
-            // 🔥 LOGIKA HITUNG JUMLAH (TERMASUK VARIAN)
+            // 🔥 1. AMBIL SETTINGAN "STOK LOS" DARI MEMORI
+            // ============================================================
+            val context = itemView.context
+            val prefs = context.getSharedPreferences("store_prefs", android.content.Context.MODE_PRIVATE)
+            val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: Wajib Cek Stok
+
+            // ============================================================
+            // 🔢 HITUNG SISA STOK (Dikurang yang ada di keranjang)
             // ============================================================
             val totalQtyInCart = cartList.filter {
                 it.id == product.id || it.parentId == product.id
             }.sumOf { it.stock }
 
             val currentStock = product.stock - totalQtyInCart
-            tvStock.text = "Stok: $currentStock"
 
+            // TAMPILAN TEXT STOK
             if (currentStock <= 0) {
-                tvStock.setTextColor(Color.RED)
-                tvStock.text = "Habis!"
+                tvStock.setTextColor(android.graphics.Color.RED)
+                // Kalau Stok Los Aktif, tulisannya beda biar gak bingung
+                if (!isStockSystemActive) {
+                    tvStock.text = "Stok: $currentStock (Los)" // Tetap tampil angka walau 0/minus
+                    tvStock.setTextColor(android.graphics.Color.parseColor("#FF9800")) // Oranye
+                } else {
+                    tvStock.text = "Habis!"
+                }
             } else {
-                tvStock.setTextColor(Color.parseColor("#1976D2"))
+                tvStock.text = "Stok: $currentStock"
+                tvStock.setTextColor(android.graphics.Color.parseColor("#1976D2"))
             }
 
-            // ============================================================
-            // 🔥 TAMPILKAN BADGE MERAH
-            // ============================================================
+            // BADGE KERANJANG
             if (totalQtyInCart > 0) {
                 tvBadge.visibility = View.VISIBLE
                 tvBadge.text = totalQtyInCart.toString()
@@ -86,11 +98,9 @@ class ProductAdapter(
                 tvBadge.visibility = View.GONE
             }
 
-            // ============================================================
-            // 🖼️ LOAD GAMBAR
-            // ============================================================
+            // LOAD GAMBAR
             if (!product.imagePath.isNullOrEmpty()) {
-                Glide.with(itemView.context)
+                com.bumptech.glide.Glide.with(itemView.context)
                     .load(product.imagePath)
                     .placeholder(R.mipmap.ic_launcher)
                     .error(R.mipmap.ic_launcher)
@@ -100,8 +110,25 @@ class ProductAdapter(
                 imgProduct.setImageResource(R.mipmap.ic_launcher)
             }
 
-            // KLIK LISTENER
-            itemView.setOnClickListener { onItemClick(product) }
+            // ============================================================
+            // 🔥 2. LOGIKA KLIK (INTI DARI FITUR STOK LOS)
+            // ============================================================
+            itemView.setOnClickListener {
+                if (isStockSystemActive) {
+                    // KASUS A: WAJIB CEK STOK (Switch ON)
+                    if (currentStock > 0) {
+                        onItemClick(product)
+                    } else {
+                        // Cegah klik dan kasih peringatan
+                        android.widget.Toast.makeText(context, "Stok Habis! (Cek Pengaturan Toko)", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    // KASUS B: STOK LOS (Switch OFF)
+                    // Hajar terus walau stok 0 atau minus
+                    onItemClick(product)
+                }
+            }
+
             itemView.setOnLongClickListener {
                 onItemLongClick(product)
                 true

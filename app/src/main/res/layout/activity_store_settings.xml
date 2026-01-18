@@ -106,8 +106,44 @@
                         android:inputType="numberDecimal"
                         android:minHeight="48dp"
                         android:layout_marginTop="5dp"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="15dp"
+                        android:background="#F0F0F0"
+                        android:padding="10dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Wajib Cek Stok?"
+                                android:textStyle="bold"
+                                android:textColor="#000000"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Matikan jika ingin mode 'Stok Los' (Unlimited)"
+                                android:textSize="12sp"
+                                android:textColor="#666666"/>
+                        </LinearLayout>
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/switchStockSystem"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"/>
+                    </LinearLayout>
+                </LinearLayout> </androidx.cardview.widget.CardView>
+
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardSectionPrinter"
