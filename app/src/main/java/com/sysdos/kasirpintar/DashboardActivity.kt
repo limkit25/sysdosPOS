@@ -263,12 +263,20 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun cekKeamananHP() {
-        if (BuildConfig.DEBUG) return // Bypass Emulator
+        // ❌ HAPUS ATAU KOMENTARI BARIS DI BAWAH INI SAAT MAU TES DI HP SENDIRI
+        // if (BuildConfig.DEBUG) return
 
         try {
-            val isDevMode = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0
+            // 1. Cek USB Debugging (ADB) - Ini yang paling krusial
             val isAdb = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) != 0
-            if (isDevMode || isAdb) tampilkanPeringatanKeamanan()
+
+            // 2. Cek Developer Options (Opsi Pengembang)
+            val isDevMode = android.provider.Settings.Global.getInt(contentResolver, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0
+
+            // Jika salah satu nyala, langsung blokir
+            if (isAdb || isDevMode) {
+                tampilkanPeringatanKeamanan()
+            }
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -324,6 +332,7 @@ class DashboardActivity : AppCompatActivity() {
         val startOfDay = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0) }.timeInMillis
         val filterTime = if (shiftStartTime > 0) shiftStartTime else startOfDay
 
+        // 1. Ambil Data Transaksi Shift Ini
         val myTrx = allTrx.filter { it.timestamp >= filterTime }
 
         var totalTunai = 0.0; var totalQris = 0.0; var totalDebit = 0.0; var totalTransfer = 0.0
@@ -345,27 +354,43 @@ class DashboardActivity : AppCompatActivity() {
         val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer + piutangLunas + piutangBelumLunas
         val expectedCash = modalAwal + totalTunai + piutangLunas
 
+        // Helper Format Uang
         val fmt = { d: Double -> java.text.NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(d) }
+
         val pesan = "Tunai: ${fmt(totalTunai)}\nQRIS: ${fmt(totalQris)}\nDebit: ${fmt(totalDebit)}\nTransfer: ${fmt(totalTransfer)}\nPiutang Cair: ${fmt(piutangLunas)}\nPiutang Gantung: ${fmt(piutangBelumLunas)}\n\nTOTAL OMZET: ${fmt(totalOmzet)}\n\nLaci Harusnya: ${fmt(expectedCash)}"
 
         AlertDialog.Builder(this).setTitle("Ringkasan Shift").setMessage(pesan)
             .setPositiveButton("LANJUT") { _, _ ->
-                showInputCashDialog(expectedCash, totalOmzet, userName, filterTime, modalAwal, totalTunai, totalQris, totalTransfer, totalDebit, piutangBelumLunas)
+                // 🔥 UPDATE PENTING DISINI: Tambahkan 'myTrx' di paling belakang
+                showInputCashDialog(expectedCash, totalOmzet, userName, filterTime, modalAwal, totalTunai, totalQris, totalTransfer, totalDebit, piutangBelumLunas, myTrx)
             }.setNegativeButton("Batal", null).show()
     }
 
-    private fun showInputCashDialog(expectedCash: Double, totalOmzet: Double, userName: String, startTime: Long, modal: Double, tunai: Double, qris: Double, trf: Double, debit: Double, piutang: Double) {
+    private fun showInputCashDialog(
+        expectedCash: Double, totalOmzet: Double, userName: String, startTime: Long,
+        modal: Double, tunai: Double, qris: Double, trf: Double, debit: Double, piutang: Double,
+        trxList: List<Transaction>
+    ) {
         val input = EditText(this); input.inputType = InputType.TYPE_CLASS_NUMBER; input.hint = "Uang fisik di laci"
+
         AlertDialog.Builder(this).setTitle("Verifikasi Fisik").setView(input)
             .setPositiveButton("TUTUP & PRINT") { _, _ ->
                 val actual = input.text.toString().toDoubleOrNull() ?: 0.0
-                viewModel.closeShift(userName, expectedCash, actual)
-                printShiftReport(userName, startTime, modal, tunai, qris, trf, debit, piutang, expectedCash, actual)
 
-                // Hapus Shift
+                // 1. Simpan ke Database (Tetap pakai Username/Email biar aman/unik)
+                viewModel.closeShift(userName, expectedCash, actual)
+
+                // 2. 🔥 AMBIL NAMA ASLI UNTUK DI STRUK 🔥
+                val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                // Kalau ada fullname pakai fullname, kalau kosong terpaksa pakai username
+                val realName = session.getString("fullname", userName) ?: userName
+
+                // 3. Kirim 'realName' ke fungsi print (Bukan userName lagi)
+                printShiftReport(realName, startTime, modal, tunai, qris, trf, debit, piutang, expectedCash, actual, trxList)
+
+                // 4. Hapus Shift & Logout
                 val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
                 shiftPrefs.edit().remove("IS_OPEN_GLOBAL_SESSION").remove("MODAL_AWAL_GLOBAL").remove("START_TIME_GLOBAL").apply()
-
                 performLogout(getSharedPreferences("session_kasir", Context.MODE_PRIVATE), false)
             }.show()
     }
@@ -395,12 +420,133 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    private fun printShiftReport(kasirName: String, startTime: Long, modal: Double, tunai: Double, qris: Double, trf: Double, debit: Double, piutang: Double, expected: Double, actual: Double) {
+    private fun printShiftReport(
+        kasirName: String, startTime: Long, modal: Double, tunai: Double,
+        qris: Double, trf: Double, debit: Double, piutang: Double,
+        expected: Double, actual: Double,
+        trxList: List<Transaction> // Pastikan parameter ini ada
+    ) {
         val storePrefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val targetMac = storePrefs.getString("printer_mac", "")
-        if (targetMac.isNullOrEmpty()) return
-        // (Isi fungsi print sama seperti sebelumnya, disingkat agar muat)
-        Toast.makeText(this, "Sedang mencetak...", Toast.LENGTH_SHORT).show()
+        if (targetMac.isNullOrEmpty()) {
+            Toast.makeText(this, "Printer belum disetting!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Thread {
+            var socket: android.bluetooth.BluetoothSocket? = null
+            val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    return@Thread
+                }
+
+                val device = bluetoothAdapter.getRemoteDevice(targetMac)
+                val uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+                socket = device.createRfcommSocketToServiceRecord(uuid)
+                socket?.connect()
+
+                val outputStream = socket!!.outputStream
+                val storeName = storePrefs.getString("name", "Toko Saya")
+                val openTimeStr = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(startTime))
+                val closeTimeStr = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+
+                // 1. HITUNG RINGKASAN KEUANGAN DARI LIST TRANSAKSI
+                var shiftSubtotal = 0.0
+                var shiftDiscount = 0.0
+                var shiftTax = 0.0
+                var shiftGrandTotal = 0.0
+
+                // Hitung jumlah transaksi per metode
+                var countTunai = 0; var countQris = 0; var countDebit = 0; var countTrf = 0; var countPiutang = 0
+
+                for (trx in trxList) {
+                    shiftSubtotal += trx.subtotal
+                    shiftDiscount += trx.discount
+                    shiftTax += trx.tax
+                    shiftGrandTotal += trx.totalAmount
+
+                    val m = trx.paymentMethod.lowercase()
+                    when {
+                        m.contains("tunai") -> countTunai++
+                        m.contains("qris") -> countQris++
+                        m.contains("debit") -> countDebit++
+                        m.contains("transfer") -> countTrf++
+                        m.contains("piutang") -> countPiutang++
+                        else -> countTunai++
+                    }
+                }
+
+                val p = StringBuilder()
+
+                // === HEADER ===
+                p.append("\u001B\u0061\u0001") // Tengah
+                p.append("\u001B\u0045\u0001$storeName\n\u001B\u0045\u0000")
+                p.append("LAPORAN TUTUP SHIFT\n")
+                p.append("--------------------------------\n")
+                p.append("\u001B\u0061\u0000") // Kiri
+                p.append("Kasir : $kasirName\n")
+                p.append("Buka  : $openTimeStr\n")
+                p.append("Tutup : $closeTimeStr\n")
+                p.append("--------------------------------\n")
+
+                // Helper Rupiah Ringkas
+                fun row(kiri: String, valDbl: Double): String {
+                    val kanan = formatRupiah(valDbl).replace("Rp ", "")
+                    val maxChars = 32
+                    val maxKiri = maxChars - kanan.length - 1
+                    val textKiri = if (kiri.length > maxKiri) kiri.substring(0, maxKiri) else kiri
+                    val sisa = maxChars - textKiri.length - kanan.length
+                    return "$textKiri${" ".repeat(if(sisa>0) sisa else 1)}$kanan\n"
+                }
+
+                // === 1. LAPORAN LACI (CASH DRAWER) ===
+                p.append("LACI KASIR (FISIK):\n")
+                p.append(row("Modal Awal", modal))
+                p.append(row("Penjualan Tunai", tunai))
+                // Piutang Lunas (optional, jika ada logika pelunasan tunai di shift ini)
+                p.append("--------------------------------\n")
+                p.append(row("Total Sistem", modal + tunai))
+                p.append(row("Fisik Laci", actual))
+
+                val selisih = actual - (modal + tunai)
+                if (selisih == 0.0) p.append("Selisih: KLOP (OK)\n")
+                else p.append(row("Selisih", selisih))
+
+                p.append("--------------------------------\n")
+
+                // === 2. RINCIAN PEMBAYARAN (METODE) ===
+                p.append("PEMBAYARAN DITERIMA:\n")
+                if (tunai > 0) p.append(row("Tunai ($countTunai Trx)", tunai))
+                if (qris > 0) p.append(row("QRIS ($countQris Trx)", qris))
+                if (debit > 0) p.append(row("Debit ($countDebit Trx)", debit))
+                if (trf > 0) p.append(row("Transfer ($countTrf Trx)", trf))
+                if (piutang > 0) p.append(row("Piutang ($countPiutang Trx)", piutang))
+                p.append("--------------------------------\n")
+
+                // === 3. RINGKASAN PENJUALAN (OMZET) ===
+                // Ini yang diminta: Subtotal, Diskon, Pajak
+                p.append(row("Subtotal Jual", shiftSubtotal))
+                if (shiftDiscount > 0) p.append(row("Total Diskon", -shiftDiscount)) // Minus biar jelas
+                if (shiftTax > 0) p.append(row("Total Pajak", shiftTax))
+
+                p.append("--------------------------------\n")
+                p.append("\u001B\u0045\u0001${row("GRAND TOTAL", shiftGrandTotal)}\u001B\u0045\u0000")
+                p.append("--------------------------------\n")
+
+                p.append("\n\n\n") // Feed Akhir
+
+                outputStream.write(p.toString().toByteArray())
+                outputStream.flush()
+                Thread.sleep(2500)
+                socket.close()
+
+            } catch (e: Exception) {
+                try { socket?.close() } catch (x: Exception) {}
+            }
+        }.start()
     }
 
     private fun formatRupiah(amount: Double): String = String.format(Locale("id", "ID"), "Rp %,d", amount.toLong()).replace(',', '.')
