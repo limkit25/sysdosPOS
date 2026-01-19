@@ -1,76 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:fitsSystemWindows="true"
-    android:background="#F5F8FA">
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#1976D2"
-        android:elevation="0dp">
+        android:fitsSystemWindows="true"
+        android:background="#1976D2">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:gravity="center_vertical">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#1976D2"
+            android:elevation="0dp">
 
-            <ImageButton
-                android:id="@+id/btnBack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_back_arrow"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#FFFFFF"
-                android:padding="12dp"
-                android:scaleType="fitCenter"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:gravity="center_vertical"
+                android:elevation="4dp">
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                <ImageButton
+                    android:id="@+id/btnMenuDrawer"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_menu"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF"
+                    android:padding="10dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Menu"/>
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Manajemen Gudang"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="16dp"/>
+
+                <ImageButton
+                    android:id="@+id/btnImportCsv"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_menu_upload"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF"
+                    android:padding="10dp"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="Import CSV"/>
+            </LinearLayout>
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tabLayout"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Manajemen Gudang"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp"/>
-
-            <ImageButton
-                android:id="@+id/btnImportCsv"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@android:drawable/ic_menu_upload"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#FFFFFF"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:contentDescription="Import CSV"/>
+                android:background="#1976D2"
+                app:tabTextColor="#BBDEFB"
+                app:tabSelectedTextColor="#FFFFFF"
+                app:tabIndicatorColor="#FFFFFF"
+                app:tabIndicatorHeight="3dp"
+                app:tabMode="fixed"
+                app:tabGravity="fill"/>
         </LinearLayout>
 
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tabLayout"
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/viewPager"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#1976D2"
-            app:tabTextColor="#BBDEFB"
-            app:tabSelectedTextColor="#FFFFFF"
-            app:tabIndicatorColor="#FFFFFF"
-            app:tabIndicatorHeight="3dp"
-            app:tabMode="fixed"
-            app:tabGravity="fill"/>
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="#F5F8FA"/>
+
     </LinearLayout>
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/viewPager"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#F5F8FA"/>
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="true"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/nav_menu"
+        app:itemIconTint="#1976D2"
+        app:itemTextColor="#333333"/>
 
-</LinearLayout>
+</androidx.drawerlayout.widget.DrawerLayout>

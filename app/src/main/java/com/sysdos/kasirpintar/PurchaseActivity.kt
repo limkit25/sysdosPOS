@@ -46,6 +46,8 @@ class PurchaseActivity : AppCompatActivity() {
     private lateinit var layoutHistory: LinearLayout
     private lateinit var btnTabInput: Button
     private lateinit var btnTabHistory: Button
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     // SCANNER
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
@@ -67,6 +69,31 @@ class PurchaseActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        // --- SETUP MENU SAMPING (BARU) ---
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer)
+
+        // 1. Klik Tombol Burger
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
+        }
+
+        // 2. Klik Item Menu
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_laporan -> startActivity(android.content.Intent(this, SalesReportActivity::class.java))
+                R.id.nav_stok -> startActivity(android.content.Intent(this, ProductListActivity::class.java))
+                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
+                // ... menu lain ...
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
+
+        // --- KODINGAN LAMA MAS HERU ---
         layoutInput = findViewById(R.id.layoutInput)
         layoutHistory = findViewById(R.id.layoutHistory)
         btnTabInput = findViewById(R.id.btnTabInput)
@@ -75,7 +102,8 @@ class PurchaseActivity : AppCompatActivity() {
         btnAddSupplier = findViewById(R.id.btnAddSupplier)
         tvTotal = findViewById(R.id.tvTotalPurchase)
         svSearch = findViewById(R.id.svSearchProduct)
-        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+
+        // Hapus baris btnBack.setOnClickListener karena sudah diganti btnMenuDrawer
     }
 
     private fun setupRecyclerViews() {
@@ -478,5 +506,12 @@ class PurchaseActivity : AppCompatActivity() {
             holder.itemView.setOnClickListener { onItemClick(product) }
         }
         override fun getItemCount(): Int = items.size
+    }
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
 }

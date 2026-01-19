@@ -43,6 +43,8 @@ import androidx.core.app.ActivityCompat
 class ProductListActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     // 1. LAUNCHER PILIH FILE
     private val pickCsvLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -55,33 +57,82 @@ class ProductListActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
+        // =============================================================
+        // 🔥 BAGIAN BARU: LOGIKA MENU SAMPING (DRAWER)
+        // =============================================================
 
-        // =============================================================
-        // 🔥 2. MODIFIKASI TOMBOL IMPORT (Munculkan Pilihan)
-        // =============================================================
-        val btnImport = findViewById<ImageButton>(R.id.btnImportCsv)
-        btnImport?.setOnClickListener {
-            showImportOptionDialog() // <--- Panggil Dialog Pilihan
+        // 1. Inisialisasi
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        // Perhatikan ID-nya harus sesuai XML baru (btnMenuDrawer)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer)
+
+        // 2. Klik Tombol Burger -> Buka Menu
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
         }
 
-        val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
-        val viewPager = findViewById<ViewPager2>(R.id.viewPager)
+        // 3. Setup Header Menu (Nama User)
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
 
-        // --- ADAPTER TAB ---
-        viewPager.adapter = object : FragmentStateAdapter(this) {
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        // 4. Logika Pindah Halaman saat Menu Diklik
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    startActivity(android.content.Intent(this, DashboardActivity::class.java))
+                    finish()
+                }
+                R.id.nav_kasir -> {
+                    startActivity(android.content.Intent(this, MainActivity::class.java))
+                    finish()
+                }
+                R.id.nav_stok -> {
+                    // Kita sudah di halaman Stok, tutup drawer aja
+                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+                }
+                R.id.nav_laporan -> startActivity(android.content.Intent(this, SalesReportActivity::class.java))
+                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
+                // ... tambahkan menu lain jika perlu ...
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
+
+        // =============================================================
+        // 🔥 KODINGAN LAMA ANDA (IMPORT & TABS) - LANJUT DISINI
+        // =============================================================
+
+        // Tombol Import
+        val btnImport = findViewById<android.widget.ImageButton>(R.id.btnImportCsv)
+        btnImport?.setOnClickListener {
+            showImportOptionDialog()
+        }
+
+        val tabLayout = findViewById<com.google.android.material.tabs.TabLayout>(R.id.tabLayout)
+        val viewPager = findViewById<androidx.viewpager2.widget.ViewPager2>(R.id.viewPager)
+
+        // Adapter Tab
+        viewPager.adapter = object : androidx.viewpager2.adapter.FragmentStateAdapter(this) {
             override fun getItemCount(): Int = 2
-            override fun createFragment(position: Int): Fragment {
+            override fun createFragment(position: Int): androidx.fragment.app.Fragment {
                 return when (position) {
                     0 -> ProductFragment()
-                    1 -> ReportFragment()
+                    1 -> ReportFragment() // Pastikan Fragment ini ada
                     else -> ProductFragment()
                 }
             }
         }
 
-        // --- JUDUL TAB ---
-        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+        // Judul Tab
+        com.google.android.material.tabs.TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> "PRODUK"
                 1 -> "ASET/STOK"
@@ -89,7 +140,7 @@ class ProductListActivity : AppCompatActivity() {
             }
         }.attach()
 
-        // BUKA TAB SPESIFIK
+        // Buka Tab Spesifik
         val targetTab = intent.getIntExtra("OPEN_TAB_INDEX", -1)
         if (targetTab != -1 && targetTab < 2) {
             viewPager.setCurrentItem(targetTab, false)
@@ -409,5 +460,12 @@ class ProductListActivity : AppCompatActivity() {
 
         // Sekarang baris ini tidak akan merah lagi
         notificationManager.notify(notificationId, builder.build())
+    }
+    override fun onBackPressed() {
+        if (::drawerLayout.isInitialized && drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
 }

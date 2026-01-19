@@ -21,47 +21,78 @@ class UserListActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: UserAdapter
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_list)
 
-        viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+        // === SETUP MENU SAMPING ===
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // ID Baru
 
-        val rvUsers = findViewById<RecyclerView>(R.id.rvUserList)
-        val fabAdd = findViewById<FloatingActionButton>(R.id.fabAddUser)
-        val tvHint = findViewById<TextView>(R.id.tvHint)
-
-        tvHint.text = "Klik user untuk Edit. Tahan untuk Hapus."
-
-        // SETUP ADAPTER
-        adapter = UserAdapter(
-            onClick = { user ->
-                // EDIT USER
-                showUserDialog(user)
-            },
-            onLongClick = { user ->
-                // HAPUS USER
-                if (user.id == 1 || user.role == "admin") {
-                    // Proteksi sederhana: Admin tidak bisa dihapus sembarangan (opsional)
-                    confirmDelete(user)
-                } else {
-                    confirmDelete(user)
-                }
-            }
-        )
-
-        rvUsers.layoutManager = LinearLayoutManager(this)
-        rvUsers.adapter = adapter
-
-        // Load data user real-time
-        viewModel.allUsers.observe(this) { users ->
-            adapter.submitList(users)
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
         }
 
-        // TAMBAH USER BARU
-        fabAdd.setOnClickListener {
-            showUserDialog(null) // null artinya Mode Tambah
+        // Setup Header Menu
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
+
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        // Navigasi
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_stok -> { startActivity(android.content.Intent(this, ProductListActivity::class.java)); finish() }
+                R.id.nav_laporan -> { startActivity(android.content.Intent(this, SalesReportActivity::class.java)); finish() }
+                R.id.nav_user -> drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START) // Tutup aja
+                // ... menu lain
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
+
+        // === KODINGAN LAMA ===
+        // HAPUS BARIS INI: val btnBack = findViewById<android.view.View>(R.id.btnBack)...
+
+        viewModel = androidx.lifecycle.ViewModelProvider(this)[ProductViewModel::class.java]
+        val rvUsers = findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvUserList)
+        val fabAdd = findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fabAddUser)
+        val tvHint = findViewById<android.widget.TextView>(R.id.tvHint)
+
+        // ... Sisa logika Adapter, ViewModel, dan FAB tetap sama ...
+        tvHint.text = "Klik user untuk Edit. Tahan untuk Hapus."
+
+        adapter = UserAdapter(
+            onClick = { user -> showUserDialog(user) },
+            onLongClick = { user ->
+                if (user.id == 1 || user.role == "admin") confirmDelete(user) else confirmDelete(user)
+            }
+        )
+        rvUsers.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rvUsers.adapter = adapter
+
+        viewModel.allUsers.observe(this) { users -> adapter.submitList(users) }
+
+        fabAdd.setOnClickListener { showUserDialog(null) }
+    }
+
+    // Tambahkan ini di luar onCreate
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
         }
     }
 

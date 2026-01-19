@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import androidx.core.view.GravityCompat
 
 class HistoryActivity : AppCompatActivity() {
 
@@ -48,56 +49,95 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var cardPiutang: androidx.cardview.widget.CardView
     private lateinit var tvTotalPiutang: TextView
 
+    // 🔥 1. VARIABEL MENU SAMPING
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_history)
 
-        // 1. SETUP RECYCLERVIEW (SAMA)
+        viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+
+        // =============================================================
+        // 🔥 2. SETUP MENU SAMPING (DRAWER)
+        // =============================================================
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<View>(R.id.btnMenuDrawer) // Sesuai ID di XML baru
+
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        // Setup Header Menu
+        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
+
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        // Logika Navigasi Pindah Halaman
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
+                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
+                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+
+        // =============================================================
+        // 🔥 3. INISIALISASI VIEWS (KODINGAN LAMA ANDA)
+        // =============================================================
+
+        // Setup RecyclerView
         val rvHistory = findViewById<RecyclerView>(R.id.rvHistory)
         rvHistory.layoutManager = LinearLayoutManager(this)
         adapter = TransactionAdapter()
         rvHistory.adapter = adapter
 
-        // 2. SETUP VIEWMODEL (SAMA)
-        viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
-        viewModel.allUsers.observe(this) { users ->
-            listSemuaPegawai = users
-        }
-
-        // 3. SETUP FILTER UI
+        // Setup Filter UI
         btnToday = findViewById(R.id.btnFilterToday)
         btnWeek = findViewById(R.id.btnFilterWeek)
         btnMonth = findViewById(R.id.btnFilterMonth)
         btnAll = findViewById(R.id.btnFilterAll)
         btnExport = findViewById(R.id.btnExport)
 
-        // 🔥 INISIALISASI KARTU PIUTANG BARU
         cardPiutang = findViewById(R.id.cardSummaryPiutang)
         tvTotalPiutang = findViewById(R.id.tvTotalPiutangDashboard)
 
-        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+        // ❌ HAPUS BARIS INI: findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+        // Karena tombol btnBack sudah tidak ada di XML (diganti btnMenuDrawer)
 
-        // Logic Export (SAMA)
-        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        val role = session.getString("role", "kasir")
-        if (role == "kasir") btnExport.visibility = View.GONE else {
+        // Logic Export
+        if (role == "kasir") {
+            btnExport.visibility = View.GONE
+        } else {
             btnExport.visibility = View.VISIBLE
             btnExport.setOnClickListener { showExportDateDialog() }
         }
 
-        // 4. OBSERVE DATA (UPDATE LOGIC)
+        // Observe Data
         viewModel.allTransactions.observe(this) { transactions ->
             fullTransactionList = transactions
-
-            // 🔥 HITUNG TOTAL PIUTANG REAL-TIME
             calculateTotalPiutang()
-
-            // Default Filter: Hari Ini
             filterList("TODAY")
             updateFilterUI(btnToday)
         }
 
-        // 5. SEARCH VIEW (SAMA)
+        viewModel.allUsers.observe(this) { users ->
+            listSemuaPegawai = users
+        }
+
+        // Search View Logic
         val svSearch = findViewById<androidx.appcompat.widget.SearchView>(R.id.svSearchHistory)
         svSearch.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean = false
@@ -112,52 +152,50 @@ class HistoryActivity : AppCompatActivity() {
             }
         })
 
-        // 6. KLIK FILTER BIASA (SAMA)
+        // Filter Click Listeners
         btnToday.setOnClickListener { updateFilterUI(btnToday); filterList("TODAY") }
         btnWeek.setOnClickListener { updateFilterUI(btnWeek); filterList("WEEK") }
         btnMonth.setOnClickListener { updateFilterUI(btnMonth); filterList("MONTH") }
         btnAll.setOnClickListener { updateFilterUI(btnAll); filterList("ALL") }
 
-        // 🔥 7. KLIK KARTU PIUTANG (FITUR BARU) 🔥
+        // Fitur Klik Kartu Piutang
         cardPiutang.setOnClickListener {
-            // Matikan warna semua tombol filter (biar user tau ini mode khusus)
             updateFilterUI(null)
-
-            // Filter: Hanya yang Piutang DAN Belum Lunas
             val debtList = fullTransactionList.filter { trx ->
                 val isPiutang = trx.paymentMethod.lowercase().contains("piutang")
                 val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
                 isPiutang && !isLunas
-            }.sortedBy { it.timestamp } // Urutkan dari hutang terlama
+            }.sortedBy { it.timestamp }
 
             if (debtList.isEmpty()) {
                 Toast.makeText(this, "Tidak ada piutang yang belum lunas! 🎉", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Menampilkan ${debtList.size} Transaksi Belum Lunas", Toast.LENGTH_SHORT).show()
             }
-
             adapter.submitList(debtList)
         }
 
-        // 8. KLIK DETAIL & REPRINT (SAMA - Sudah terhubung ke showDetailDialog yang ada tombol LUNASI)
+        // Klik Detail & Void
         adapter.setOnItemClickListener { showDetailDialog(it) }
         adapter.setOnReprintClickListener { doReprint(it) }
-        // 🔥🔥🔥 FITUR VOID (TEKAN LAMA UNTUK BATALKAN) 🔥🔥🔥
         adapter.setOnItemLongClickListener { trx ->
             AlertDialog.Builder(this)
                 .setTitle("⚠️ Batalkan Transaksi?")
-                .setMessage("ID: #${trx.id}\nTotal: ${formatRupiah(trx.totalAmount)}\n\nStok barang akan dikembalikan ke gudang dan transaksi dihapus permanen.")
+                .setMessage("ID: #${trx.id}\n\nStok barang akan dikembalikan dan transaksi dihapus.")
                 .setPositiveButton("YA, VOID") { _, _ ->
-                    // Panggil fungsi void di ViewModel
                     viewModel.voidTransaction(trx) {
-                        Toast.makeText(this, "Transaksi Dibatalkan & Stok Kembali!", Toast.LENGTH_SHORT).show()
-
-                        // Refresh data hitungan piutang
+                        Toast.makeText(this, "Transaksi Dibatalkan!", Toast.LENGTH_SHORT).show()
                         calculateTotalPiutang()
                     }
                 }
-                .setNegativeButton("Batal", null)
-                .show()
+                .setNegativeButton("Batal", null).show()
+        }
+    }
+
+    // 🔥 4. TAMBAH LOGIKA BACK BUTTON HP
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
         }
     }
 

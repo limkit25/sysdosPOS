@@ -18,17 +18,49 @@ class LogReportActivity : AppCompatActivity() {
     private lateinit var btnVoid: Button
     private lateinit var btnRetur: Button
     private lateinit var rv: RecyclerView
-    private lateinit var btnBack: ImageButton
+    // ❌ HAPUS btnBack DARI SINI
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_log_report) // 🔥 HUBUNGKAN XML
+        setContentView(R.layout.activity_log_report)
+
+        // === 1. SETUP MENU SAMPING ===
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer)
+
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
+        }
+
+        // Setup Header & Navigasi
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_laporan -> { startActivity(android.content.Intent(this, SalesReportActivity::class.java)); finish() }
+                R.id.nav_stok -> { startActivity(android.content.Intent(this, ProductListActivity::class.java)); finish() }
+                R.id.nav_user -> { startActivity(android.content.Intent(this, UserListActivity::class.java)); finish() }
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
 
         // INIT VIEW
         btnVoid = findViewById(R.id.btnTabVoid)
         btnRetur = findViewById(R.id.btnTabRetur)
         rv = findViewById(R.id.rvLogReport)
-        btnBack = findViewById(R.id.btnBackLog)
 
         // INIT DATA
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
@@ -42,12 +74,20 @@ class LogReportActivity : AppCompatActivity() {
 
         // LISTENER
         btnVoid.setOnClickListener { loadData("VOID") }
-        btnRetur.setOnClickListener { loadData("OUT") } // Di DB tipe retur = "OUT"
-        btnBack.setOnClickListener { finish() }
+        btnRetur.setOnClickListener { loadData("OUT") }
+
+        // ❌ HAPUS BARIS INI: btnBack.setOnClickListener { finish() }
+    }
+
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
 
     private fun loadData(type: String) {
-        // Update Tampilan Tombol
         if (type == "VOID") {
             btnVoid.alpha = 1.0f
             btnRetur.alpha = 0.5f
@@ -60,7 +100,6 @@ class LogReportActivity : AppCompatActivity() {
             btnVoid.text = "RIWAYAT VOID"
         }
 
-        // Ambil Data
         viewModel.getLogReport(type).observe(this) { logs ->
             adapter.submitList(logs)
         }

@@ -1,62 +1,86 @@
 package com.sysdos.kasirpintar
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
-import android.widget.ImageButton
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
-import com.sysdos.kasirpintar.viewmodel.ShiftAdapter
+import com.sysdos.kasirpintar.viewmodel.ShiftAdapter // Pastikan nama adapternya benar
 
 class ShiftHistoryActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: ShiftAdapter
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shift_history)
 
-        // 🔥 1. FUNGSI TOMBOL BACK (Agar bisa kembali ke Dashboard)
-        val btnBack = findViewById<ImageButton>(R.id.btnBack)
-        btnBack.setOnClickListener {
-            finish()
+        // === 1. SETUP MENU SAMPING (DRAWER) ===
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<View>(R.id.btnMenuDrawer)
+
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // Cek Role (Keamanan)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        val role = session.getString("role", "kasir")?.lowercase()
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
 
-        if (role != "admin" && role != "manager") {
-            Toast.makeText(this, "Akses Ditolak! Khusus Admin/Manager.", Toast.LENGTH_SHORT).show()
-            finish()
-            return
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
         }
 
-        val rv = findViewById<RecyclerView>(R.id.rvShiftLogs)
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
+                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
+                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+
+        // === 2. SETUP RECYCLERVIEW (INI YANG TADI KURANG) ===
+        val rvShiftLogs = findViewById<RecyclerView>(R.id.rvShiftLogs)
+        rvShiftLogs.layoutManager = LinearLayoutManager(this)
+
+        // Inisialisasi adapter (Pastikan class ShiftAdapter sudah ada)
         adapter = ShiftAdapter()
+        rvShiftLogs.adapter = adapter
 
-        // 🔥 2. LOGIKA TAMPILAN RESPONSIVE (HP vs TABLET)
-        val displayMetrics = resources.displayMetrics
-        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
-
-        if (screenWidthDp >= 600) {
-            // Kalau TABLET (Lebar > 600dp) -> Pakai Grid 2 Kolom biar rapi
-            rv.layoutManager = GridLayoutManager(this, 2)
-        } else {
-            // Kalau HP BIASA -> Pakai List ke Bawah
-            rv.layoutManager = LinearLayoutManager(this)
-        }
-
-        rv.adapter = adapter
-
-        // Setup ViewModel
+        // === 3. HUBUNGKAN KE VIEWMODEL (AMBIL DATA) ===
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+
+        // Ambil data dari database melalui ViewModel
         viewModel.allShiftLogs.observe(this) { logs ->
-            adapter.submitList(logs)
+            if (logs != null && logs.isNotEmpty()) {
+                adapter.submitList(logs)
+            } else {
+                Toast.makeText(this, "Belum ada riwayat setoran", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
         }
     }
 }

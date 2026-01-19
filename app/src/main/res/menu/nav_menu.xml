@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_home"
+            android:icon="@android:drawable/ic_menu_rotate"
+            android:title="Dashboard Utama" />
+        <item
+            android:id="@+id/nav_kasir"
+            android:icon="@drawable/icon_menu_kasir"
+            android:title="Kasir / POS" />
+        <item
+            android:id="@+id/nav_laporan"
+            android:icon="@drawable/icon_menu_laporan"
+            android:title="Laporan Penjualan" />
+        <item
+            android:id="@+id/nav_stok"
+            android:icon="@drawable/icon_menu_gudang"
+            android:title="Cek Stok Gudang" />
+    </group>
+
+    <item android:title="Akun &amp; Setting">
+        <menu>
+            <item
+                android:id="@+id/nav_user"
+                android:icon="@drawable/icon_menu_users"
+                android:title="Kelola User" />
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@android:drawable/ic_lock_power_off"
+                android:title="Keluar (Logout)" />
+        </menu>
+    </item>
+</menu>

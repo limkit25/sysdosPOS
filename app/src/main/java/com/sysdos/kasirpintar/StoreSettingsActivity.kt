@@ -74,6 +74,8 @@ class StoreSettingsActivity : AppCompatActivity() {
     private val deviceList = ArrayList<String>()
     private val deviceMacs = ArrayList<String>()
     private lateinit var listAdapter: ArrayAdapter<String>
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     private var isInitialSetup = false
 
@@ -81,16 +83,58 @@ class StoreSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_store_settings)
 
-        // 1. INIT VIEWMODEL
+        // =============================================================
+        // 🔥 1. SETUP MENU SAMPING (DRAWER) - KODE BARU
+        // =============================================================
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // Tombol Burger
+
+        // A. Klik Tombol Burger
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
+        }
+
+        // B. Setup Header Menu (Nama User)
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
+
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        // C. Logika Pindah Halaman
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_stok -> { startActivity(android.content.Intent(this, ProductListActivity::class.java)); finish() }
+                R.id.nav_laporan -> { startActivity(android.content.Intent(this, SalesReportActivity::class.java)); finish() }
+                R.id.nav_user -> { startActivity(android.content.Intent(this, UserListActivity::class.java)); finish() }
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
+
+        // =============================================================
+        // 🔥 2. KODINGAN LAMA MAS HERU (LANJUT DI BAWAH)
+        // =============================================================
+
+        // INIT VIEWMODEL
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // 2. CEK INTENT (Apakah ini pendaftaran awal?)
+        // CEK INTENT
         isInitialSetup = intent.getBooleanExtra("IS_INITIAL_SETUP", false)
         val target = intent.getStringExtra("TARGET")
 
-        // 3. BIND VIEW
+        // BIND VIEW
         tvTitle = findViewById(R.id.tvSettingsTitle)
-        btnBack = findViewById(R.id.btnBack)
+
+        // ❌ HAPUS BARIS INI: btnBack = findViewById(R.id.btnBack) ❌
+        // Karena tombolnya sudah tidak ada di XML.
 
         cardSectionStore = findViewById(R.id.cardSectionStore)
         cardSectionPrinter = findViewById(R.id.cardSectionPrinter)
@@ -104,7 +148,6 @@ class StoreSettingsActivity : AppCompatActivity() {
         etStoreFooter = findViewById(R.id.etStoreFooter)
         etStoreTax = findViewById(R.id.etStoreTax)
 
-        // 🔥 2. BIND VIEW SWITCH 🔥
         switchStock = findViewById(R.id.switchStockSystem)
 
         btnSave = findViewById(R.id.btnSaveStore)
@@ -117,7 +160,7 @@ class StoreSettingsActivity : AppCompatActivity() {
         tvLicenseStatus = findViewById(R.id.tvLicenseStatus)
         btnActivate = findViewById(R.id.btnActivateLicense)
 
-        // 4. LOAD DATA EXISTING
+        // LOAD DATA EXISTING
         viewModel.storeConfig.observe(this) { config ->
             if (config != null) {
                 etStoreName.setText(config.storeName)
@@ -128,20 +171,21 @@ class StoreSettingsActivity : AppCompatActivity() {
             }
         }
 
-        // 🔥 3. LOAD PENGATURAN STOK DARI PREFERENCES 🔥
-        val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        val isStockActive = prefs.getBoolean("use_stock_system", true) // Default TRUE (Wajib Cek Stok)
+        // LOAD PENGATURAN STOK
+        val prefs = getSharedPreferences("store_prefs", android.content.Context.MODE_PRIVATE)
+        val isStockActive = prefs.getBoolean("use_stock_system", true)
         switchStock.isChecked = isStockActive
 
-        // 5. SETUP ADAPTER & UI
-        listAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
+        // SETUP ADAPTER & UI
+        listAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         lvPrinters.adapter = listAdapter
 
         setupUI(target)
         checkLicenseStatus()
 
-        // 6. LISTENERS
-        btnBack.setOnClickListener { finish() }
+        // LISTENERS
+        // ❌ HAPUS BARIS INI: btnBack.setOnClickListener { finish() } ❌
+
         btnSave.setOnClickListener { saveStoreSettings() }
         btnActivate.setOnClickListener { showActivationDialog() }
 
@@ -151,24 +195,30 @@ class StoreSettingsActivity : AppCompatActivity() {
         }
 
         lvPrinters.setOnItemClickListener { _, _, position, _ ->
-            if (checkPermission() && bluetoothAdapter?.isDiscovering == true) bluetoothAdapter.cancelDiscovery()
+            if (checkPermission() && bluetoothAdapter?.isDiscovering == true) bluetoothAdapter?.cancelDiscovery()
 
             val selectedMac = deviceMacs[position]
             val rawName = deviceList[position].split("\n")[0].replace(" [✅ AKTIF]", "")
 
-            // Simpan Printer Mac ke Prefs
             prefs.edit().putString("printer_mac", selectedMac).apply()
 
-            Toast.makeText(this, "Printer Utama: $rawName", Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this, "Printer Utama: $rawName", android.widget.Toast.LENGTH_SHORT).show()
             showPairedDevices()
         }
 
         setupBackupRestoreLogic()
 
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+        val filter = android.content.IntentFilter(android.bluetooth.BluetoothDevice.ACTION_FOUND)
         registerReceiver(receiver, filter)
 
         if (target == "PRINTER" && checkPermission()) showPairedDevices()
+    }
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
 
     private fun setupUI(target: String?) {

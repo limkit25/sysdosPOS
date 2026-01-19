@@ -1,467 +1,269 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:fitsSystemWindows="true"
-    android:background="#F8F9FA">
+    android:background="#1976D2">
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="#1976D2"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:elevation="0dp">
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:background="#1976D2" />
+        <ImageView
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:src="@drawable/logo_toko"
+            android:background="@drawable/bg_rounded_white"
+            android:padding="4dp"
+            android:layout_marginEnd="12dp"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvGreeting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Halo, Admin"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvRole"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Role: Owner"
+                android:textColor="#BBDEFB"
+                android:textSize="12sp"/>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnLogout"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_lock_power_off"
+            app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:tooltipText="Keluar Aplikasi"/>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F5F8FA"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:paddingBottom="20dp">
 
-            <LinearLayout
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:layout_marginBottom="20dp">
-
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/logo_toko"
-                    android:background="@drawable/bg_rounded_white"
-                    android:padding="4dp"
-                    android:elevation="4dp"/>
+                android:layout_margin="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#FFFFFF">
 
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:orientation="vertical"
-                    android:layout_marginStart="12dp">
+                    android:padding="20dp">
 
                     <TextView
-                        android:id="@+id/tvGreeting"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Halo, Admin"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp"
-                        android:textStyle="bold"/>
+                        android:text="Total Omzet Hari Ini"
+                        android:textColor="#757575" />
 
                     <TextView
-                        android:id="@+id/tvRole"
+                        android:id="@+id/tvTodayRevenue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Kasir Pintar POS"
-                        android:textColor="#E3F2FD"
-                        android:textSize="12sp"/>
-                    <TextView
-                        android:id="@+id/tvTrialStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Sisa Trial: 7 Hari"
-                        android:textColor="#FFEB3B"
-                        android:textStyle="bold"
-                        android:textSize="12sp"
-                        android:layout_marginTop="2dp"/>
+                        android:text="Rp 0"
+                        android:textColor="#4CAF50"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-                <ImageView
-                    android:id="@+id/btnLogout"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:padding="8dp"
-                    android:src="@android:drawable/ic_lock_power_off"
-                    app:tint="#FFFFFF"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"/>
-            </LinearLayout>
-
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvTrialStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:baselineAligned="false">
+                android:text="TRIAL MODE"
+                android:gravity="center"
+                android:textColor="#FF5722"
+                android:visibility="gone"/>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardLowStockInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardBackgroundColor="#FFEBEE">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:gravity="center_vertical">
+                    <ImageView android:id="@+id/imgAlertStock" android:layout_width="24dp" android:layout_height="24dp" android:src="@android:drawable/ic_dialog_alert" app:tint="#D32F2F"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Stok Menipis:" android:layout_marginStart="8dp" android:textColor="#D32F2F"/>
+                    <TextView android:id="@+id/tvLowStockCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 Item" android:textStyle="bold" android:layout_marginStart="4dp" android:textColor="#D32F2F"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <GridLayout
+                android:id="@+id/mainGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="2"
+                android:padding="8dp"
+                android:alignmentMode="alignMargins">
 
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/cardPOS"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
                     app:cardCornerRadius="12dp"
-                    app:cardElevation="6dp"
-                    app:cardBackgroundColor="#FFFFFF"
-                    android:layout_marginEnd="8dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Omzet Hari Ini"
-                            android:textColor="#757575"
-                            android:textSize="12sp"/>
-
-                        <TextView
-                            android:id="@+id/tvTodayRevenue"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Rp 0"
-                            android:textColor="#1976D2"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="4dp"/>
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_kasir" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Kasir / POS" android:textStyle="bold" android:textColor="#333"/>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
                 <androidx.cardview.widget.CardView
-                    android:id="@+id/cardLowStockInfo"
+                    android:id="@+id/cardProduct"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
                     app:cardCornerRadius="12dp"
-                    app:cardElevation="6dp"
-                    app:cardBackgroundColor="#FFF3E0"
-                    android:clickable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:layout_marginStart="8dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_weight="1"
-                                android:layout_height="wrap_content"
-                                android:text="Stok Menipis"
-                                android:textColor="#E65100"
-                                android:textSize="12sp"
-                                android:textStyle="bold"/>
-
-                            <ImageView
-                                android:id="@+id/imgAlertStock"
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
-                                android:src="@android:drawable/stat_notify_error"
-                                app:tint="#E65100"/>
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvLowStockCount"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Checking..."
-                            android:textColor="#E65100"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="4dp"/>
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_gudang" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Produk" android:textStyle="bold" android:textColor="#333"/>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
-            </LinearLayout>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardPurchase"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_purch" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pembelian" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardReport"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_laporan" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Laporan" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardUser"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_users" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Kelola User" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardShift"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_shift" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Riwayat Shift" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardStore"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_toko" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Setting Toko" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardPrinter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/icon_menu_printer" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Printer" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardAbout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="3dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:padding="16dp">
+                        <ImageView android:src="@drawable/about" android:layout_width="50dp" android:layout_height="50dp" android:layout_marginBottom="8dp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tentang" android:textStyle="bold" android:textColor="#333"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+            </GridLayout>
         </LinearLayout>
-    </FrameLayout>
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true">
-
-        <GridLayout
-            android:id="@+id/mainGrid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:rowCount="4"
-            android:padding="12dp"
-            android:alignmentMode="alignMargins">
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardPOS"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_kasir"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="KASIR"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardProduct"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_gudang"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="GUDANG"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardPurchase"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_purch"
-
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="BELANJA"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardReport"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_laporan"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="LAPORAN"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardUser"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_users"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="USERS"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardShift"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@drawable/icon_menu_shift"
-                        app:tint="#1976D2" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="SHIFT"
-                        android:textStyle="bold"
-                        android:textColor="#333333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardStore"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_toko"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="INFO TOKO"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardPrinter"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/icon_menu_printer"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="PRINTER"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardAbout"
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:layout_columnWeight="1"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp"
-                android:layout_margin="6dp"
-                android:clickable="true"
-                android:foreground="?android:attr/selectableItemBackground">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
-                    <ImageView
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/logo_toko"
-                        app:tint="#1976D2"
-                        android:layout_marginBottom="8dp"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TENTANG"
-                        android:textStyle="bold"
-                        android:textColor="#333"/>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </GridLayout>
     </ScrollView>
+
 </LinearLayout>

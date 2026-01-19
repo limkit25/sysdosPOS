@@ -154,49 +154,46 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     // --- CART (KERANJANG) - VALIDASI DENGAN FITUR STOK LOS ---
     fun addToCart(product: Product, onResult: (String) -> Unit) {
-
-        // 1. AMBIL SETTINGAN TOKO (SAKLAR)
         val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: ON (Wajib Cek)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
 
         val currentList = _cart.value?.toMutableList() ?: mutableListOf()
         val index = currentList.indexOfFirst { it.id == product.id }
-        val stokGudang = product.stock // Stok asli di database
+        val stokGudang = product.stock
 
         if (index != -1) {
-            // BARANG SUDAH ADA, MAU TAMBAH QTY
             val existingItem = currentList[index]
             val qtyBaru = existingItem.stock + 1
 
-            // 🔥 CEK STOK HANYA JIKA SAKLAR ON 🔥
             if (isStockSystemActive) {
                 if (qtyBaru > stokGudang) {
                     onResult("❌ Stok Habis! Sisa: $stokGudang")
-                    return
+                    return // Berhenti karena stok mentok
                 }
             }
-            // Jika Saklar OFF (Los), dia akan langsung lewat ke sini (Boleh tambah terus)
 
             currentList[index] = existingItem.copy(stock = qtyBaru)
+            // 🔥 JANGAN LUPA PANGGIL INI
             onResult("Qty ditambah")
         } else {
-            // BARANG BARU MAU MASUK KERANJANG
-
-            // 🔥 CEK STOK HANYA JIKA SAKLAR ON 🔥
             if (isStockSystemActive) {
                 if (stokGudang <= 0) {
                     onResult("❌ Stok Kosong!")
-                    return
+                    return // Berhenti karena stok kosong
                 }
             }
-            // Jika Saklar OFF (Los), biarpun stok 0 atau minus, TETAP BOLEH MASUK
 
             currentList.add(product.copy(stock = 1))
+            // 🔥 JANGAN LUPA PANGGIL INI
             onResult("Masuk keranjang")
         }
 
         _cart.value = currentList
         calculateTotal()
+
+        // --- TAMBAHAN PENTING ---
+        // Jika Mas Heru ingin memastikan UI selalu update,
+        // pastikan onResult dipanggil SETELAH _cart.value diupdate.
     }
 
     fun decreaseCartItem(product: Product) {

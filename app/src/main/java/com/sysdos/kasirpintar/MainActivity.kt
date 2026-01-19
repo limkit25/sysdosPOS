@@ -64,6 +64,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var session: SharedPreferences
     private lateinit var shiftPrefs: SharedPreferences
 
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
+
     // 🔥 HELPER: Ambil Key Unik Berdasarkan Username yg Login
     private val currentUserKey: String
         get() = session.getString("username", "default") ?: "default"
@@ -84,7 +87,51 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        // ===============================================================
+        // 🔥 2. SETUP MENU SAMPING (NAVIGATION DRAWER) - MASUKKAN DISINI
+        // ===============================================================
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenuDrawer = findViewById<android.view.View>(R.id.btnMenuDrawer) // Tombol Burger
 
+        // A. Aksi Klik Tombol Burger -> Buka Laci
+        btnMenuDrawer.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
+        }
+
+        // B. Setup Header (Nama User & Role)
+        // Ambil data dari session yang nanti di-init di bawah, atau ambil langsung disini
+        val tempSession = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+        val realName = tempSession.getString("fullname", "Kasir")
+        val role = tempSession.getString("role", "kasir")
+
+        val headerView = navView.getHeaderView(0)
+        headerView.findViewById<TextView>(R.id.tvHeaderName).text = realName
+        headerView.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+
+        // C. Aksi Klik Item Menu
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    // Pindah ke Dashboard
+                    startActivity(Intent(this, DashboardActivity::class.java))
+                    finish() // Tutup halaman Kasir
+                }
+                R.id.nav_kasir -> {
+                    // Sudah di halaman Kasir, tutup laci saja
+                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+                }
+                R.id.nav_laporan -> startActivity(Intent(this, SalesReportActivity::class.java))
+                R.id.nav_stok -> startActivity(Intent(this, ProductListActivity::class.java))
+                R.id.nav_user -> startActivity(Intent(this, UserListActivity::class.java))
+                R.id.nav_logout -> {
+                    // Logika logout bisa dipanggil disini atau redirect ke Dashboard dulu
+                    Toast.makeText(this, "Silakan Logout dari Dashboard", Toast.LENGTH_SHORT).show()
+                }
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
         // 1. INIT PREFERENCES
         session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
@@ -139,15 +186,15 @@ class MainActivity : AppCompatActivity() {
         viewModel.allCategories.observe(this) { categories ->
             setupCategoryButtons(categories ?: emptyList())
         }
-        viewModel.cart.observe(this) {
-            productAdapter.updateCartCounts(it)
-            val itemCount = it.sumOf { item -> item.stock }
-            tvCartCount.text = "$itemCount Item"
-            // 🔥 TAMBAHAN BARU:
-            // Jika Dialog Keranjang sedang terbuka, Refresh otomatis!
+        viewModel.cart.observe(this) { cartItems ->
+            productAdapter.updateCartCounts(cartItems)
+            tvCartCount.text = "${cartItems.sumOf { it.stock }} Item"
+            tvCartTotal.text = formatRupiah(viewModel.totalPrice.value ?: 0.0)
+
+            // Cukup update harga di header biru saja kalau dialog lagi terbuka
             if (cartDialog?.isShowing == true) {
-                cartDialog?.dismiss() // Tutup yang lama
-                showCartPreview()     // Buka yang baru dengan data fresh
+                val tvTotalTop = cartDialog?.findViewById<TextView>(R.id.tvPreviewTotalTop)
+                tvTotalTop?.text = formatRupiah(viewModel.totalPrice.value ?: 0.0)
             }
         }
         viewModel.totalPrice.observe(this) {
@@ -202,10 +249,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 7. HANDLE BACK BUTTON
+        // 7. HANDLE BACK BUTTON (YANG DIPERBARUI)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                finish()
+                // 🔥 Cek dulu: Kalau menu samping terbuka, tutup menu dulu
+                if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+                } else {
+                    // Kalau menu tertutup, baru jalankan fungsi Back biasa (Finish)
+                    finish()
+                }
             }
         })
 
@@ -219,6 +272,14 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onFailure(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, t: Throwable) {}
         })
+    }
+    private fun updateTotalHeader() {
+        val tvTotalTop = cartDialog?.findViewById<TextView>(R.id.tvPreviewTotalTop)
+        viewModel.totalPrice.value?.let { total ->
+            tvTotalTop?.text = formatRupiah(total)
+        }
+        // Update juga total yang ada di bar bawah dashboard utama
+        tvCartTotal.text = formatRupiah(viewModel.totalPrice.value ?: 0.0)
     }
 
 
@@ -595,13 +656,8 @@ class MainActivity : AppCompatActivity() {
             tvQty.text = item.stock.toString()
             tvSubtotal.text = formatRupiah(item.price * item.stock)
 
-            // TOMBOL PLUS (+) - Logika Satpam Stok Mas Heru (TETAP SAMA)
             btnPlus.setOnClickListener {
-                // 1. AMBIL SETTINGAN STOK DULU
-                val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-                val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default ON
-
-                // Cari Data Produk Asli (Induk) di Daftar Produk
+                // 1. Ambil data stok gudang yang paling segar
                 val masterProduct = if (item.id < 0) {
                     fullList.find { it.id == item.parentId }
                 } else {
@@ -609,41 +665,67 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (masterProduct != null) {
-                    // 2. CEK STOK HANYA JIKA SISTEM AKTIF (SAKLAR NYALA)
+                    val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                    val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
+
                     if (isStockSystemActive) {
-                        val totalDiKeranjang = currentCart.filter {
+                        // 2. Ambil data keranjang TERBARU langsung dari ViewModel saat diklik
+                        val currentCart = viewModel.cart.value ?: emptyList()
+
+                        // Hitung berapa total barang ini yang SUDAH ada di keranjang
+                        val qtyBarangIniDiKeranjang = currentCart.filter {
                             it.id == masterProduct.id || it.parentId == masterProduct.id
                         }.sumOf { it.stock }
 
-                        if (totalDiKeranjang >= masterProduct.stock) {
-                            Toast.makeText(this, "❌ Stok Mentok! Sisa: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
+                        // 3. LOGIKA CEK: Jika yang di keranjang sudah SAMA atau LEBIH dari stok gudang
+                        if (qtyBarangIniDiKeranjang >= masterProduct.stock) {
+                            Toast.makeText(this, "⚠️ Stok Mentok! Sisa gudang: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
                             return@setOnClickListener
                         }
                     }
 
-                    // 🔥 PERBAIKAN UTAMA DISINI 🔥
-                    // Kita harus menyalin item keranjang, TAPI stok-nya kita ganti dengan Stok Gudang Asli
-                    // Agar ViewModel tau batas stok sebenarnya.
+                    // 4. 🔥 SOLUSI KLIK PERTAMA:
+                    // Kita kirim 'masterProduct' (data asli gudang) tapi ID-nya pakai ID item keranjang saat ini
+                    // Agar ViewModel tidak bingung mana yang mau ditambah.
                     val productToSend = item.copy(stock = masterProduct.stock)
 
-                    // Kirim data yang sudah diperbaiki
-                    viewModel.addToCart(productToSend) {}
-
-                } else {
-                    // Jaga-jaga kalau data induk gak ketemu
-                    viewModel.addToCart(item) {}
+                    viewModel.addToCart(productToSend) {
+                        // 5. REFRESH DIALOG
+                        cartDialog?.dismiss()
+                        showCartPreview()
+                    }
                 }
             }
 
-            // TOMBOL MINUS (-)
+// --- TOMBOL MINUS (-) ---
             btnMinus.setOnClickListener {
-                viewModel.decreaseCartItem(item)
-            }
-            (btnMinus as? ImageButton)?.setImageResource(android.R.drawable.btn_minus)
+                if (item.stock > 1) {
+                    viewModel.decreaseCartItem(item)
+                } else {
+                    viewModel.removeCartItem(item)
+                }
 
-            // TOMBOL HAPUS
+                // 🔥 Beri jeda sedikit atau pastikan terpanggil agar visual "kedip" langsung muncul
+                cartDialog?.dismiss()
+                showCartPreview()
+            }
+
+// --- TOMBOL HAPUS (Sampah) ---
             btnRemove.setOnClickListener {
+                // 1. Perintahkan ViewModel hapus dari database
                 viewModel.removeCartItem(item)
+
+                // 2. Langsung hapus baris (View) dari layar saat itu juga
+                container?.removeView(itemView)
+
+                // 3. Update total harga di header biru
+                updateTotalHeader()
+
+                // 4. Tutup dialog jika sudah tidak ada barang lagi
+                if (container?.childCount == 0) {
+                    cartDialog?.dismiss()
+                    Toast.makeText(this, "Keranjang Kosong", Toast.LENGTH_SHORT).show()
+                }
             }
 
             container?.addView(itemView)

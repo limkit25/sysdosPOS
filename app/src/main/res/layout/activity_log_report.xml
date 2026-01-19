@@ -1,71 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:fitsSystemWindows="true"
-    android:background="#F5F5F5">
+    android:fitsSystemWindows="true">
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/colorPrimary"
-        android:padding="15dp"
-        android:gravity="center_vertical">
-
-        <ImageButton
-            android:id="@+id/btnBackLog"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back_arrow"
-            app:tint="#FFFFFF"
-            xmlns:app="http://schemas.android.com/apk/res-auto"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Riwayat Void &amp; Retur"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:layout_marginStart="10dp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="10dp"
-        android:background="#FFFFFF"
-        android:elevation="2dp">
-
-        <Button
-            android:id="@+id/btnTabVoid"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="RIWAYAT VOID"
-            android:backgroundTint="#D32F2F"
-            android:textColor="#FFFFFF"
-            android:layout_marginEnd="5dp"/>
-
-        <Button
-            android:id="@+id/btnTabRetur"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="RIWAYAT RETUR"
-            android:backgroundTint="#FF9800"
-            android:textColor="#FFFFFF"
-            android:layout_marginStart="5dp"/>
-    </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvLogReport"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="10dp"
-        android:clipToPadding="false"/>
+        android:orientation="vertical"
+        android:fitsSystemWindows="true"
+        android:background="#1976D2">
 
-</LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="#1976D2"
+            android:paddingHorizontal="16dp"
+            android:gravity="center_vertical"
+            android:elevation="4dp">
+
+            <ImageButton
+                android:id="@+id/btnMenuDrawer"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                app:tint="#FFFFFF"
+                android:padding="10dp"
+                android:scaleType="fitCenter"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Riwayat Void &amp; Retur"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:background="#F5F8FA">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:background="#FFFFFF"
+                android:elevation="2dp">
+
+                <Button
+                    android:id="@+id/btnTabVoid"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="50dp"
+                    android:text="RIWAYAT VOID"
+                    android:backgroundTint="#D32F2F"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp"
+                    android:layout_marginEnd="6dp"/>
+
+                <Button
+                    android:id="@+id/btnTabRetur"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="50dp"
+                    android:text="RIWAYAT RETUR"
+                    android:backgroundTint="#FF9800"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvLogReport"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp"
+                android:clipToPadding="false"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="true"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/nav_menu"
+        app:itemIconTint="#1976D2"
+        app:itemTextColor="#333333"/>
+
+</androidx.drawerlayout.widget.DrawerLayout>

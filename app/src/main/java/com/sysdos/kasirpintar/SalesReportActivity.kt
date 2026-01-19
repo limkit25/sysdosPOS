@@ -47,20 +47,61 @@ class SalesReportActivity : AppCompatActivity() {
     // Variable Sensor Laba
     private var actualProfitValue: Double = 0.0
     private var isProfitVisible: Boolean = false
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var navView: com.google.android.material.navigation.NavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sales_report)
 
+        // =============================================================
+        // 🔥 1. SETUP MENU SAMPING (DRAWER)
+        // =============================================================
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // ID Baru
+
+        // Klik Tombol Burger
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
+        }
+
+        // Setup Header & Session
+        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
+        val realName = session.getString("fullname", "Admin")
+        val role = session.getString("role", "admin")
+
+        if (navView.headerCount > 0) {
+            val header = navView.getHeaderView(0)
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
+            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
+        }
+
+        // Logika Navigasi
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
+                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
+                R.id.nav_stok -> startActivity(android.content.Intent(this, ProductListActivity::class.java))
+                R.id.nav_laporan -> drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
+            }
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            true
+        }
+
+        // =============================================================
+        // 🔥 2. LOGIKA LAPORAN (Kodingan Lama)
+        // =============================================================
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
-        // 1. INIT VIEW
+        // INIT VIEW
         tvRevenue = findViewById(R.id.tvTotalRevenue)
         tvProfit = findViewById(R.id.tvTotalProfit)
         tvPiutang = findViewById(R.id.tvTotalPiutang)
 
         cardProfit = findViewById(R.id.cardProfit)
-        cardPiutang = findViewById(R.id.cardPiutang) // 🔥 Bind Card Merah
+        cardPiutang = findViewById(R.id.cardPiutang)
 
         barChart = findViewById(R.id.chartRevenue)
         btnToggleProfit = findViewById(R.id.btnToggleProfit)
@@ -68,16 +109,18 @@ class SalesReportActivity : AppCompatActivity() {
         btnOpenTopProducts = findViewById(R.id.btnOpenTopProducts)
         btnOpenHistory = findViewById(R.id.btnOpenHistory)
 
-        // 2. LISTENERS
-        findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
-        findViewById<ImageButton>(R.id.btnPrintDaily).setOnClickListener { printDailyRecap() }
+        // LISTENERS
+        // ❌ HAPUS BARIS btnBack INI KARENA SUDAH DIGANTI btnMenuDrawer
+        // findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
+
+        findViewById<android.widget.ImageButton>(R.id.btnPrintDaily).setOnClickListener { printDailyRecap() }
 
         btnOpenTopProducts.setOnClickListener {
-            startActivity(Intent(this, TopProductsActivity::class.java))
+            startActivity(android.content.Intent(this, TopProductsActivity::class.java))
         }
 
         btnOpenHistory.setOnClickListener {
-            startActivity(Intent(this, HistoryActivity::class.java))
+            startActivity(android.content.Intent(this, HistoryActivity::class.java))
         }
 
         btnToggleProfit.setOnClickListener {
@@ -85,7 +128,6 @@ class SalesReportActivity : AppCompatActivity() {
             updateProfitDisplay()
         }
 
-        // 🔥 FITUR KLIK PIUTANG (LIHAT RINCIAN)
         cardPiutang.setOnClickListener {
             showDebtDetails()
         }
@@ -93,15 +135,22 @@ class SalesReportActivity : AppCompatActivity() {
         setupChartConfig()
 
         // 3. PRIVASI KASIR (Sembunyikan Laba)
-        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        if (session.getString("role", "kasir") == "kasir") {
-            cardProfit.visibility = View.GONE
+        // Kita pakai variabel 'role' yang sudah diambil di atas supaya tidak double
+        if (role == "kasir") {
+            cardProfit.visibility = android.view.View.GONE
         }
 
         // 4. OBSERVE DATA
         viewModel.allTransactions.observe(this) { transactions ->
             fullList = transactions
             updateSummaryAndChart(transactions)
+        }
+    }
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+        } else {
+            super.onBackPressed()
         }
     }
 

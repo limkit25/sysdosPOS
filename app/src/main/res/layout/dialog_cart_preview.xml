@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F8FA"
+    android:background="#1976D2"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -41,13 +41,14 @@
             android:text="Rp 0"
             android:textColor="#FFEB3B"
             android:textSize="18sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
     </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:background="#F5F8FA"
         android:padding="16dp"
         android:clipToPadding="false">
 
@@ -73,7 +74,7 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="56dp"
-            android:text="+ TAMBAH MENU"
+            android:text="+ TAMBAH"
             android:textStyle="bold"
             android:backgroundTint="#FFEBEE"
             android:textColor="#D32F2F"
