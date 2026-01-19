@@ -19,7 +19,7 @@ android {
         applicationId = "com.sysdos.kasirpintar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 7
+        versionCode = 9
         versionName = "1.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

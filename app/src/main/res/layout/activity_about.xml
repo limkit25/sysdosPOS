@@ -57,18 +57,12 @@
                 android:padding="30dp">
 
                 <ImageView
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
+                    android:layout_width="250dp"
+                    android:layout_height="200dp"
                     android:src="@drawable/logo_toko"
                     android:layout_marginBottom="16dp"/>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Sysdos POS"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="#333333"/>
+
 
                 <TextView
                     android:id="@+id/tvAppVersion"
@@ -91,7 +85,7 @@
                     android:id="@+id/btnUpgradePremium"
                     android:layout_width="match_parent"
                     android:layout_height="60dp"
-                    android:text="👑 UPGRADE PREMIUM (Rp 199.000)"
+                    android:text="👑 UPGRADE PREMIUM (Rp 999.000) Lifetime"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="#000000"

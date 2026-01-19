@@ -657,7 +657,9 @@ class MainActivity : AppCompatActivity() {
             tvSubtotal.text = formatRupiah(item.price * item.stock)
 
             btnPlus.setOnClickListener {
-                // 1. Ambil data stok gudang yang paling segar
+                val currentCart = viewModel.cart.value ?: emptyList()
+
+                // Cari Master Product (Induk)
                 val masterProduct = if (item.id < 0) {
                     fullList.find { it.id == item.parentId }
                 } else {
@@ -669,28 +671,24 @@ class MainActivity : AppCompatActivity() {
                     val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
 
                     if (isStockSystemActive) {
-                        // 2. Ambil data keranjang TERBARU langsung dari ViewModel saat diklik
-                        val currentCart = viewModel.cart.value ?: emptyList()
-
-                        // Hitung berapa total barang ini yang SUDAH ada di keranjang
-                        val qtyBarangIniDiKeranjang = currentCart.filter {
+                        // Hitung total barang ini yang ada di keranjang
+                        val totalInCart = currentCart.filter {
                             it.id == masterProduct.id || it.parentId == masterProduct.id
                         }.sumOf { it.stock }
 
-                        // 3. LOGIKA CEK: Jika yang di keranjang sudah SAMA atau LEBIH dari stok gudang
-                        if (qtyBarangIniDiKeranjang >= masterProduct.stock) {
-                            Toast.makeText(this, "⚠️ Stok Mentok! Sisa gudang: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
+                        // Cek Stok: Jika total sudah SAMA dengan stok gudang, tolak.
+                        if (totalInCart >= masterProduct.stock) {
+                            Toast.makeText(this, "⚠️ Stok Mentok! Maks: ${masterProduct.stock}", Toast.LENGTH_SHORT).show()
                             return@setOnClickListener
                         }
                     }
 
-                    // 4. 🔥 SOLUSI KLIK PERTAMA:
-                    // Kita kirim 'masterProduct' (data asli gudang) tapi ID-nya pakai ID item keranjang saat ini
-                    // Agar ViewModel tidak bingung mana yang mau ditambah.
+                    // Kirim data dengan info stok gudang yang benar
                     val productToSend = item.copy(stock = masterProduct.stock)
 
                     viewModel.addToCart(productToSend) {
-                        // 5. REFRESH DIALOG
+                        // Karena ViewModel sudah kita perbaiki urutannya,
+                        // Perintah ini sekarang akan memunculkan data yang BENAR-BENAR BARU.
                         cartDialog?.dismiss()
                         showCartPreview()
                     }

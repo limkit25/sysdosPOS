@@ -162,38 +162,40 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val stokGudang = product.stock
 
         if (index != -1) {
+            // --- LOGIKA TAMBAH QTY ---
             val existingItem = currentList[index]
             val qtyBaru = existingItem.stock + 1
 
             if (isStockSystemActive) {
+                // Pakai '>' supaya kalau qtyBaru == stokGudang masih boleh
                 if (qtyBaru > stokGudang) {
                     onResult("❌ Stok Habis! Sisa: $stokGudang")
-                    return // Berhenti karena stok mentok
+                    return
                 }
             }
 
             currentList[index] = existingItem.copy(stock = qtyBaru)
-            // 🔥 JANGAN LUPA PANGGIL INI
-            onResult("Qty ditambah")
+            // ❌ JANGAN PANGGIL onResult DISINI DULU
         } else {
+            // --- LOGIKA BARANG BARU ---
             if (isStockSystemActive) {
                 if (stokGudang <= 0) {
                     onResult("❌ Stok Kosong!")
-                    return // Berhenti karena stok kosong
+                    return
                 }
             }
 
             currentList.add(product.copy(stock = 1))
-            // 🔥 JANGAN LUPA PANGGIL INI
-            onResult("Masuk keranjang")
+            // ❌ JANGAN PANGGIL onResult DISINI DULU
         }
 
+        // ✅ UPDATE DATA DULU (WAJIB PERTAMA)
         _cart.value = currentList
         calculateTotal()
 
-        // --- TAMBAHAN PENTING ---
-        // Jika Mas Heru ingin memastikan UI selalu update,
-        // pastikan onResult dipanggil SETELAH _cart.value diupdate.
+        // ✅ BARU LAPORAN KE MAIN ACTIVITY (TERAKHIR)
+        // Dengan begini, saat MainActivity refresh, dia ngambil data yang SUDAH BARU.
+        onResult("Berhasil")
     }
 
     fun decreaseCartItem(product: Product) {
