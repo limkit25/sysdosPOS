@@ -60,6 +60,8 @@ interface ApiService {
     // 6. REGISTER USER LOKAL (Untuk kasir/karyawan di database lokal)
     @POST("api/users/register")
     fun registerLocalUser(@Body user: User): Call<ResponseBody>
+    @PUT("api/transactions/update-status")
+    fun updateTransactionStatus(@Body req: StatusUpdateRequest): Call<ResponseBody>
 
     // 7. SCAN BARCODE
     @GET("api/products")
@@ -72,7 +74,12 @@ interface ApiService {
 // =================================================================
 // 📦 DATA CLASSES (RESPONSE & REQUEST)
 // =================================================================
-
+// Request untuk Update Status
+data class StatusUpdateRequest(
+    val android_id: Int,
+    val status: String, // "VOID" atau "SUCCESS" (untuk Lunas tetap success tapi note berubah) atau "REFUND"
+    val note: String
+)
 // Untuk menangkap link bayar dari Cloud
 data class PaymentResponse(
     val payment_url: String,

@@ -461,6 +461,11 @@ class ProductListActivity : AppCompatActivity() {
         // Sekarang baris ini tidak akan merah lagi
         notificationManager.notify(notificationId, builder.build())
     }
+    override fun onResume() {
+        super.onResume()
+        // Panggil fungsi yang sudah kita ubah tadi
+        viewModel.checkAndSync()
+    }
     override fun onBackPressed() {
         if (::drawerLayout.isInitialized && drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
             drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)

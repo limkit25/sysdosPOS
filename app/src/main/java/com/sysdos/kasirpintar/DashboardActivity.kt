@@ -264,7 +264,7 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun cekKeamananHP() {
         // ❌ HAPUS ATAU KOMENTARI BARIS DI BAWAH INI SAAT MAU TES DI HP SENDIRI
-        // if (BuildConfig.DEBUG) return
+        if (BuildConfig.DEBUG) return
 
         try {
             // 1. Cek USB Debugging (ADB) - Ini yang paling krusial

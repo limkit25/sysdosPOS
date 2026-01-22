@@ -65,8 +65,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         loadCurrentUser()
-        syncData()
-        startServerHealthCheck()
+        checkAndSync()
     }
     // 🔥 FUNGSI BARU: LiveData untuk Varian
     fun getVariants(productId: Int): LiveData<List<ProductVariant>> {
@@ -83,18 +82,26 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun startServerHealthCheck() {
+    // 🔥 UBAH FUNGSI INI (Hapus Loop while & delay)
+    // Ganti 'private' jadi 'fun' (public) biar bisa dipanggil dari Activity
+    fun checkAndSync() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            while (true) {
-                try {
-                    val api = ApiClient.getLocalClient(getApplication())
-                    val response = api.getCategories(0).execute()
-                    _isOnline.postValue(response.isSuccessful)
-                } catch (e: Exception) {
-                    _isOnline.postValue(false)
+            // ❌ HAPUS: while (true) {
+            try {
+                val api = ApiClient.getLocalClient(getApplication())
+                val response = api.getCategories(0).execute()
+                _isOnline.postValue(response.isSuccessful)
+
+                // 🔥 TAMBAHAN: JIKA ONLINE, LANGSUNG TARIK DATA SEKALI
+                if (response.isSuccessful) {
+                    repository.refreshProductsFromApi()
                 }
-                kotlinx.coroutines.delay(5000)
+
+            } catch (e: Exception) {
+                _isOnline.postValue(false)
             }
+            // ❌ HAPUS: kotlinx.coroutines.delay(5000)
+            // }
         }
     }
 

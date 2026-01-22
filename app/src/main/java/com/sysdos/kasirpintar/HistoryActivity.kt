@@ -181,9 +181,13 @@ class HistoryActivity : AppCompatActivity() {
                 .setTitle("⚠️ Batalkan Transaksi?")
                 .setMessage("ID: #${trx.id}\n\nStok barang akan dikembalikan dan transaksi dihapus.")
                 .setPositiveButton("YA, VOID") { _, _ ->
+                    // 1. Proses Lokal (Room & Stok)
                     viewModel.voidTransaction(trx) {
-                        Toast.makeText(this, "Transaksi Dibatalkan!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Transaksi Dibatalkan di HP!", Toast.LENGTH_SHORT).show()
                         calculateTotalPiutang()
+
+                        // 🔥 2. PROSES SERVER (Kirim data VOID ke Golang)
+                        syncUpdateToServer(trx.id, "VOID", "Dibatalkan oleh Kasir")
                     }
                 }
                 .setNegativeButton("Batal", null).show()
@@ -515,6 +519,7 @@ class HistoryActivity : AppCompatActivity() {
                         Toast.makeText(this@HistoryActivity, "✅ Hutang Lunas!", Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
                         // Refresh Data (Opsional, karena LiveData akan auto-update)
+                        syncUpdateToServer(trx.id, "SUCCESS", updatedTrx.note)
                     }
                 }
             }
@@ -668,5 +673,29 @@ class HistoryActivity : AppCompatActivity() {
 
     private fun formatRupiah(number: Double): String {
         return String.format(Locale("id", "ID"), "Rp %,d", number.toLong()).replace(',', '.')
+    }
+    // 🔥 Fungsi Tambahan untuk Kirim Update ke Golang
+    private fun syncUpdateToServer(androidId: Int, newStatus: String, newNote: String) {
+        val req = com.sysdos.kasirpintar.api.StatusUpdateRequest(
+            android_id = androidId,
+            status = newStatus,
+            note = newNote
+        )
+
+        // Ambil Client Lokal (Pastikan IP Server sudah di-set saat Login)
+        com.sysdos.kasirpintar.api.ApiClient.getLocalClient(this)
+            .updateTransactionStatus(req)
+            .enqueue(object : retrofit2.Callback<okhttp3.ResponseBody> {
+                override fun onResponse(call: retrofit2.Call<okhttp3.ResponseBody>, response: retrofit2.Response<okhttp3.ResponseBody>) {
+                    if (response.isSuccessful) {
+                        android.util.Log.d("SYNC", "Server Updated: $newStatus")
+                    } else {
+                        android.util.Log.e("SYNC", "Gagal Update Server: ${response.code()}")
+                    }
+                }
+                override fun onFailure(call: retrofit2.Call<okhttp3.ResponseBody>, t: Throwable) {
+                    android.util.Log.e("SYNC", "Error Koneksi: ${t.message}")
+                }
+            })
     }
 }

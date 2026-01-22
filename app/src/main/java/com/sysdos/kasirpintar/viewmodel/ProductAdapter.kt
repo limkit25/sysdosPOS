@@ -32,7 +32,8 @@ class ProductAdapter(
     }
 
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        // Pastikan pakai productList[position] atau getItem(position) sesuai base adapter kakak
+        holder.bind(productList[position])
     }
 
     inner class ProductViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -40,11 +41,7 @@ class ProductAdapter(
         private val tvPrice: TextView = itemView.findViewById(R.id.tvProductPrice)
         private val tvStock: TextView = itemView.findViewById(R.id.tvStock)
         private val imgProduct: ImageView = itemView.findViewById(R.id.imgProduct)
-
-        // Badge Merah
         private val tvBadge: TextView = itemView.findViewById(R.id.tvCartBadge)
-
-        // 🔥 1. DEFINISIKAN VIEW SKU (Pastikan ID ini ada di XML item_product.xml)
         private val tvSku: TextView = itemView.findViewById(R.id.tvProductSku)
 
         fun bind(product: Product) {
@@ -60,15 +57,14 @@ class ProductAdapter(
             }
 
             // ============================================================
-            // 🔥 1. AMBIL SETTINGAN "STOK LOS" DARI MEMORI
+            // 🔥 1. AMBIL SETTINGAN "STOK LOS" (Ganti nama jadi storePrefs)
             // ============================================================
             val context = itemView.context
-            val prefs = context.getSharedPreferences("store_prefs", android.content.Context.MODE_PRIVATE)
-            val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: Wajib Cek Stok
+            val storePrefs = context.getSharedPreferences("store_prefs", android.content.Context.MODE_PRIVATE)
+            val isStockSystemActive = storePrefs.getBoolean("use_stock_system", true)
 
-            // ============================================================
-            // 🔢 HITUNG SISA STOK (Dikurang yang ada di keranjang)
-            // ============================================================
+            // 🔢 HITUNG SISA STOK
+            // Pastikan 'cartList' bisa diakses di sini (biasanya passed dari Activity/Fragment)
             val totalQtyInCart = cartList.filter {
                 it.id == product.id || it.parentId == product.id
             }.sumOf { it.stock }
@@ -77,13 +73,14 @@ class ProductAdapter(
 
             // TAMPILAN TEXT STOK
             if (currentStock <= 0) {
-                tvStock.setTextColor(android.graphics.Color.RED)
-                // Kalau Stok Los Aktif, tulisannya beda biar gak bingung
                 if (!isStockSystemActive) {
-                    tvStock.text = "Stok: $currentStock (Los)" // Tetap tampil angka walau 0/minus
-                    tvStock.setTextColor(android.graphics.Color.parseColor("#FF9800")) // Oranye
+                    // KASUS STOK LOS (Oranye)
+                    tvStock.text = "Stok: $currentStock (Los)"
+                    tvStock.setTextColor(android.graphics.Color.parseColor("#FF9800"))
                 } else {
+                    // KASUS WAJIB STOK (Merah)
                     tvStock.text = "Habis!"
+                    tvStock.setTextColor(android.graphics.Color.RED)
                 }
             } else {
                 tvStock.text = "Stok: $currentStock"
@@ -98,10 +95,18 @@ class ProductAdapter(
                 tvBadge.visibility = View.GONE
             }
 
-            // LOAD GAMBAR
+            // ============================================================
+            // 🔥 2. LOAD GAMBAR (Ganti nama jadi ipPrefs)
+            // ============================================================
             if (!product.imagePath.isNullOrEmpty()) {
+                val ipPrefs = itemView.context.getSharedPreferences("SysdosSettings", android.content.Context.MODE_PRIVATE)
+                val serverIp = ipPrefs.getString("SERVER_IP", "192.168.1.10:9000")
+
+                // Gabung URL: http://192.168.1.10:9000/uploads/foto.jpg
+                val fullUrl = "http://$serverIp${product.imagePath}"
+
                 com.bumptech.glide.Glide.with(itemView.context)
-                    .load(product.imagePath)
+                    .load(fullUrl)
                     .placeholder(R.mipmap.ic_launcher)
                     .error(R.mipmap.ic_launcher)
                     .centerCrop()
@@ -111,20 +116,18 @@ class ProductAdapter(
             }
 
             // ============================================================
-            // 🔥 2. LOGIKA KLIK (INTI DARI FITUR STOK LOS)
+            // 🔥 3. LOGIKA KLIK (Stok Los vs Wajib Stok)
             // ============================================================
             itemView.setOnClickListener {
                 if (isStockSystemActive) {
-                    // KASUS A: WAJIB CEK STOK (Switch ON)
+                    // WAJIB CEK STOK
                     if (currentStock > 0) {
                         onItemClick(product)
                     } else {
-                        // Cegah klik dan kasih peringatan
                         android.widget.Toast.makeText(context, "Stok Habis! (Cek Pengaturan Toko)", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    // KASUS B: STOK LOS (Switch OFF)
-                    // Hajar terus walau stok 0 atau minus
+                    // STOK LOS (Bebas Klik)
                     onItemClick(product)
                 }
             }
