@@ -5,6 +5,7 @@ import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.http.*
+import com.google.gson.annotations.SerializedName
 
 interface ApiService {
 
@@ -103,14 +104,22 @@ data class LeadRequest(
     val email: String
 )
 
-// Response Barang (Lokal)
 data class ProductResponse(
     val id: Int,
     val name: String,
     val category: String?,
-    val cost_price: Int,
-    val price: Int,
+
+    // 🔥 WAJIB PAKAI @SerializedName KARENA GOLANG PAKAI "cost"
+    @SerializedName("cost")
+    val cost_price: Double, // Gunakan Double (karena di Golang float64)
+
+    // 🔥 Gunakan Double untuk harga jual juga
+    val price: Double,
+
     val stock: Int,
+
+    // 🔥 WAJIB PAKAI @SerializedName KARENA GOLANG PAKAI "imagePath"
+    @SerializedName("imagePath")
     val image_path: String?
 )
 

@@ -132,10 +132,19 @@ class ProductRepository(
                         serverProducts.forEach { apiItem ->
                             val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) dynamicBaseUrl + apiItem.image_path else null
                             val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
+
                             val newProd = Product(
-                                id = apiItem.id, name = apiItem.name, price = apiItem.price.toDouble(),
-                                costPrice = apiItem.cost_price.toDouble(), stock = apiItem.stock,
-                                category = serverCategory, barcode = "", imagePath = fullImagePath
+                                id = apiItem.id,
+                                name = apiItem.name,
+
+                                // 🔥 PERBAIKAN: Gunakan .toDouble() karena Product.kt butuh Double
+                                price = apiItem.price.toDouble(),
+                                costPrice = apiItem.cost_price.toDouble(),
+
+                                stock = apiItem.stock,
+                                category = serverCategory,
+                                barcode = "",
+                                imagePath = fullImagePath
                             )
                             productDao.insertProduct(newProd)
                         }
@@ -151,21 +160,57 @@ class ProductRepository(
         withContext(Dispatchers.IO) {
             try {
                 val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-                val email = prefs.getString("username", "") ?: ""
-                val currentUser = productDao.getUserByEmail(email) ?: return@withContext
+                val email = prefs.getString("username", "admin") ?: "admin" // Default admin jika kosong
+
+                // 🔥 PERBAIKAN: Jika user tidak ketemu di DB Lokal, pakai ID 1 (Admin) atau ID dari Transaksi
+                // Jangan langsung return/berhenti!
+                val currentUser = productDao.getUserByEmail(email)
+                val userIdToSend = currentUser?.id ?: trx.userId
+
                 val itemList = cartItems.map { com.sysdos.kasirpintar.api.TransactionItemRequest(it.id, it.stock) }
+
                 val requestData = com.sysdos.kasirpintar.api.TransactionUploadRequest(
-                    trx.totalAmount, trx.profit, trx.itemsSummary, currentUser.id, itemList
+                    trx.totalAmount,
+                    trx.profit,
+                    trx.itemsSummary,
+                    userIdToSend, // Pakai ID yang sudah dipastikan ada
+                    itemList
                 )
-                ApiClient.getLocalClient(context).uploadTransaction(requestData).execute()
-            } catch (e: Exception) { Log.e("SysdosPOS", "Gagal Upload: ${e.message}") }
+
+                Log.d("SysdosPOS", "Mencoba Upload Transaksi: $requestData") // Cek Logcat
+
+                val api = ApiClient.getLocalClient(context)
+                val response = api.uploadTransaction(requestData).execute()
+
+                if (response.isSuccessful) {
+                    Log.d("SysdosPOS", "✅ Upload Berhasil: ${response.body()?.string()}")
+                } else {
+                    Log.e("SysdosPOS", "❌ Gagal Server: ${response.code()} - ${response.errorBody()?.string()}")
+                }
+
+            } catch (e: Exception) {
+                Log.e("SysdosPOS", "❌ Error Koneksi: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
     suspend fun updateProductToServer(product: Product) {
         withContext(Dispatchers.IO) {
             try {
-                val dataKirim = ProductResponse(id = product.id, name = product.name, category = product.category, price = product.price.toInt(), cost_price = product.costPrice.toInt(), stock = product.stock, image_path = null)
+                // 🔥 PERBAIKAN DI SINI (Ubah ke .toDouble())
+                // Karena ProductResponse (ApiService) sekarang mintanya Double
+                val dataKirim = ProductResponse(
+                    id = product.id,
+                    name = product.name,
+                    category = product.category,
+
+                    price = product.price.toDouble(),       // Ganti .toInt() jadi .toDouble()
+                    cost_price = product.costPrice.toDouble(), // Ganti .toInt() jadi .toDouble()
+
+                    stock = product.stock,
+                    image_path = null
+                )
                 ApiClient.getLocalClient(context).updateProduct(dataKirim).execute()
             } catch (e: Exception) {}
         }
