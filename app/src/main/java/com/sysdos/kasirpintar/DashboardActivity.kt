@@ -161,8 +161,23 @@ class DashboardActivity : AppCompatActivity() {
                 AlertDialog.Builder(this)
                     .setTitle("⚠️ MASA TRIAL HABIS")
                     .setMessage("Masa percobaan 7 hari telah berakhir.")
-                    .setPositiveButton("Hubungi Admin") { _, _ ->
-                        // ... logic WA ...
+                    .setPositiveButton("HUBUNGI ADMIN") { _, _ ->
+                        try {
+                            // 1. GANTI NOMOR WA ANDA DISINI (Wajib pakai kode negara 62)
+                            val nomorAdmin = "628179842043"
+
+                            // 2. Pesan otomatis
+                            val pesan = "Halo Admin, masa trial sysdos POS saya sudah habis. Saya ingin melakukan pembayaran untuk Upgrade ke Premium."
+
+                            // 3. Buka WhatsApp
+                            val url = "https://api.whatsapp.com/send?phone=$nomorAdmin&text=${java.net.URLEncoder.encode(pesan, "UTF-8")}"
+                            val intent = Intent(Intent.ACTION_VIEW)
+                            intent.data = android.net.Uri.parse(url)
+                            startActivity(intent)
+
+                        } catch (e: Exception) {
+                            Toast.makeText(this, "Gagal membuka WhatsApp, pastikan terinstall.", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     .setNegativeButton("Tutup", null)
                     .show()
@@ -264,7 +279,7 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun cekKeamananHP() {
         // ❌ HAPUS ATAU KOMENTARI BARIS DI BAWAH INI SAAT MAU TES DI HP SENDIRI
-        if (BuildConfig.DEBUG) return
+//        if (BuildConfig.DEBUG) return
 
         try {
             // 1. Cek USB Debugging (ADB) - Ini yang paling krusial

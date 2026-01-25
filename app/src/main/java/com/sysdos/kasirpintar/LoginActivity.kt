@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.*
@@ -12,10 +11,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
+
+// IMPORT WAJIB
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
 import com.sysdos.kasirpintar.api.ApiClient
@@ -32,10 +35,9 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
     private lateinit var sessionManager: SessionManager
+    private lateinit var mGoogleSignInClient: GoogleSignInClient
 
-    // 🔥 VARIABEL PENTING: Untuk membedakan Login atau Register
     private var isRegisterMode = false
-    // Biar dialog register bisa ditutup otomatis saat sukses Google
     private var activeRegisterDialog: AlertDialog? = null
 
     // Launcher Google
@@ -53,12 +55,21 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Setup Google Client
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+        mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
+
         setContentView(R.layout.activity_login)
 
+        // Cek apakah ada request buka register langsung
         if (intent.getBooleanExtra("OPEN_REGISTER_DIRECTLY", false)) {
             showRegisterDialog()
         }
 
+        // Cek Session (Kalau sudah login, langsung ke Dashboard)
         sessionManager = SessionManager(this)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         if (session.contains("username")) {
@@ -69,10 +80,11 @@ class LoginActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
+        // Binding View
         val etUser = findViewById<TextInputEditText>(R.id.etUsername)
         val etPass = findViewById<TextInputEditText>(R.id.etPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
-        val btnGoogleLogin = findViewById<MaterialCardView>(R.id.btnGoogleLogin) // Tombol di Layar Login
+        val btnGoogleLogin = findViewById<MaterialCardView>(R.id.btnGoogleLogin)
         val btnRegisterLink = findViewById<TextView>(R.id.btnRegisterLink)
         val btnGear = findViewById<ImageButton>(R.id.btnServerSetting)
         val tvAppVersion = findViewById<TextView>(R.id.tvAppVersion)
@@ -82,51 +94,47 @@ class LoginActivity : AppCompatActivity() {
             tvAppVersion.text = "Ver ${pInfo.versionName}"
         } catch (e: Exception) {}
 
+        // =================================================================
+        // 🔒 1. LOGIKA LOGIN MANUAL (USERNAME & PASSWORD)
+        // =================================================================
         btnLogin.setOnClickListener {
             val u = etUser.text.toString().trim()
             val p = etPass.text.toString().trim()
 
             if (u.isNotEmpty() && p.isNotEmpty()) {
-
-                // 🔍 LANGKAH 1: Cek apakah User (Email) ini sudah ada di Database HP?
+                // A. Cek di Database HP dulu
                 viewModel.getUserByEmail(u) { existingUser ->
-
                     if (existingUser != null) {
-                        // 🟢 KASUS A: USER SUDAH ADA DI HP
-                        // Kita WAJIB validasi password di sini secara ketat.
-
+                        // User Ada di HP -> Cek Password
                         if (existingUser.password == p) {
-                            // ✅ Password Benar -> Masuk
                             processLoginSuccess(existingUser)
                         } else {
-                            // ❌ Password Salah -> STOP! JANGAN KE SERVER!
                             Toast.makeText(this, "❌ Password Salah!", Toast.LENGTH_SHORT).show()
                         }
-                    }
-                    else {
-                        // 🔴 KASUS B: USER TIDAK ADA DI HP (DATABASE KOSONG / HP BARU)
-                        // Baru kita izinkan cek ke Server untuk proses Restore/Pemulihan.
-
+                    } else {
+                        // B. User Kosong di HP -> Cek Server (Siapa tau ganti HP)
                         val loading = android.app.ProgressDialog(this)
-                        loading.setMessage("Database kosong/User baru. Memeriksa ke server...")
+                        loading.setMessage("Mencari akun di server...")
                         loading.show()
 
                         viewModel.checkUserOnCloud(u) { response ->
                             loading.dismiss()
 
                             if (response != null) {
-                                if (response.status == "BLOCKED") {
-                                    showErrorDialog("Akses Ditolak", "Akun terkunci di device lain: ${response.message}")
+                                // 🔥 SATPAM 1: CEK APAKAH AKUN DITEMUKAN? 🔥
+                                if (response.message.lowercase().contains("tidak ditemukan")) {
+                                    showErrorDialog("Gagal Masuk", "Email $u belum terdaftar di sistem.\nSilakan Daftar Akun dulu.")
                                 }
-                                else if (response.message.lowercase().contains("tidak ditemukan")) {
-                                    Toast.makeText(this, "Akun belum terdaftar.", Toast.LENGTH_LONG).show()
+                                // 🔥 SATPAM 2: CEK BLOCK 🔥
+                                else if (response.status == "BLOCKED") {
+                                    showErrorDialog("Akses Ditolak", "Akun terkunci di HP lain:\n${response.message}")
                                 }
                                 else {
-                                    // ✅ RESTORE BERHASIL (Hanya jika user di HP memang kosong)
+                                    // ✅ LOLOS: Akun Valid -> Restore ke HP
                                     val restoredUser = User(
                                         name = "Owner Toko",
                                         username = u,
-                                        password = p, // Password baru ini akan disimpan sebagai password login
+                                        password = p, // Simpan password yang diketik user
                                         role = "admin"
                                     )
                                     viewModel.insertUser(restoredUser)
@@ -134,11 +142,11 @@ class LoginActivity : AppCompatActivity() {
                                     val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
                                     prefs.edit().putBoolean("is_full_version", response.status == "PREMIUM").apply()
 
-                                    Toast.makeText(this, "Akun Dipulihkan di HP ini!", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this, "Akun Dipulihkan!", Toast.LENGTH_LONG).show()
                                     processLoginSuccess(restoredUser)
                                 }
                             } else {
-                                Toast.makeText(this, "Gagal koneksi server. Cek internet.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, "Gagal koneksi ke server.", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -148,7 +156,9 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        // 2. LOGIN GOOGLE (TOMBOL DI LAYAR LOGIN)
+        // =================================================================
+        // 🔒 2. LOGIKA LOGIN GOOGLE
+        // =================================================================
         btnGoogleLogin.setOnClickListener {
             isRegisterMode = false // Mode LOGIN
             startGoogleSignIn()
@@ -166,38 +176,34 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun startGoogleSignIn() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .build()
-        val mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
-        // Logout dulu biar bisa pilih akun lain
         mGoogleSignInClient.signOut().addOnCompleteListener {
             googleSignInLauncher.launch(mGoogleSignInClient.signInIntent)
         }
     }
 
-    // 🔥 UPDATE LOGIKA GOOGLE (PERBAIKAN ERROR "Type Mismatch")
     private fun handleGoogleResult(account: GoogleSignInAccount) {
         val email = account.email ?: return
         val name = account.displayName ?: "User Google"
 
         viewModel.checkGoogleUser(email) { existingUser ->
+
+            // --- MODE REGISTER (User klik Daftar) ---
             if (isRegisterMode) {
-                // === MODE REGISTER (User Sengaja Klik Tombol Daftar) ===
                 if (existingUser != null) {
-                    Toast.makeText(this, "Email ini sudah ada di HP ini. Login saja.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Email sudah ada di HP ini. Login saja.", Toast.LENGTH_LONG).show()
                 } else {
-                    // 🔥 Perbaikan Check Cloud (Terima Object, bukan Boolean)
                     viewModel.checkUserOnCloud(email) { response ->
-                        if (response != null) {
-                            Toast.makeText(this, "Email ini SUDAH TERDAFTAR di Server! Silakan Login.", Toast.LENGTH_LONG).show()
+                        if (response != null && !response.message.lowercase().contains("tidak ditemukan")) {
+                            Toast.makeText(this, "Email SUDAH TERDAFTAR di Server! Login saja.", Toast.LENGTH_LONG).show()
                         } else {
                             performGoogleRegistration(name, email)
                         }
                     }
                 }
-            } else {
-                // === MODE LOGIN (User Klik Masuk) ===
+            }
+
+            // --- MODE LOGIN (User klik Masuk) ---
+            else {
                 if (existingUser != null) {
                     processLoginSuccess(existingUser)
                 } else {
@@ -205,17 +211,23 @@ class LoginActivity : AppCompatActivity() {
                     loading.setMessage("Mencari data akun Anda...")
                     loading.show()
 
-                    // 🔥 Perbaikan Check Cloud & Blocked Status (Terima Object)
                     viewModel.checkUserOnCloud(email) { response ->
                         loading.dismiss()
 
                         if (response != null) {
-                            // 🛑 CEK STATUS BLOCK
-                            if (response.status == "BLOCKED") {
-                                showErrorDialog("Akses Ditolak!", "Akun ini terkunci di HP lain:\n\n📱 ${response.message}\n\nSilakan Reset Device dulu.")
-                            } else {
-                                // ✅ PULIHKAN
-                                Toast.makeText(this, "Akun ditemukan! Memulihkan data...", Toast.LENGTH_SHORT).show()
+                            // 🔥 SATPAM 1: CEK APAKAH AKUN DITEMUKAN? 🔥
+                            if (response.message.lowercase().contains("tidak ditemukan")) {
+                                showErrorDialog("Akses Ditolak", "Email $email belum terdaftar.\nSilakan 'Daftar Akun' terlebih dahulu.")
+                                mGoogleSignInClient.signOut()
+                            }
+                            // 🔥 SATPAM 2: CEK BLOCK 🔥
+                            else if (response.status == "BLOCKED") {
+                                showErrorDialog("Akses Ditolak!", "Akun terkunci:\n${response.message}")
+                                mGoogleSignInClient.signOut()
+                            }
+                            else {
+                                // ✅ LOLOS: Akun Valid -> Restore
+                                Toast.makeText(this, "Akun ditemukan! Memulihkan...", Toast.LENGTH_SHORT).show()
                                 viewModel.logoutAndReset {
                                     val restoredUser = User(
                                         name = name,
@@ -225,7 +237,6 @@ class LoginActivity : AppCompatActivity() {
                                     )
                                     viewModel.insertUser(restoredUser)
 
-                                    // Simpan Status Lisensi
                                     val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
                                     prefs.edit().putBoolean("is_full_version", response.status == "PREMIUM").apply()
 
@@ -233,7 +244,8 @@ class LoginActivity : AppCompatActivity() {
                                 }
                             }
                         } else {
-                            showErrorDialog("Akun Belum Terdaftar", "Email ($email) belum terdaftar.\nSilakan Daftar Akun Baru.")
+                            showErrorDialog("Gagal Login", "Gagal menghubungi server.")
+                            mGoogleSignInClient.signOut()
                         }
                     }
                 }
@@ -241,18 +253,15 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    // 🔥 UPDATE FUNGSI INI (Google Register)
     private fun performGoogleRegistration(name: String, email: String) {
         val loading = android.app.ProgressDialog(this)
         loading.setMessage("Mendaftarkan akun Google...")
         loading.setCancelable(false)
         loading.show()
 
-        // 1. Reset Data Lama
         viewModel.logoutAndReset {
             getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
 
-            // 2. Simpan User Baru
             val newUser = User(
                 name = name,
                 username = email,
@@ -261,7 +270,6 @@ class LoginActivity : AppCompatActivity() {
             )
             viewModel.insertUser(newUser)
 
-            // 3. Kirim ke Cloud
             val leadRequest = LeadRequest(
                 name = name, store_name = "Toko $name", store_address = "-", store_phone = "-", phone = "-", email = email
             )
@@ -269,20 +277,14 @@ class LoginActivity : AppCompatActivity() {
                 override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
                     loading.dismiss()
                     if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
-
-                    Toast.makeText(this@LoginActivity, "Registrasi Berhasil! Silakan Setup Toko.", Toast.LENGTH_LONG).show()
-
-                    // 🔥 ARAHKAN KE SETUP TOKO, BUKAN DASHBOARD
+                    Toast.makeText(this@LoginActivity, "Registrasi Berhasil!", Toast.LENGTH_LONG).show()
                     finalizeRegistration(newUser, activeRegisterDialog)
                 }
 
                 override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
                     loading.dismiss()
                     if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
-
-                    Toast.makeText(this@LoginActivity, "Registrasi Offline. Silakan Setup Toko.", Toast.LENGTH_LONG).show()
-
-                    // 🔥 ARAHKAN KE SETUP TOKO
+                    Toast.makeText(this@LoginActivity, "Registrasi Offline.", Toast.LENGTH_LONG).show()
                     finalizeRegistration(newUser, activeRegisterDialog)
                 }
             })
@@ -290,25 +292,13 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun processLoginSuccess(user: User) {
-
-        // 🔥 PERBAIKAN PENTING DISINI 🔥
-        // Cek Lisensi ke Server HANYA JIKA yang login adalah ADMIN (Owner)
-        // Kasir & Manager "menumpang" lisensi Owner yang tersimpan di HP.
-
         if (user.role == "admin") {
             viewModel.checkServerLicense(user.username)
-        } else {
-            // Kalau Kasir/Manager, TIDAK USAH cek ke server.
-            // Biarkan dia pakai status lisensi terakhir yang ada di HP.
         }
-
         saveSession(user)
-
-        // Kirim data user ke sistem sales (opsional, boleh di-if juga kalau mau hemat kuota)
         if (user.role == "admin") {
             viewModel.sendDataToSalesSystem(user)
         }
-
         Toast.makeText(this, "Selamat Datang, ${user.name}!", Toast.LENGTH_SHORT).show()
         startActivity(Intent(this, DashboardActivity::class.java))
         finish()
@@ -316,21 +306,13 @@ class LoginActivity : AppCompatActivity() {
 
     private fun showRegisterDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_user_entry, null)
-
-        // Find Views
         val etName = view.findViewById<EditText>(R.id.etName)
         val etUser = view.findViewById<EditText>(R.id.etUsername)
         val etPhone = view.findViewById<EditText>(R.id.etPhone)
         val etPass = view.findViewById<EditText>(R.id.etPassword)
-
-        // 🔥 FITUR 1: SEMBUNYIKAN PILIHAN ROLE (Spinner)
-        // Kita cek dulu apakah spRole ada di layout, kalau ada kita hilangkan.
         val spRole = view.findViewById<Spinner>(R.id.spRole)
-        if (spRole != null) {
-            spRole.visibility = View.GONE
-        }
+        if (spRole != null) spRole.visibility = View.GONE
 
-        // Tombol Google (Pakai View biar aman, mau itu CardView atau Button)
         val btnGoogleReg = view.findViewById<View>(R.id.btnGoogleRegister)
 
         val dialog = AlertDialog.Builder(this)
@@ -340,26 +322,20 @@ class LoginActivity : AppCompatActivity() {
             .setNegativeButton("BATAL", null)
             .create()
 
-        activeRegisterDialog = dialog // Simpan referensi biar bisa ditutup
+        activeRegisterDialog = dialog
 
-        // --- TOMBOL GOOGLE DI REGISTER ---
         btnGoogleReg.setOnClickListener {
-            isRegisterMode = true // Set Mode ke REGISTER
-            // startGoogleSignIn() adalah fungsi yang sudah ada di codingan Anda
+            isRegisterMode = true
             startGoogleSignIn()
         }
 
         dialog.setOnShowListener {
             val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             button.setOnClickListener {
-                // LOGIKA DAFTAR MANUAL
                 val nama = etName.text.toString().trim()
                 val email = etUser.text.toString().trim()
                 val hp = etPhone.text.toString().trim()
                 val pass = etPass.text.toString().trim()
-
-                // 🔥 FITUR 2: PAKSA ROLE JADI ADMIN
-                val fixedRole = "admin"
 
                 if (nama.isEmpty() || email.isEmpty() || hp.isEmpty() || pass.isEmpty()) {
                     Toast.makeText(this, "Lengkapi semua data!", Toast.LENGTH_SHORT).show()
@@ -367,57 +343,49 @@ class LoginActivity : AppCompatActivity() {
                 }
 
                 val loading = android.app.ProgressDialog(this)
-                loading.setMessage("Proses Pendaftaran...")
+                loading.setMessage("Cek ketersediaan email...")
                 loading.show()
 
-                // Panggil ViewModel Anda (Sesuai codingan lama)
-                viewModel.logoutAndReset {
-                    getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
+                // 🔥 CEK DUPLIKAT DI SERVER SEBELUM DAFTAR MANUAL
+                viewModel.checkUserOnCloud(email) { response ->
+                    if (response != null && !response.message.lowercase().contains("tidak ditemukan")) {
+                        loading.dismiss()
+                        showErrorDialog("Gagal Daftar", "Email ini SUDAH TERDAFTAR di sistem pusat.\nSilakan Login saja.")
+                    } else {
+                        // Oke, email bersih, lanjut daftar
+                        loading.setMessage("Menyimpan data...")
+                        viewModel.logoutAndReset {
+                            getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
+                            val newUser = User(name = nama, username = email, phone = hp, password = pass, role = "admin")
+                            viewModel.insertUser(newUser)
 
-                    // Insert User dengan Role ADMIN (Fixed)
-                    val newUser = User(
-                        name = nama,
-                        username = email,
-                        phone = hp,
-                        password = pass,
-                        role = fixedRole // <--- SUDAH DIPAKSA ADMIN
-                    )
-                    viewModel.insertUser(newUser)
-
-                    // Kirim ke Server (Sesuai codingan lama)
-                    val req = LeadRequest(name = nama, store_name = "Toko $nama", store_address = "-", store_phone = "-", phone = hp, email = email)
-                    ApiClient.webClient.registerLead(req).enqueue(object : Callback<ResponseBody> {
-                        override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
-                            loading.dismiss()
-                            finalizeRegistration(newUser, dialog)
+                            val req = LeadRequest(name = nama, store_name = "Toko $nama", store_address = "-", store_phone = "-", phone = hp, email = email)
+                            ApiClient.webClient.registerLead(req).enqueue(object : Callback<ResponseBody> {
+                                override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
+                                    loading.dismiss()
+                                    finalizeRegistration(newUser, dialog)
+                                }
+                                override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
+                                    loading.dismiss()
+                                    finalizeRegistration(newUser, dialog)
+                                }
+                            })
                         }
-                        override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
-                            loading.dismiss()
-                            finalizeRegistration(newUser, dialog)
-                        }
-                    })
+                    }
                 }
             }
         }
         dialog.show()
     }
 
-    // 🔥 UPDATE FUNGSI INI (Pintu Keluar Register)
     private fun finalizeRegistration(user: User, dialog: AlertDialog?) {
-        // 1. Simpan Sesi dulu biar dianggap login
         saveSession(user)
         viewModel.sendDataToSalesSystem(user)
         viewModel.checkServerLicense(user.username)
-
         dialog?.dismiss()
-
-        // 2. 🔥 BELOKKAN KE STORE SETTINGS (SETUP AWAL)
         val intent = Intent(this, StoreSettingsActivity::class.java)
-        // Kirim sinyal bahwa ini adalah "Pendaftaran Awal"
         intent.putExtra("IS_INITIAL_SETUP", true)
         startActivity(intent)
-
-        // 3. Tutup LoginActivity agar user tidak bisa back ke login
         finish()
     }
 
@@ -433,19 +401,11 @@ class LoginActivity : AppCompatActivity() {
     private fun saveSession(user: User) {
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val editor = session.edit()
-
-        // Simpan Data Standar
         editor.putString("username", user.username)
         editor.putString("role", user.role)
         editor.putBoolean("is_logged_in", true)
-
-        // 🔥 INI TAMBAHAN PENTINGNYA 🔥
-        // Kita cek, kalau namanya kosong, pakai username. Kalau ada, pakai nama asli.
         val namaLengkap = if (user.name.isNullOrEmpty()) user.username else user.name
-
-        // Simpan dengan kunci "fullname"
         editor.putString("fullname", namaLengkap)
-
         editor.apply()
     }
 

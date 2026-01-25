@@ -124,35 +124,53 @@ class ProductRepository(
                 val session = SessionManager(context)
                 val dynamicBaseUrl = session.getServerUrl()
 
+                // 1. Ambil Produk dari Server
                 val responseProd = api.getProducts(currentUser.id).execute()
+
                 if (responseProd.isSuccessful) {
                     val serverProducts = responseProd.body()
                     if (serverProducts != null) {
+                        // Hapus data lama di HP biar bersih & sama dengan server
                         productDao.deleteAllProducts()
+
                         serverProducts.forEach { apiItem ->
+                            // Logic URL Gambar
                             val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) dynamicBaseUrl + apiItem.image_path else null
                             val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
 
+                            // 🔥 PERBAIKAN FINAL (androidId DIHAPUS) 🔥
                             val newProd = Product(
-                                id = apiItem.id,
+                                id = apiItem.id, // Pakai ID dari server sebagai ID lokal
                                 name = apiItem.name,
 
-                                // 🔥 PERBAIKAN: Gunakan .toDouble() karena Product.kt butuh Double
+                                // Konversi Double (Server) ke Double (Lokal)
                                 price = apiItem.price.toDouble(),
                                 costPrice = apiItem.cost_price.toDouble(),
 
                                 stock = apiItem.stock,
                                 category = serverCategory,
-                                barcode = "",
+                                barcode = "", // Default kosong
                                 imagePath = fullImagePath
+                                // ❌ androidId = ... (DIBUANG KARENA TIDAK ADA DI MODEL)
                             )
                             productDao.insertProduct(newProd)
                         }
                     }
                 }
+
+                // 2. Ambil Kategori dari Server
                 val responseCat = api.getCategories(currentUser.id).execute()
-                if (responseCat.isSuccessful) responseCat.body()?.forEach { productDao.insertCategory(Category(id = it.id, name = it.name)) }
-            } catch (e: Exception) { Log.e("SysdosRepo", "Error Sync: ${e.message}") }
+                if (responseCat.isSuccessful) {
+                    // Opsional: Hapus kategori lama jika perlu
+                    // productDao.deleteAllCategories()
+                    responseCat.body()?.forEach {
+                        productDao.insertCategory(Category(id = it.id, name = it.name))
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("SysdosRepo", "Error Sync: ${e.message}")
+            }
         }
     }
 
