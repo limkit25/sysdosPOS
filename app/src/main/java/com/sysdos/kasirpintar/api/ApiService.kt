@@ -70,6 +70,10 @@ interface ApiService {
         @Query("barcode") barcode: String,
         @Query("user_id") userId: Int
     ): Call<List<ProductResponse>>
+
+    // 8. GET ALL USERS (SYNC DARI WEB)
+    @GET("api/users")
+    fun getAllUsers(): Call<List<User>>
 }
 
 // =================================================================

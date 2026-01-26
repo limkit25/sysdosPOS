@@ -167,6 +167,24 @@ class ProductRepository(
                         productDao.insertCategory(Category(id = it.id, name = it.name))
                     }
                 }
+                val responseUser = api.getAllUsers().execute()
+                if (responseUser.isSuccessful && responseUser.body() != null) {
+                    val serverUsers = responseUser.body()!!
+                    serverUsers.forEach { sUser ->
+                        // Cek apakah user sudah ada di HP?
+                        val localUser = productDao.getUserByEmail(sUser.username)
+                        if (localUser == null) {
+                            // Jika belum ada, masukkan!
+                            // Password dari server sudah ter-enkripsi (aman), jadi langsung simpan saja.
+                            productDao.insertUser(sUser)
+                        } else {
+                            // Jika sudah ada, update datanya (termasuk jika password diganti di web)
+                            // Pastikan ID-nya sama agar tidak duplikat
+                            val updatedUser = sUser.copy(id = localUser.id)
+                            productDao.updateUser(updatedUser)
+                        }
+                    }
+                }
 
             } catch (e: Exception) {
                 Log.e("SysdosRepo", "Error Sync: ${e.message}")
