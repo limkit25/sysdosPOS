@@ -135,6 +135,10 @@ data class TransactionUploadRequest(
     val profit: Double,
     val items_summary: String,
     val user_id: Int,
+    // 🔥 TAMBAHAN BARU:
+    val tax: Double = 0.0,
+    val discount: Double = 0.0,
+    val note: String = "",
     val items: List<TransactionItemRequest>
 )
 

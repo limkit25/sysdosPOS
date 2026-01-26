@@ -191,7 +191,11 @@ class ProductRepository(
                     trx.totalAmount,
                     trx.profit,
                     trx.itemsSummary,
-                    userIdToSend, // Pakai ID yang sudah dipastikan ada
+                    userIdToSend,
+                    // 🔥 MASUKKAN ANGKA DARI TRANSAKSI DISINI:
+                    trx.tax,       // Pajak
+                    trx.discount,  // Diskon
+                    trx.note,      // Catatan
                     itemList
                 )
 
