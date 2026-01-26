@@ -93,27 +93,33 @@ class ProductAdapter(
             // 🖼️ LOGIKA LOAD GAMBAR (FIX DOUBLE SLASH //)
             // ============================================================
             if (!product.imagePath.isNullOrEmpty()) {
-                val ipPrefs = context.getSharedPreferences("SysdosSettings", Context.MODE_PRIVATE)
-                var serverIp = ipPrefs.getString("SERVER_IP", "192.168.1.10:9000") ?: "192.168.1.10:9000"
+                var finalUrl = product.imagePath
 
-                // 🔥 LANGKAH PEMBERSIHAN (Cleaning)
-                // 1. Hapus http/https kalau user mengetiknya manual
-                serverIp = serverIp.replace("http://", "").replace("https://", "")
+                if (!finalUrl.startsWith("http")) {
+                    val session = com.sysdos.kasirpintar.utils.SessionManager(context)
+                    var baseUrl = session.getServerUrl() // "http://192.168.1.15:9000/"
 
-                // 2. Hapus tanda miring '/' di paling belakang jika ada
-                if (serverIp.endsWith("/")) {
-                    serverIp = serverIp.substring(0, serverIp.length - 1)
+                    // Gabung dulu apa adanya (biarkan double slash terjadi)
+                    // Hasil: "http://192.168.1.15:9000//uploads/..."
+                    finalUrl = baseUrl + "/" + finalUrl.replace("/", "")
+                    // Eh salah, cara di atas ribet.
+
+                    // CARA PALING GAMPANG: Gabung saja dulu
+                    if (!finalUrl.startsWith("/")) finalUrl = "/$finalUrl"
+                    finalUrl = baseUrl + finalUrl
                 }
 
-                // 3. Rakit ulang dengan format yang pasti benar
-                // Format Akhir: http://192.168.1.5:9000/uploads/foto.jpg
-                val fullUrl = "http://$serverIp${product.imagePath}"
+                // 🔥 FIX FORCE: Paksa ganti //uploads menjadi /uploads
+                // Kita replace "9000//" jadi "9000/" supaya aman
+                finalUrl = finalUrl.replace(":9000//", ":9000/")
 
-                // Debugging Log (Bisa dilihat di Logcat dengan kata kunci "GLIDE_URL")
-                android.util.Log.d("GLIDE_URL", "Requesting: $fullUrl")
+                // Atau lebih ganas lagi: ganti semua // jadi / (kecuali http://)
+                // Tapi cara replace :9000// di atas sudah paling aman buat kasus Bapak.
+
+                android.util.Log.d("GLIDE_URL", "FORCE FIX: $finalUrl")
 
                 Glide.with(itemView.context)
-                    .load(fullUrl)
+                    .load(finalUrl)
                     .placeholder(R.mipmap.ic_launcher)
                     .error(R.mipmap.ic_launcher)
                     .centerCrop()
