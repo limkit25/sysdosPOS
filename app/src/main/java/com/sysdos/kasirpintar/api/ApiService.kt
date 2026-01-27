@@ -6,6 +6,7 @@ import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.http.*
 import com.google.gson.annotations.SerializedName
+import com.sysdos.kasirpintar.data.model.StockLog
 
 interface ApiService {
 
@@ -74,6 +75,9 @@ interface ApiService {
     // 8. GET ALL USERS (SYNC DARI WEB)
     @GET("api/users")
     fun getAllUsers(): Call<List<User>>
+    // 9. UPLOAD STOCK LOGS (BELANJA / VOID)
+    @POST("api/stock-logs/sync")
+    fun syncStockLogs(@Body logs: List<StockLog>): Call<ResponseBody>
 }
 
 // =================================================================

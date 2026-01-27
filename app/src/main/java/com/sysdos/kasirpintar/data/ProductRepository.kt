@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
+import kotlinx.coroutines.flow.first
 
 class ProductRepository(
     private val context: Context,
@@ -184,6 +185,14 @@ class ProductRepository(
                             productDao.updateUser(updatedUser)
                         }
                     }
+                }
+                // 4. KIRIM DATA LOG STOK
+// Ambil semua log saat ini (gunakan .first() untuk ambil snapshot dari Flow)
+                val logs = stockLogDao.getAllStockLogs().first()
+
+                if (logs.isNotEmpty()) {
+                    // Gunakan variable 'api' yang SUDAH ADA di atas (jangan pakai val lagi)
+                    api.syncStockLogs(logs).execute()
                 }
 
             } catch (e: Exception) {
