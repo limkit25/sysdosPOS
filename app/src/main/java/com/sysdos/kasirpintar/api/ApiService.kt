@@ -80,8 +80,12 @@ interface ApiService {
     @POST("api/stock-logs/sync")
     fun syncStockLogs(@Body logs: List<StockLog>): Call<ResponseBody>
     // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
+    // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
     @POST("api/shifts/sync")
-    fun syncShiftLogs(@Body logs: List<ShiftLog>): Call<ResponseBody>
+    fun syncShiftLogs(
+        @Body logs: List<ShiftLog>,
+        @Query("user_id") userId: Int
+    ): Call<ResponseBody>
 }
 
 // =================================================================

@@ -120,7 +120,11 @@ class UserListActivity : AppCompatActivity() {
             etName.setText(userToEdit.name)
             etUser.setText(userToEdit.username)
             etPhone.setText(userToEdit.phone)
-            etPass.setText(userToEdit.password)
+            
+            // 🔥 JANGAN TAMPILKAN PASSWORD HASH (BIKIN BINGUNG)
+            // Biarkan kosong, user isi hanya jika mau ganti.
+            etPass.hint = "Isi HANYA jika ingin ubah password" 
+            etPass.setText("") 
 
             // Set Pilihan Spinner sesuai Role user yang diedit
             val roleIndex = roleOptions.indexOf(userToEdit.role)
@@ -144,7 +148,7 @@ class UserListActivity : AppCompatActivity() {
                 val nama = etName.text.toString().trim()
                 val username = etUser.text.toString().trim()
                 val hp = etPhone.text.toString().trim()
-                val password = etPass.text.toString().trim()
+                val passwordInput = etPass.text.toString().trim()
 
                 // 🔥 AMBIL ROLE DARI PILIHAN SPINNER
                 val selectedRole = spRole.selectedItem.toString()
@@ -160,8 +164,16 @@ class UserListActivity : AppCompatActivity() {
                     etPhone.error = "No HP min 10 angka"
                     isValid = false
                 }
-                if (nama.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(this, "Data tidak boleh kosong!", Toast.LENGTH_SHORT).show()
+                
+                // VALIDASI PASSWORD:
+                // - Wajib diisi jika User Baru
+                // - Boleh kosong jika Edit (artinya pakai password lama)
+                if (userToEdit == null && passwordInput.isEmpty()) {
+                    etPass.error = "Password wajib diisi!"
+                    isValid = false
+                }
+                if (nama.isEmpty()) {
+                    etName.error = "Nama wajib diisi!"
                     isValid = false
                 }
 
@@ -173,20 +185,23 @@ class UserListActivity : AppCompatActivity() {
                             name = nama,
                             username = username,
                             phone = hp,
-                            password = password,
-                            role = selectedRole // <--- PAKAI YANG DIPILIH
+                            password = passwordInput,
+                            role = selectedRole 
                         )
                         viewModel.insertUser(newUser)
-                        viewModel.syncUser(newUser) // Kirim ke VPS (opsional)
+                        viewModel.syncUser(newUser) 
                         Toast.makeText(this, "Pegawai ($selectedRole) berhasil dibuat!", Toast.LENGTH_SHORT).show()
                     } else {
                         // MODE EDIT
+                        // Kalau password kosong, pakai yang lama
+                        val finalPassword = if (passwordInput.isNotEmpty()) passwordInput else userToEdit.password
+                        
                         val updatedUser = userToEdit.copy(
                             name = nama,
                             username = username,
                             phone = hp,
-                            password = password,
-                            role = selectedRole // <--- PAKAI YANG DIPILIH
+                            password = finalPassword,
+                            role = selectedRole 
                         )
                         viewModel.updateUser(updatedUser)
                         viewModel.syncUser(updatedUser)

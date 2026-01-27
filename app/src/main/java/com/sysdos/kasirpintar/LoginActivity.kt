@@ -106,7 +106,19 @@ class LoginActivity : AppCompatActivity() {
                 viewModel.getUserByEmail(u) { existingUser ->
                     if (existingUser != null) {
                         // User Ada di HP -> Cek Password
-                        if (existingUser.password == p) {
+                        // User Ada di HP -> Cek Password (Hybrid: Bisa Text Biasa / Hash BCrypt)
+                        val storedPassword = existingUser.password
+                        val isMatch = if (storedPassword.startsWith("$2a$")) {
+                            // Cek pakai BCrypt (Untuk User Web)
+                            try {
+                                org.mindrot.jbcrypt.BCrypt.checkpw(p, storedPassword)
+                            } catch (e: Exception) { false }
+                        } else {
+                            // Cek string biasa (Untuk Owner / User Lama)
+                            storedPassword == p
+                        }
+
+                        if (isMatch) {
                             processLoginSuccess(existingUser)
                         } else {
                             Toast.makeText(this, "❌ Password Salah!", Toast.LENGTH_SHORT).show()
@@ -406,6 +418,17 @@ class LoginActivity : AppCompatActivity() {
         editor.putBoolean("is_logged_in", true)
         val namaLengkap = if (user.name.isNullOrEmpty()) user.username else user.name
         editor.putString("fullname", namaLengkap)
+
+        // 🔥 SIMPAN DATA CABANG (Fixed untuk Kotlin var)
+        val currentBranch = user.branch // 👈 Copy ke variabel lokal dulu (aman)
+        if (currentBranch != null) {
+            editor.putString("branch_name", currentBranch.name)
+            editor.putString("branch_address", currentBranch.address)
+        } else {
+            editor.putString("branch_name", "Pusat") // Default Pusat
+            editor.putString("branch_address", "-")
+        }
+
         editor.apply()
     }
 

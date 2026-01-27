@@ -94,5 +94,5 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // Opsional, buat cek log
-
+    implementation("org.mindrot:jbcrypt:0.4") // 🔥 Untuk Cek Password dari Web
 }

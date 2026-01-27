@@ -202,7 +202,7 @@ class ProductRepository(
 
                 val shiftLogs = shiftDao.getAllShiftLogs().first() // Pakai .first() karena Flow
                 if (shiftLogs.isNotEmpty()) {
-                    api.syncShiftLogs(shiftLogs).execute()
+                    api.syncShiftLogs(shiftLogs, currentUser.id).execute()
                 }
 
             } catch (e: Exception) {
