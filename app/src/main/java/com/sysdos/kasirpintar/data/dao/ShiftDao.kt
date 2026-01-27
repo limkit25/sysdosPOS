@@ -18,4 +18,6 @@ interface ShiftDao {
     // Tambahan untuk cek status shift terakhir user
     @Query("SELECT * FROM shift_logs WHERE userId = :uid ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastLog(uid: Int): ShiftLog?
+
+    @Query("SELECT * FROM shift_logs") fun getAllShiftLogs(): Flow<List<ShiftLog>>
 }

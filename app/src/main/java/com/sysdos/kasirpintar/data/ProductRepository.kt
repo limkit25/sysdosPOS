@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
+import com.sysdos.kasirpintar.data.model.ShiftLog
 import kotlinx.coroutines.flow.first
 
 class ProductRepository(
@@ -193,6 +194,15 @@ class ProductRepository(
                 if (logs.isNotEmpty()) {
                     // Gunakan variable 'api' yang SUDAH ADA di atas (jangan pakai val lagi)
                     api.syncStockLogs(logs).execute()
+                }
+                // 5. KIRIM DATA SHIFT (Log Buka/Tutup Kasir)
+// Ambil semua shift log dari DB Local
+// (Pastikan DAO shift ada fungsi getAllShiftLogs(), jika belum ada, buat dulu di ShiftDao!)
+// Contoh: @Query("SELECT * FROM shift_logs") fun getAllShiftLogs(): Flow<List<ShiftLog>>
+
+                val shiftLogs = shiftDao.getAllShiftLogs().first() // Pakai .first() karena Flow
+                if (shiftLogs.isNotEmpty()) {
+                    api.syncShiftLogs(shiftLogs).execute()
                 }
 
             } catch (e: Exception) {

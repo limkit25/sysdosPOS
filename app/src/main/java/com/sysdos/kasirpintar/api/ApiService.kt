@@ -7,6 +7,7 @@ import retrofit2.Call
 import retrofit2.http.*
 import com.google.gson.annotations.SerializedName
 import com.sysdos.kasirpintar.data.model.StockLog
+import com.sysdos.kasirpintar.data.model.ShiftLog
 
 interface ApiService {
 
@@ -78,6 +79,9 @@ interface ApiService {
     // 9. UPLOAD STOCK LOGS (BELANJA / VOID)
     @POST("api/stock-logs/sync")
     fun syncStockLogs(@Body logs: List<StockLog>): Call<ResponseBody>
+    // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
+    @POST("api/shifts/sync")
+    fun syncShiftLogs(@Body logs: List<ShiftLog>): Call<ResponseBody>
 }
 
 // =================================================================
