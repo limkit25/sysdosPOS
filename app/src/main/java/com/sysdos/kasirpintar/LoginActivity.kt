@@ -26,6 +26,7 @@ import com.sysdos.kasirpintar.api.LeadRequest
 import com.sysdos.kasirpintar.data.model.User
 import com.sysdos.kasirpintar.utils.SessionManager
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
+import kotlinx.coroutines.flow.first
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Callback
@@ -289,14 +290,38 @@ class LoginActivity : AppCompatActivity() {
                 override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
                     loading.dismiss()
                     if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
-                    Toast.makeText(this@LoginActivity, "Registrasi Berhasil!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@LoginActivity, "Registrasi Cloud Berhasil!", Toast.LENGTH_SHORT).show()
+                    
+                    // 🔥 DUAL SYNC: REGISTER LOCAL JUGA 🔥
+                    Thread {
+                        try {
+                            ApiClient.getLocalClient(this@LoginActivity).registerLocalUser(newUser).execute()
+                            runOnUiThread { Toast.makeText(this@LoginActivity, "Sync Lokal OK!", Toast.LENGTH_SHORT).show() }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                             runOnUiThread {
+                                android.app.AlertDialog.Builder(this@LoginActivity)
+                                    .setTitle("⚠️ Sync Lokal Gagal")
+                                    .setMessage("Registrasi Cloud SUKSES, tapi gagal konek ke Server Lokal.\n\nPastikan Aplikasi Server Go sudah jalan & IP Server diatur benar (Port 9000).")
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        }
+                    }.start()
+
                     finalizeRegistration(newUser, activeRegisterDialog)
                 }
 
                 override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
                     loading.dismiss()
-                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
                     Toast.makeText(this@LoginActivity, "Registrasi Offline.", Toast.LENGTH_LONG).show()
+                    
+                    // Register Lokal (Backup)
+                    Thread {
+                       try { ApiClient.getLocalClient(this@LoginActivity).registerLocalUser(newUser).execute() } catch (e: Exception) {}
+                    }.start()
+
+                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
                     finalizeRegistration(newUser, activeRegisterDialog)
                 }
             })
@@ -368,17 +393,51 @@ class LoginActivity : AppCompatActivity() {
                         loading.setMessage("Menyimpan data...")
                         viewModel.logoutAndReset {
                             getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
+                            
                             val newUser = User(name = nama, username = email, phone = hp, password = pass, role = "admin")
                             viewModel.insertUser(newUser)
 
+                            // 1. DAFTAR KE CLOUD (Utama)
                             val req = LeadRequest(name = nama, store_name = "Toko $nama", store_address = "-", store_phone = "-", phone = hp, email = email)
+                            
                             ApiClient.webClient.registerLead(req).enqueue(object : Callback<ResponseBody> {
                                 override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
                                     loading.dismiss()
+                                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
+                                    Toast.makeText(this@LoginActivity, "Registrasi Cloud Berhasil!", Toast.LENGTH_SHORT).show()
+                                    
+                                    // 🔥 2. DUAL REGISTRATION: DAFTAR KE LOCAL GO SERVER JUGA 🔥
+                                    Thread {
+                                        try {
+                                            ApiClient.getLocalClient(this@LoginActivity).registerLocalUser(newUser).execute()
+                                            runOnUiThread { Toast.makeText(this@LoginActivity, "Sync Lokal OK!", Toast.LENGTH_SHORT).show() }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                            runOnUiThread {
+                                                android.app.AlertDialog.Builder(this@LoginActivity)
+                                                    .setTitle("⚠️ Sync Lokal Gagal")
+                                                    .setMessage("Registrasi Cloud SUKSES, tapi gagal konek ke Server Lokal.\n\nPastikan Aplikasi Server Go sudah jalan & IP Server diatur benar (Port 9000).")
+                                                    .setPositiveButton("OK", null)
+                                                    .show()
+                                            }
+                                        }
+                                    }.start()
+
                                     finalizeRegistration(newUser, dialog)
                                 }
                                 override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
+                                    // Jika Gagal Cloud, Tetap Simpan Lokal ?
+                                    // Idealnya jangan, tapi kalau internet mati, user mau pake offline.
+                                    // Kita izinkan offline, tapi Cloud-nya pending.
                                     loading.dismiss()
+                                    Toast.makeText(this@LoginActivity, "Registrasi Offline (Cloud Gagal).", Toast.LENGTH_LONG).show()
+
+                                    // Coba Daftar Lokal (Backup)
+                                    Thread {
+                                       try { ApiClient.getLocalClient(this@LoginActivity).registerLocalUser(newUser).execute() } catch (e: Exception) {}
+                                    }.start()
+
+                                    if (activeRegisterDialog?.isShowing == true) activeRegisterDialog?.dismiss()
                                     finalizeRegistration(newUser, dialog)
                                 }
                             })
@@ -420,16 +479,44 @@ class LoginActivity : AppCompatActivity() {
         editor.putString("fullname", namaLengkap)
 
         // 🔥 SIMPAN DATA CABANG (Fixed untuk Kotlin var)
-        val currentBranch = user.branch // 👈 Copy ke variabel lokal dulu (aman)
+        val currentBranch = user.branch // Cek object direct (jika dari Retrofit)
+        
         if (currentBranch != null) {
             editor.putString("branch_name", currentBranch.name)
             editor.putString("branch_address", currentBranch.address)
+            editor.apply()
         } else {
-            editor.putString("branch_name", "Pusat") // Default Pusat
-            editor.putString("branch_address", "-")
+            // Jika Object Null (misal dari Room), Cek ID-nya
+            val bId = user.branchId ?: 0
+            if (bId > 0) {
+                 // Cari Nama Cabang di DB Lokal (Background Thread)
+                 // Karena saveSession dipanggil di MainThread, kita pakai Thread sederhana
+                 Thread {
+                     try {
+                         // Gunakan runBlocking atau GlobalScope karena ini Thread biasa
+                         // ATAU ganti getBranchById jadi non-suspend jika perlu, tapi suspend lebih aman.
+                         // Kita pakai runBlocking untuk simplisitas di dalam Thread ini
+                         // Kita pakai runBlocking untuk simplisitas di dalam Thread ini
+                         kotlinx.coroutines.runBlocking {
+                             val dbBranch = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this@LoginActivity)
+                                 .branchDao().getBranchById(bId).first()
+                             if (dbBranch != null) {
+                                val e = getSharedPreferences("session_kasir", Context.MODE_PRIVATE).edit()
+                                e.putString("branch_name", dbBranch.name)
+                                e.putString("branch_address", dbBranch.address)
+                                e.apply()
+                             }
+                         }
+                     } catch (e: Exception) { e.printStackTrace() }
+                 }.start()
+                 // Sambil nunggu thread, set sementara (bisa ketimpa nanti)
+                 editor.putString("branch_name", "Memuat...") 
+            } else {
+                editor.putString("branch_name", "Pusat") // Default Pusat
+                editor.putString("branch_address", "-")
+            }
+            editor.apply()
         }
-
-        editor.apply()
     }
 
     private fun showServerDialog() {

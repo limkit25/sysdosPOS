@@ -26,8 +26,14 @@ interface ApiService {
     fun checkLicense(
         @Query("email") email: String,
         @Query("device_id") deviceId: String,
-        @Query("device_model") deviceModel: String // <--- TAMBAHAN
+        @Query("device_model") deviceModel: String
     ): Call<LicenseCheckResponse>
+
+    // 🔥 2b. GET STORE CONFIG (Dinamis per Cabang)
+    @GET("api/store-config")
+    fun getStoreConfig(
+        @Query("branch_id") branchId: Int
+    ): Call<com.sysdos.kasirpintar.data.model.StoreConfig>
 
     // 3. PEMBAYARAN MIDTRANS (Wajib Cloud)
     @POST("api/payment/create")
@@ -60,6 +66,14 @@ interface ApiService {
     @PUT("api/products")
     fun updateProduct(@Body product: ProductResponse): Call<ResponseBody>
 
+    // 5b. CREATE PRODUCT
+    @POST("api/products/create")
+    fun createProduct(@Body product: ProductResponse): Call<ResponseBody>
+
+    // 5c. DELETE PRODUCT
+    @DELETE("api/products/delete")
+    fun deleteProduct(@Query("id") id: Int): Call<ResponseBody>
+
     // 6. REGISTER USER LOKAL (Untuk kasir/karyawan di database lokal)
     @POST("api/users/register")
     fun registerLocalUser(@Body user: User): Call<ResponseBody>
@@ -76,6 +90,10 @@ interface ApiService {
     // 8. GET ALL USERS (SYNC DARI WEB)
     @GET("api/users")
     fun getAllUsers(): Call<List<User>>
+
+    // 8b. GET ALL BRANCHES (SYNC DARI WEB)
+    @GET("api/branches")
+    fun getBranches(): Call<List<com.sysdos.kasirpintar.data.model.Branch>>
     // 9. UPLOAD STOCK LOGS (BELANJA / VOID)
     @POST("api/stock-logs/sync")
     fun syncStockLogs(@Body logs: List<StockLog>): Call<ResponseBody>

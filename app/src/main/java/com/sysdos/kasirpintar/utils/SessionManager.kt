@@ -16,8 +16,15 @@ class SessionManager(context: Context) {
         prefs.edit().putString("SERVER_URL", finalUrl).apply()
     }
 
-    // Ambil IP Server (Default ke IP lama Anda buat jaga-jaga)
+    // Ambil IP Server
     fun getServerUrl(): String {
-        return prefs.getString("SERVER_URL", "http://192.168.1.15:3000/") ?: "http://192.168.1.15:3000/"
+        var url = prefs.getString("SERVER_URL", "http://192.168.1.15:9000/") ?: "http://192.168.1.15:9000/"
+        
+        // 🔥 AUTO-FIX: Jika masih pakai Port 3000, ganti ke 9000 otomatis
+        if (url.contains(":3000")) {
+            url = url.replace(":3000", ":9000")
+            saveServerUrl(url) // Simpan yang baru
+        }
+        return url
     }
 }

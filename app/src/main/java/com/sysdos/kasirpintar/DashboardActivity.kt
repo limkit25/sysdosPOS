@@ -74,9 +74,14 @@ class DashboardActivity : AppCompatActivity() {
         val username = session.getString("username", "Admin")
         val realName = session.getString("fullname", username) ?: "Admin"
         val role = session.getString("role", "kasir")
+        // Hapus statis: val branchName = session.getString("branch_name", "Pusat")
 
         tvGreeting.text = "Halo, $realName"
-        tvRole.text = "Role: ${role?.uppercase()}"
+        
+        // 🔥 OBSERVE LIVE DATA NAMA CABANG
+        viewModel.branchName.observe(this) { bName ->
+            tvRole.text = "Role: ${role?.uppercase()}\nLokasi: $bName"
+        }
 
         if (role == "kasir") {
             cardLowStockInfo.visibility = View.GONE

@@ -23,6 +23,7 @@ class ProductRepository(
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao,
     private val storeConfigDao: StoreConfigDao,
+    private val branchDao: BranchDao, // 🔥 Tambah ini
     private val transactionDao: TransactionDao
 ) {
     // --- STORE CONFIG ---
@@ -37,10 +38,22 @@ class ProductRepository(
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
 
     suspend fun insert(product: Product) = productDao.insertProduct(product)
-    suspend fun insertProductReturnId(product: Product): Long = productDao.insertProduct(product)
+    
+    suspend fun insertProductReturnId(product: Product): Long {
+        val newId = productDao.insertProduct(product)
+        // 🔥 SYNC CREATE KE SERVER 🔥
+        createProductOnServer(product.copy(id = newId.toInt()))
+        return newId
+    } 
+
     suspend fun insertVariants(variants: List<ProductVariant>) = productDao.insertVariants(variants)
     suspend fun update(product: Product) = productDao.update(product)
-    suspend fun delete(product: Product) = productDao.delete(product)
+    
+    suspend fun delete(product: Product) {
+        productDao.delete(product)
+        // 🔥 SYNC DELETE KE SERVER 🔥
+        deleteProductOnServer(product.id)
+    }
 
     fun getVariantsByProductId(productId: Int): Flow<List<ProductVariant>> = productDao.getVariantsByProductId(productId)
 
@@ -58,6 +71,9 @@ class ProductRepository(
 
     suspend fun getProductById(id: Int): Product? = productDao.getProductById(id)
     suspend fun getProductByBarcode(barcode: String): Product? = productDao.getProductByBarcode(barcode)
+    
+    // 🔥 NEW: Helper untuk ViewModel
+    fun getBranchById(id: Int): Flow<Branch?> = branchDao.getBranchById(id)
 
     // =================================================================
     // 🛒 TRANSAKSI
@@ -172,18 +188,29 @@ class ProductRepository(
                 val responseUser = api.getAllUsers().execute()
                 if (responseUser.isSuccessful && responseUser.body() != null) {
                     val serverUsers = responseUser.body()!!
+                    val serverUserIds = serverUsers.map { it.id }
+
+                    // 1. Sync Insert/Update
                     serverUsers.forEach { sUser ->
-                        // Cek apakah user sudah ada di HP?
                         val localUser = productDao.getUserByEmail(sUser.username)
                         if (localUser == null) {
-                            // Jika belum ada, masukkan!
-                            // Password dari server sudah ter-enkripsi (aman), jadi langsung simpan saja.
                             productDao.insertUser(sUser)
                         } else {
-                            // Jika sudah ada, update datanya (termasuk jika password diganti di web)
-                            // Pastikan ID-nya sama agar tidak duplikat
                             val updatedUser = sUser.copy(id = localUser.id)
                             productDao.updateUser(updatedUser)
+                        }
+                    }
+
+                    // 2. Sync Delete (Hapus user lokal yang tidak ada di server)
+                    // Ambil SEMUA user lokal saat ini
+                    val allLocalUsers = productDao.getAllUsers().first()
+                    
+                    allLocalUsers.forEach { localUser ->
+                        // Jangan hapus user ADMIN "Owner Toko" (biasanya ID 0 atau logout reset)
+                        // Dan jangan hapus diri sendiri (sedang login) -> logic ini opsional
+                        if (!serverUserIds.contains(localUser.id) && localUser.username != "admin") {
+                            productDao.deleteUser(localUser)
+                            Log.d("SysdosSync", "User dihapus: ${localUser.username}")
                         }
                     }
                 }
@@ -203,6 +230,46 @@ class ProductRepository(
                 val shiftLogs = shiftDao.getAllShiftLogs().first() // Pakai .first() karena Flow
                 if (shiftLogs.isNotEmpty()) {
                     api.syncShiftLogs(shiftLogs, currentUser.id).execute()
+                }
+
+                // 5b. 🔥 SYNC BRANCHES DARI SERVER 🔥
+                val responseBranches = api.getBranches().execute()
+                if (responseBranches.isSuccessful && responseBranches.body() != null) {
+                    branchDao.deleteAll()
+                    branchDao.insertBranches(responseBranches.body()!!)
+                }
+
+                if (shiftLogs.isNotEmpty()) {
+                    api.syncShiftLogs(shiftLogs, currentUser.id).execute()
+                }
+
+                // 6. 🔥 SYNC STORE CONFIG DARI SERVER 🔥
+                // Ambil Branch ID dari User yang sedang login (REFETCH biar dapat update terbaru dari step no 3)
+                
+                val updatedUser = productDao.getUserByEmail(email) ?: currentUser
+                val branchIdToSync = try { updatedUser.branchId ?: 0 } catch (e: Exception) { 0 }
+
+                val responseConfig = api.getStoreConfig(branchIdToSync).execute()
+                if (responseConfig.isSuccessful && responseConfig.body() != null) {
+                    val rawConfig = responseConfig.body()!!
+                    
+                    // 🔥 PASTIIN ID-NYA 1 (Agar terbaca oleh DAO: SELECT * FROM ... WHERE id=1)
+                    // Server mungkin kirim ID 5, 10, dll. Kita timpa jadi 1 untuk Local DB HP.
+                    val serverConfig = rawConfig.copy(id = 1)
+                    
+                    // 1. Simpan ke Database Room Local
+                    storeConfigDao.saveConfig(serverConfig)
+
+                    // 2. Simpan ke SharedPreferences (Karena StoreSettingsActivity baca dari sini)
+                    val prefsStore = context.getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                    prefsStore.edit().apply {
+                        putString("name", serverConfig.storeName)
+                        putString("address", serverConfig.storeAddress)
+                        putString("phone", serverConfig.storePhone)
+                        putString("email", serverConfig.strukFooter) // 'email' dipakai buat footer di Activity
+                        apply()
+                    }
+                    Log.d("SysdosPOS", "✅ Store Config Synced: ${serverConfig.storeName}")
                 }
 
             } catch (e: Exception) {
@@ -277,6 +344,31 @@ class ProductRepository(
 
     suspend fun syncUserToServer(user: User) {
         withContext(Dispatchers.IO) { try { ApiClient.getLocalClient(context).registerLocalUser(user).execute() } catch (e: Exception) {} }
+    }
+
+    suspend fun createProductOnServer(product: Product) {
+        withContext(Dispatchers.IO) {
+            try {
+               val dataKirim = ProductResponse(
+                    id = product.id,
+                    name = product.name,
+                    category = product.category,
+                    price = product.price.toDouble(),
+                    cost_price = product.costPrice.toDouble(),
+                    stock = product.stock,
+                    image_path = null
+                )
+                ApiClient.getLocalClient(context).createProduct(dataKirim).execute()
+            } catch (e: Exception) { Log.e("SysdosPOS", "Gagal Create Sync: ${e.message}") }
+        }
+    }
+
+    suspend fun deleteProductOnServer(productId: Int) {
+        withContext(Dispatchers.IO) {
+            try {
+                ApiClient.getLocalClient(context).deleteProduct(productId).execute()
+            } catch (e: Exception) { Log.e("SysdosPOS", "Gagal Delete Sync: ${e.message}") }
+        }
     }
 
     suspend fun clearAllData() = AppDatabase.getDatabase(context).clearAllTables()

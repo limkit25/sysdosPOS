@@ -12,6 +12,8 @@ import com.sysdos.kasirpintar.data.ProductRepository
 import com.sysdos.kasirpintar.data.model.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import androidx.lifecycle.asLiveData
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -22,6 +24,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val shiftDao = AppDatabase.getDatabase(application).shiftDao()
         val stockLogDao = AppDatabase.getDatabase(application).stockLogDao()
         val storeConfigDao = AppDatabase.getDatabase(application).storeConfigDao()
+        val branchDao = AppDatabase.getDatabase(application).branchDao() // 🔥 DAO BARU
 
         // 🔥 TAMBAHAN BARU:
         val transactionDao = AppDatabase.getDatabase(application).transactionDao()
@@ -32,6 +35,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             shiftDao,
             stockLogDao,
             storeConfigDao,
+            branchDao, // 🔥 Inject BranchDao
             transactionDao // <--- 🔥 MASUKKAN INI DI PALING BELAKANG
         )
     }
@@ -60,8 +64,38 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
+    
     private val _isOnline = MutableLiveData<Boolean>(false)
     val isOnline: LiveData<Boolean> = _isOnline
+
+    // 🔥 LIVE DATA UNTUK NAMA CABANG (Supaya tidak stuck "Memuat...")
+    // Menggunakan switchMap agar otomatis update saat user berubah (Login/Init)
+    val branchName: LiveData<String> = _currentUserId.switchMap { uid ->
+        if (uid > 0) {
+            liveData {
+                emit("Memuat...")
+                // Cari User dulu untuk dapat BranchID
+                val user = try { repository.allUsers.first().find { it.id == uid } } catch (e: Exception) { null }
+                
+                if (user != null) {
+                    if (user.branchId != null && user.branchId!! > 0) {
+                        // Observe Flow dari Database (Realtime)
+                        emitSource(
+                            repository.getBranchById(user.branchId!!)
+                            .map { branch -> branch?.name ?: "Cabang #${user.branchId}" }
+                            .asLiveData()
+                        )
+                    } else {
+                        emit("Pusat")
+                    }
+                } else {
+                    emit("User ???")
+                }
+            }
+        } else {
+            MutableLiveData("Belum Login")
+        }
+    }
 
     init {
         loadCurrentUser()

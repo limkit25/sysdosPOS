@@ -21,9 +21,10 @@ import kotlinx.coroutines.launch
         Supplier::class,
         StockLog::class,
         StoreConfig::class,
+        Branch::class,        // 🔥 WAJIB DITAMBAHKAN
         ProductVariant::class // 🔥 WAJIB DITAMBAHKAN DI SINI
     ],
-    version = 7, // 🔥 NAIKKAN VERSI (Misal dari 6 jadi 7) BIAR AMAN
+    version = 8, // 🔥 NAIKKAN VERSI (Misal dari 7 jadi 8) BIAR AMAN
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun supplierDao(): SupplierDao
     abstract fun stockLogDao(): StockLogDao
     abstract fun storeConfigDao(): StoreConfigDao
+    abstract fun branchDao(): BranchDao // 🔥 Tambah ini
     abstract fun transactionDao(): TransactionDao // (Pastikan ini ada juga jika dipakai)
 
     companion object {

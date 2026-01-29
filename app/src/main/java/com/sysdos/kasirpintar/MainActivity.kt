@@ -215,7 +215,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
         viewModel.storeConfig.observe(this) { config ->
-            // Pancingan data toko agar tombol pajak update
+            // Update Tampilan Nama Toko
+            if (config != null) {
+                // 1. Ganti Judul Aplikasi
+                supportActionBar?.title = config.storeName
+
+                // 2. Ganti di Header Menu Samping
+                if (::navView.isInitialized) {
+                    val headerView = navView.getHeaderView(0)
+                    val tvRole = headerView.findViewById<TextView>(R.id.tvHeaderRole)
+                    val currentRole = session.getString("role", "KASIR")?.uppercase()
+                    tvRole.text = "$currentRole  |  ${config.storeName}"
+                }
+            }
         }
 
 
