@@ -18,10 +18,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
-import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.ViewModelProvider
-import com.google.android.material.navigation.NavigationView
 import com.sysdos.kasirpintar.data.model.Transaction
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import java.text.SimpleDateFormat
@@ -35,6 +32,30 @@ class DashboardActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
     private var allTrx: List<Transaction> = emptyList()
+
+    // 🔥 AUTO SLIDE HANDLER
+    private val sliderHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val sliderRunnable = object : Runnable {
+        override fun run() {
+            val vp = findViewById<androidx.viewpager2.widget.ViewPager2>(R.id.vpRevenueSlider)
+            if (vp?.adapter != null && vp.adapter!!.itemCount > 0) {
+                val nextItem = (vp.currentItem + 1) % vp.adapter!!.itemCount
+                vp.currentItem = nextItem
+            }
+            sliderHandler.postDelayed(this, 5000) // 5 Detik
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sliderHandler.removeCallbacks(sliderRunnable)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        cekKeamananHP()
+        sliderHandler.postDelayed(sliderRunnable, 5000)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,18 +73,20 @@ class DashboardActivity : AppCompatActivity() {
 
         val tvGreeting = findViewById<TextView>(R.id.tvGreeting)
         val tvRole = findViewById<TextView>(R.id.tvRole)
-        val tvRevenue = findViewById<TextView>(R.id.tvTodayRevenue)
+
         val btnLogout = findViewById<ImageView>(R.id.btnLogout)
         val mainGrid = findViewById<GridLayout>(R.id.mainGrid)
 
         // Init Card
         val cardPOS = findViewById<CardView>(R.id.cardPOS)
         val cardProduct = findViewById<CardView>(R.id.cardProduct)
+        val cardCategory = findViewById<CardView>(R.id.cardCategory) // 🔥 NEW
         val cardPurchase = findViewById<CardView>(R.id.cardPurchase)
         val cardReport = findViewById<CardView>(R.id.cardReport)
         val cardUser = findViewById<CardView>(R.id.cardUser)
         val cardStore = findViewById<CardView>(R.id.cardStore)
         val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
+        val cardStockOpname = findViewById<CardView>(R.id.cardStockOpname) // 🔥 NEW
         val cardShift = findViewById<CardView>(R.id.cardShift)
         val cardAbout = findViewById<CardView>(R.id.cardAbout)
 
@@ -74,13 +97,13 @@ class DashboardActivity : AppCompatActivity() {
         val username = session.getString("username", "Admin")
         val realName = session.getString("fullname", username) ?: "Admin"
         val role = session.getString("role", "kasir")
-        // Hapus statis: val branchName = session.getString("branch_name", "Pusat")
 
         tvGreeting.text = "Halo, $realName"
         
         // 🔥 OBSERVE LIVE DATA NAMA CABANG
         viewModel.branchName.observe(this) { bName ->
-            tvRole.text = "Role: ${role?.uppercase()}\nLokasi: $bName"
+            val finalBranchName = bName ?: "Pusat"
+            tvRole.text = "Role: ${role?.uppercase()}\nLokasi: $finalBranchName"
         }
 
         if (role == "kasir") {
@@ -89,23 +112,90 @@ class DashboardActivity : AppCompatActivity() {
             cardLowStockInfo.visibility = View.VISIBLE
         }
 
+        // 🔥 OBSERVE TRANSAKSI (HITUNG OMZET HARI INI)
+        // 🔥 OBSERVE TRANSAKSI (HITUNG OMZET SLIDER)
+        viewModel.allTransactions.observe(this) { transactions ->
+            allTrx = transactions
+            
+            val sdfDay = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val sdfMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+            
+            val now = Date()
+            val todayStr = sdfDay.format(now)
+            val thisMonthStr = sdfMonth.format(now)
+            
+            val cal = java.util.Calendar.getInstance()
+            cal.add(java.util.Calendar.MONTH, -1)
+            val lastMonthStr = sdfMonth.format(cal.time)
+
+            var totalHariIni = 0.0
+            var totalBulanIni = 0.0
+            var totalBulanLalu = 0.0
+
+            for (trx in transactions) {
+                val date = Date(trx.timestamp)
+                val dStr = sdfDay.format(date)
+                val mStr = sdfMonth.format(date)
+
+                if (dStr == todayStr) totalHariIni += trx.totalAmount
+                if (mStr == thisMonthStr) totalBulanIni += trx.totalAmount
+                if (mStr == lastMonthStr) totalBulanLalu += trx.totalAmount
+            }
+            
+            // SETUP SLIDER (Safe Mode)
+            try {
+                val vpSlider = findViewById<androidx.viewpager2.widget.ViewPager2>(R.id.vpRevenueSlider)
+                if (vpSlider != null) {
+                    val items = listOf(
+                        RevenueItem("Omzet Hari Ini", totalHariIni, "#4CAF50"),
+                        RevenueItem("Omzet Bulan Ini", totalBulanIni, "#1976D2"),
+                        RevenueItem("Omzet Bulan Kemarin", totalBulanLalu, "#FF5722")
+                    )
+                    vpSlider.adapter = RevenueSliderAdapter(items)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        val imgAlert = findViewById<ImageView>(R.id.imgAlertStock)
+        viewModel.allProducts.observe(this) { products ->
+            val lowStockCount = products.count { it.stock < 5 }
+            if (lowStockCount > 0) {
+                tvLowStock.text = "$lowStockCount Item"
+                tvLowStock.setTextColor(android.graphics.Color.RED)
+                imgAlert.visibility = View.VISIBLE
+                imgAlert.setColorFilter(android.graphics.Color.RED)
+            } else {
+                tvLowStock.text = "Aman"
+                tvLowStock.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                imgAlert.visibility = View.VISIBLE
+                imgAlert.setImageResource(android.R.drawable.checkbox_on_background)
+                imgAlert.setColorFilter(android.graphics.Color.parseColor("#2E7D32"))
+            }
+        }
+
         // --- SORTING MENU (HP vs TABLET) ---
         mainGrid.removeAllViews()
         val authorizedCards = mutableListOf<View>()
 
         authorizedCards.add(cardPOS)
         if (role == "admin") {
-            authorizedCards.add(cardProduct); authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
-            authorizedCards.add(cardUser); authorizedCards.add(cardShift); authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
+            authorizedCards.add(cardProduct); authorizedCards.add(cardCategory); authorizedCards.add(cardStockOpname); 
+            authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
+            authorizedCards.add(cardUser); authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
         } else if (role == "manager") {
-            authorizedCards.add(cardProduct); authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
-            authorizedCards.add(cardShift); authorizedCards.add(cardPrinter)
+            authorizedCards.add(cardProduct); authorizedCards.add(cardCategory); authorizedCards.add(cardStockOpname);
+            authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
+            authorizedCards.add(cardPrinter)
         } else {
-            authorizedCards.add(cardReport); authorizedCards.add(cardPrinter)
+            // 🔥 ROLE: KASIR (Hanya POS, About)
+            authorizedCards.add(cardReport) 
+            authorizedCards.add(cardPrinter)
         }
         authorizedCards.add(cardAbout)
 
-        // RESPONSIVE TABLET
+        // RESPONSIVE TABLET & ADD VIEWS TO GRID
         val displayMetrics = resources.displayMetrics
         val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
 
@@ -126,35 +216,6 @@ class DashboardActivity : AppCompatActivity() {
             card.layoutParams = params
         }
 
-        // OBSERVE DATA
-        viewModel.allTransactions.observe(this) { transactions ->
-            allTrx = transactions
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val todayStr = sdf.format(Date())
-            var totalHariIni = 0.0
-            for (trx in transactions) {
-                val trxDateStr = sdf.format(Date(trx.timestamp))
-                if (trxDateStr == todayStr) totalHariIni += trx.totalAmount
-            }
-            tvRevenue.text = formatRupiah(totalHariIni)
-        }
-
-        val imgAlert = findViewById<ImageView>(R.id.imgAlertStock)
-        viewModel.allProducts.observe(this) { products ->
-            val lowStockCount = products.count { it.stock < 5 }
-            if (lowStockCount > 0) {
-                tvLowStock.text = "$lowStockCount Item"
-                tvLowStock.setTextColor(android.graphics.Color.RED)
-                imgAlert.visibility = View.VISIBLE
-                imgAlert.setColorFilter(android.graphics.Color.RED)
-            } else {
-                tvLowStock.text = "Aman"
-                tvLowStock.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
-                imgAlert.visibility = View.VISIBLE
-                imgAlert.setImageResource(android.R.drawable.checkbox_on_background)
-                imgAlert.setColorFilter(android.graphics.Color.parseColor("#2E7D32"))
-            }
-        }
 
         // --- CLICK LISTENERS ---
         cardPOS.setOnClickListener {
@@ -163,16 +224,19 @@ class DashboardActivity : AppCompatActivity() {
             val isExpired = licensePrefs.getBoolean("is_expired", false)
 
             if (isExpired && !isFullVersion) {
+                // 🔥 AMBIL PESAN ASLI DARI SERVER (BIAR GAK SELALU 'TRIAL')
+                val msg = licensePrefs.getString("license_msg", "Masa Aktif Habis") ?: "Masa Aktif Habis"
+
                 AlertDialog.Builder(this)
-                    .setTitle("⚠️ MASA TRIAL HABIS")
-                    .setMessage("Masa percobaan 7 hari telah berakhir.")
+                    .setTitle("⚠️ MASA AKTIF HABIS")
+                    .setMessage("$msg\n\nSilakan hubungi Admin untuk perpanjangan.")
                     .setPositiveButton("HUBUNGI ADMIN") { _, _ ->
                         try {
                             // 1. GANTI NOMOR WA ANDA DISINI (Wajib pakai kode negara 62)
                             val nomorAdmin = "628179842043"
 
                             // 2. Pesan otomatis
-                            val pesan = "Halo Admin, masa trial sysdos POS saya sudah habis. Saya ingin melakukan pembayaran untuk Upgrade ke Premium."
+                            val pesan = "Halo Admin, lisensi saya habis ($msg). Saya mau perpanjang."
 
                             // 3. Buka WhatsApp
                             val url = "https://api.whatsapp.com/send?phone=$nomorAdmin&text=${java.net.URLEncoder.encode(pesan, "UTF-8")}"
@@ -187,30 +251,28 @@ class DashboardActivity : AppCompatActivity() {
                     .setNegativeButton("Tutup", null)
                     .show()
             } else {
-                checkModalBeforePOS()
+                // checkModalBeforePOS() -> Diganti pakai Helper
+                com.sysdos.kasirpintar.utils.BottomNavHelper.checkAndOpenPOS(this, viewModel)
             }
         }
 
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
+        cardCategory.setOnClickListener { startActivity(Intent(this, CategoryActivity::class.java)) } // 🔥 NEW
         cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) }
-        cardReport.setOnClickListener {
-            val options = arrayOf("📊 Laporan Penjualan (Omzet)", "⚠️ Riwayat Void & Retur")
-            AlertDialog.Builder(this)
-                .setTitle("Pilih Jenis Laporan")
-                .setItems(options) { _, which ->
-                    when (which) {
-                        0 -> startActivity(Intent(this, SalesReportActivity::class.java))
-                        1 -> startActivity(Intent(this, LogReportActivity::class.java))
-                    }
-                }
-                .show()
+        cardStockOpname.setOnClickListener { startActivity(Intent(this, StockOpnameActivity::class.java)) } // 🔥 CLICK LISTENER
+        cardReport.setOnClickListener { 
+            startActivity(Intent(this, ReportCenterActivity::class.java)) 
         }
         cardUser.setOnClickListener { startActivity(Intent(this, UserListActivity::class.java)) }
         cardStore.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "STORE") }) }
         cardPrinter.setOnClickListener { startActivity(Intent(this, StoreSettingsActivity::class.java).apply { putExtra("TARGET", "PRINTER") }) }
         cardShift?.setOnClickListener { startActivity(Intent(this, ShiftHistoryActivity::class.java)) }
-        cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 2) }) }
+        cardLowStockInfo.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java).apply { putExtra("OPEN_TAB_INDEX", 1) }) }
         cardAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
+
+        // 🔥 SETUP BOTTOM NAV
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
+        com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
 
         // --- LOGOUT LOGIC ---
         btnLogout.setOnClickListener {
@@ -277,10 +339,7 @@ class DashboardActivity : AppCompatActivity() {
     // 👮‍♂️ KEAMANAN & HELPER (TIDAK PERLU DIUBAH)
     // =================================================================
 
-    override fun onResume() {
-        super.onResume()
-        cekKeamananHP()
-    }
+    // override fun onResume() { ... } // SUDAH DIGABUNG DI ATAS
 
     private fun cekKeamananHP() {
         // ❌ HAPUS ATAU KOMENTARI BARIS DI BAWAH INI SAAT MAU TES DI HP SENDIRI
@@ -311,79 +370,12 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkModalBeforePOS() {
-        val prefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        val username = session.getString("username", "default") ?: "default"
-        if (!prefs.getBoolean("IS_OPEN_GLOBAL_SESSION", false)) {
-            showInputModalDialogForPOS(prefs, username)
-        } else {
-            startActivity(Intent(this, MainActivity::class.java))
-        }
-    }
-
-    private fun showInputModalDialogForPOS(prefs: android.content.SharedPreferences, username: String) {
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
-        input.hint = "Contoh: 200000"
-        AlertDialog.Builder(this)
-            .setTitle("🏪 Buka Shift Baru")
-            .setMessage("Masukkan Modal Awal:")
-            .setView(input).setCancelable(false)
-            .setPositiveButton("BUKA") { _, _ ->
-                val modalStr = input.text.toString()
-                if (modalStr.isNotEmpty()) {
-                    val modal = modalStr.toDouble()
-                    prefs.edit().putBoolean("IS_OPEN_GLOBAL_SESSION", true)
-                        .putFloat("MODAL_AWAL_GLOBAL", modal.toFloat())
-                        .putLong("START_TIME_GLOBAL", System.currentTimeMillis()).apply()
-                    viewModel.openShift(username, modal)
-                    Toast.makeText(this, "Shift Toko Dibuka!", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, MainActivity::class.java))
-                }
-            }.setNegativeButton("Batal", null).show()
-    }
+    // private fun checkModalBeforePOS() ... (SUDAH DIPINDAHKAN KE HELPER)
+    // private fun showInputModalDialogForPOS() ... (SUDAH DIPINDAHKAN KE HELPER)
 
     private fun showCloseSessionDialog(session: android.content.SharedPreferences) {
-        val userName = session.getString("username", "User") ?: "User"
-        val shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
-        val shiftStartTime = shiftPrefs.getLong("START_TIME_GLOBAL", 0L)
-        val modalAwal = shiftPrefs.getFloat("MODAL_AWAL_GLOBAL", 0f).toDouble()
-        val startOfDay = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0) }.timeInMillis
-        val filterTime = if (shiftStartTime > 0) shiftStartTime else startOfDay
-
-        // 1. Ambil Data Transaksi Shift Ini
-        val myTrx = allTrx.filter { it.timestamp >= filterTime }
-
-        var totalTunai = 0.0; var totalQris = 0.0; var totalDebit = 0.0; var totalTransfer = 0.0
-        var piutangLunas = 0.0; var piutangBelumLunas = 0.0
-
-        for (trx in myTrx) {
-            val method = trx.paymentMethod.lowercase()
-            val isLunas = trx.note.contains("LUNAS", ignoreCase = true)
-            when {
-                method.contains("tunai") -> totalTunai += trx.totalAmount
-                method.contains("qris") -> totalQris += trx.totalAmount
-                method.contains("debit") -> totalDebit += trx.totalAmount
-                method.contains("transfer") -> totalTransfer += trx.totalAmount
-                method.contains("piutang") -> if(isLunas) piutangLunas += trx.totalAmount else piutangBelumLunas += trx.totalAmount
-                else -> totalTunai += trx.totalAmount
-            }
-        }
-
-        val totalOmzet = totalTunai + totalQris + totalDebit + totalTransfer + piutangLunas + piutangBelumLunas
-        val expectedCash = modalAwal + totalTunai + piutangLunas
-
-        // Helper Format Uang
-        val fmt = { d: Double -> java.text.NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(d) }
-
-        val pesan = "Tunai: ${fmt(totalTunai)}\nQRIS: ${fmt(totalQris)}\nDebit: ${fmt(totalDebit)}\nTransfer: ${fmt(totalTransfer)}\nPiutang Cair: ${fmt(piutangLunas)}\nPiutang Gantung: ${fmt(piutangBelumLunas)}\n\nTOTAL OMZET: ${fmt(totalOmzet)}\n\nLaci Harusnya: ${fmt(expectedCash)}"
-
-        AlertDialog.Builder(this).setTitle("Ringkasan Shift").setMessage(pesan)
-            .setPositiveButton("LANJUT") { _, _ ->
-                // 🔥 UPDATE PENTING DISINI: Tambahkan 'myTrx' di paling belakang
-                showInputCashDialog(expectedCash, totalOmzet, userName, filterTime, modalAwal, totalTunai, totalQris, totalTransfer, totalDebit, piutangBelumLunas, myTrx)
-            }.setNegativeButton("Batal", null).show()
+        // 🔥 VERSI BARU: BUKA FULL SCREEN ACTIVITY
+        startActivity(Intent(this, CloseShiftActivity::class.java))
     }
 
     private fun showInputCashDialog(
@@ -423,11 +415,21 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun performLogout(session: android.content.SharedPreferences, resetData: Boolean) {
         session.edit().clear().apply()
+        
+        // 🔥 TAMBAHAN: CLEAR LICENSE & STORE CONFIG AGAR TIDAK BOCOR KE AKUN LAIN
+        getSharedPreferences("app_license", Context.MODE_PRIVATE).edit().clear().apply()
+        getSharedPreferences("store_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+
         if (resetData) {
             getSharedPreferences("shift_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+            
+            // 🔥 RESET CONFIG AGAR WELCOME SCREEN MUNCUL LAGI
+            getSharedPreferences("app_config", Context.MODE_PRIVATE).edit().clear().apply()
+
             viewModel.logoutAndReset { signOutGoogleAndExit() }
         } else {
-            signOutGoogleAndExit()
+            // Walaupun tidak reset DB, kita harus refresh ViewModel/Repo agar memori bersih
+            viewModel.logoutAndReset { signOutGoogleAndExit() }
         }
     }
 
@@ -570,4 +572,41 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun formatRupiah(amount: Double): String = String.format(Locale("id", "ID"), "Rp %,d", amount.toLong()).replace(',', '.')
+
+    // --- SLIDER ADAPTER CLASSES ---
+    data class RevenueItem(val title: String, val amount: Double, val colorHex: String)
+
+    inner class RevenueSliderAdapter(private val items: List<RevenueItem>) : androidx.recyclerview.widget.RecyclerView.Adapter<RevenueSliderAdapter.SliderViewHolder>() {
+        
+        inner class SliderViewHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+            val tvTitle: TextView = view.findViewById(R.id.tvSlideTitle)
+            val tvValue: TextView = view.findViewById(R.id.tvSlideValue)
+            val btnLeft: View = view.findViewById(R.id.imgNavLeft)
+            val btnRight: View = view.findViewById(R.id.imgNavRight)
+        }
+
+        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): SliderViewHolder {
+            val view = android.view.LayoutInflater.from(parent.context).inflate(R.layout.item_dashboard_slider, parent, false)
+            return SliderViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: SliderViewHolder, position: Int) {
+            val item = items[position]
+            holder.tvTitle.text = item.title
+            holder.tvValue.text = formatRupiah(item.amount)
+            
+            // 🔥 SET COLOR BASED ON ITEM TYPE
+            holder.tvValue.setTextColor(android.graphics.Color.parseColor(item.colorHex))
+
+            // Navigasi Arrow Logic
+            holder.btnLeft.visibility = if (position == 0) View.INVISIBLE else View.VISIBLE
+            holder.btnRight.visibility = if (position == items.size - 1) View.INVISIBLE else View.VISIBLE
+            
+            val vp = (holder.itemView.parent as? androidx.recyclerview.widget.RecyclerView)?.parent as? androidx.viewpager2.widget.ViewPager2
+            holder.btnLeft.setOnClickListener { vp?.currentItem = position - 1 }
+            holder.btnRight.setOnClickListener { vp?.currentItem = position + 1 }
+        }
+
+        override fun getItemCount(): Int = items.size
+    }
 }

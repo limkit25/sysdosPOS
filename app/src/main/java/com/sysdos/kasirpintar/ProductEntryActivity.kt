@@ -41,7 +41,7 @@ class ProductEntryActivity : AppCompatActivity() {
     private lateinit var etCost: TextInputEditText
     private lateinit var etBarcode: TextInputEditText
     private lateinit var ivProduct: ImageView
-    private lateinit var etCategory: AutoCompleteTextView
+    private lateinit var spCategory: Spinner
 
     // 🔥 VARIANT UI
     private lateinit var cbHasVariant: CheckBox
@@ -80,7 +80,7 @@ class ProductEntryActivity : AppCompatActivity() {
         etCost = findViewById(R.id.etProductCost)
         etBarcode = findViewById(R.id.etProductBarcode)
         ivProduct = findViewById(R.id.ivProductImage)
-        etCategory = findViewById(R.id.etProductCategory)
+        spCategory = findViewById(R.id.spProductCategory)
 
         cbHasVariant = findViewById(R.id.cbHasVariant)
         btnAddVariant = findViewById(R.id.btnAddVariantRow)
@@ -100,9 +100,7 @@ class ProductEntryActivity : AppCompatActivity() {
             scanLauncher.launch(options)
         }
 
-        findViewById<View>(R.id.btnAddCategoryLink).setOnClickListener {
-            startActivity(Intent(this, CategoryActivity::class.java))
-        }
+        // btnAddCategoryLink Removed (Moved to Dashboard)
 
         // 🔥 LOGIKA CHECKBOX VARIAN
         cbHasVariant.setOnCheckedChangeListener { _, isChecked ->
@@ -133,10 +131,20 @@ class ProductEntryActivity : AppCompatActivity() {
     private fun loadCategories() {
         viewModel.allCategories.observe(this) { categories ->
             val safeCategories = categories ?: emptyList()
-            val categoryNames = safeCategories.map { it.name }
-            val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categoryNames)
-            etCategory.setAdapter(adapter)
-            etCategory.setOnClickListener { etCategory.showDropDown() }
+            val categoryNames = safeCategories.map { it.name }.toMutableList()
+            
+            // 🔥 DEFAULT CATEGORY IF EMPTY
+            if (categoryNames.isEmpty()) categoryNames.add("Umum")
+
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categoryNames)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spCategory.adapter = adapter
+
+            // 🔥 PRE-SELECT IF EDIT MODE
+            productToEdit?.let { p ->
+                val position = categoryNames.indexOf(p.category)
+                if (position >= 0) spCategory.setSelection(position)
+            }
         }
     }
 
@@ -168,7 +176,7 @@ class ProductEntryActivity : AppCompatActivity() {
                 etPrice.setText(product.price.toInt().toString())
                 etCost.setText(product.costPrice.toInt().toString())
                 etBarcode.setText(product.barcode)
-                etCategory.setText(product.category, false)
+                // Category set via Observer loadCategories()
 
                 currentPhotoPath = product.imagePath
                 if (currentPhotoPath != null) setPic()
@@ -198,7 +206,7 @@ class ProductEntryActivity : AppCompatActivity() {
         val name = etName.text.toString()
         val priceStr = etPrice.text.toString()
         val costStr = etCost.text.toString()
-        val category = etCategory.text.toString()
+        val category = spCategory.selectedItem?.toString() ?: "Umum"
         val barcode = etBarcode.text.toString()
 
         if (name.isEmpty()) {

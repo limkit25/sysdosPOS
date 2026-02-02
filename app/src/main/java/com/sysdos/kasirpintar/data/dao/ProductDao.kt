@@ -92,6 +92,9 @@ interface ProductDao {
     @Query("SELECT * FROM user_table WHERE username = :email LIMIT 1")
     suspend fun getUserByEmail(email: String): User?
 
+    @Query("SELECT * FROM user_table WHERE phone = :phone LIMIT 1")
+    suspend fun getUserByPhone(phone: String): User?
+
     // --- LOG STOK ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: StockLog)

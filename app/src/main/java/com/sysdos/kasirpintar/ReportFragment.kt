@@ -102,10 +102,10 @@ class ReportFragment : Fragment(R.layout.fragment_tab_report) {
             val file = File(context.cacheDir, fileName)
             val writer = FileWriter(file)
 
-            writer.append("Nama Barang,Kategori,Stok,Harga Modal,Nilai Aset\n")
+            writer.append("ID,Nama Barang,Kategori,Stok,Harga Modal,Nilai Aset\n")
             for (p in filteredList) {
                 val asset = (p.stock * p.costPrice).toLong()
-                writer.append("${p.name},${p.category},${p.stock},${p.costPrice.toLong()},${asset}\n")
+                writer.append("${p.id},${p.name},${p.category},${p.stock},${p.costPrice.toLong()},${asset}\n")
             }
             writer.flush()
             writer.close()

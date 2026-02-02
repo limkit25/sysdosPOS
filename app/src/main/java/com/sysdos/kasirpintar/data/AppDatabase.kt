@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
         Branch::class,        // 🔥 WAJIB DITAMBAHKAN
         ProductVariant::class // 🔥 WAJIB DITAMBAHKAN DI SINI
     ],
-    version = 8, // 🔥 NAIKKAN VERSI (Misal dari 7 jadi 8) BIAR AMAN
+    version = 9, // 🔥 NAIKKAN VERSI (Misal dari 7 jadi 8) BIAR AMAN
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

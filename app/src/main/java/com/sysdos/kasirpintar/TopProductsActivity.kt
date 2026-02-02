@@ -28,9 +28,7 @@ class TopProductsActivity : AppCompatActivity() {
     private lateinit var btnWeek: Button
     private lateinit var btnMonth: Button
 
-    // 🔥 1. TAMBAH VARIABEL MENU SAMPING
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,39 +37,14 @@ class TopProductsActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
         // =============================================================
-        // 🔥 2. SETUP MENU SAMPING (DRAWER)
+        // 🔥 2. SETUP MENU SAMPING (DRAWER) -> REMOVED
         // =============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<View>(R.id.btnMenuDrawer) // Sesuai ID di XML baru
 
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
-
-        // Setup Header Menu
+        // Setup Header Menu (Session Check kept)
         val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
 
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // Logika Navigasi
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
 
         // =============================================================
         // 🔥 3. INIT VIEWS (KODINGAN LAMA DENGAN PENYESUAIAN)
@@ -99,13 +72,9 @@ class TopProductsActivity : AppCompatActivity() {
         btnMonth.setOnClickListener { updateFilterUI(btnMonth); filterData("MONTH") }
     }
 
-    // 🔥 4. TAMBAH LOGIKA BACK BUTTON AGAR DRAWER NUTUP DULU
+    // 🔥 4. TAMBAH LOGIKA BACK BUTTON AGAR DRAWER NUTUP DULU -> REMOVED
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     // --- (SISANYA: filterData, calculateProductPerformance, updateFilterUI, Adapter TETAP SAMA) ---

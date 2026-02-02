@@ -19,52 +19,27 @@ import com.sysdos.kasirpintar.api.PaymentResponse
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import androidx.appcompat.app.AlertDialog
+import android.content.DialogInterface
 
 class AboutActivity : AppCompatActivity() {
 
-    // 1. Variabel Global Menu Samping
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_about)
 
         // =============================================================
-        // 🔥 1. SETUP MENU SAMPING (DRAWER)
+        // 🔥 1. SETUP MENU SAMPING (DRAWER) -> REMOVED
         // =============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<View>(R.id.btnMenuDrawer) // Tombol Burger
-
-        // A. Klik Tombol Burger
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
 
         // B. Setup Header Menu (Nama User)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
 
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // C. Logika Navigasi Pindah Halaman
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
 
         // =============================================================
         // 🔥 2. KODINGAN HALAMAN ABOUT
@@ -76,6 +51,7 @@ class AboutActivity : AppCompatActivity() {
         val btnWA = findViewById<CardView>(R.id.btnContactWA)
         val btnEmail = findViewById<CardView>(R.id.btnContactEmail)
         val btnUpgrade = findViewById<Button>(R.id.btnUpgradePremium)
+        val btnCheckUpdate = findViewById<Button>(R.id.btnCheckUpdate) // 🔥 BUTTON BARU
 
         // Tampilkan Versi Aplikasi
         try {
@@ -83,6 +59,12 @@ class AboutActivity : AppCompatActivity() {
             tvVersion.text = "Versi Aplikasi: ${pInfo.versionName}"
         } catch (e: Exception) {
             tvVersion.text = "Versi 1.0"
+        }
+
+        // Logic Update Manual
+        btnCheckUpdate.setOnClickListener {
+             Toast.makeText(this, "Mengecek Update...", Toast.LENGTH_SHORT).show()
+             UpdateManager(this).checkForUpdate(isManual = true)
         }
 
         // Tombol WhatsApp
@@ -120,6 +102,8 @@ class AboutActivity : AppCompatActivity() {
 
         if (isFull) {
             btnUpgrade.visibility = View.GONE
+        } else {
+            btnUpgrade.text = "FORM AKTIVASI" // 🔥 GANTI TEKS
         }
 
         btnUpgrade.setOnClickListener {
@@ -128,26 +112,20 @@ class AboutActivity : AppCompatActivity() {
             if (emailUser.isNotEmpty()) {
                 Toast.makeText(this, "Membuat Pesanan...", Toast.LENGTH_SHORT).show()
 
-                // PANGGIL SERVER
-                val api = ApiClient.webClient
-                api.createPayment(emailUser).enqueue(object : Callback<PaymentResponse> {
-                    override fun onResponse(call: Call<PaymentResponse>, response: Response<PaymentResponse>) {
-                        if (response.isSuccessful && response.body() != null) {
-                            val url = response.body()!!.payment_url
 
-                            // Buka WebView Payment
-                            val intent = Intent(this@AboutActivity, PaymentActivity::class.java)
-                            intent.putExtra("PAYMENT_URL", url)
-                            startActivity(intent)
-                        } else {
-                            Toast.makeText(this@AboutActivity, "Gagal koneksi server. Code: ${response.code()}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
 
-                    override fun onFailure(call: Call<PaymentResponse>, t: Throwable) {
-                        Toast.makeText(this@AboutActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
-                    }
-                })
+                // 🔥 LANGSUNG KE FORM AKTIVASI (FULL FORM)
+                val intent = Intent(this@AboutActivity, ActivationActivity::class.java)
+                intent.putExtra("STORE_NAME", "Toko Saya") 
+                intent.putExtra("STORE_PHONE", "08123456789")
+                intent.putExtra("STORE_TYPE", "Retail")
+                
+                // Default ke 1 Bulan, tapi user bisa ganti di dalam form
+                intent.putExtra("PLAN_NAME", "PREMIUM 1 BULAN") 
+                intent.putExtra("PRICE", "Rp 50.000")
+                
+                startActivity(intent)
+                // (Code removed)
             } else {
                 Toast.makeText(this, "Gagal: Email user tidak ditemukan", Toast.LENGTH_SHORT).show()
             }
@@ -156,10 +134,6 @@ class AboutActivity : AppCompatActivity() {
 
     // Tambahkan ini di luar onCreate agar tombol Back HP menutup menu dulu
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 }

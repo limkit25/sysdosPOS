@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    android:fillViewport="true"
+    tools:context=".RegisterActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="16dp">
+
+        <!-- HEADER (Padat tapi tetap Wrap Content) -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1976D2"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp"
+            android:paddingTop="36dp"
+            android:elevation="2dp">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/colorOnPrimary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_toEndOf="@id/btnBack"
+                android:layout_marginStart="12dp"
+                android:text="Daftar"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/colorOnPrimary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="Bantuan (?)"
+                android:background="@drawable/rounded_edittext"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:textColor="@color/black"
+                android:textSize="11sp" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Lengkapi data usaha Anda dibawah ini."
+                android:textSize="12sp"
+                android:textColor="#757575"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- DATA USAHA (Vertical tapi Compact) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Data Usaha"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etStoreName"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="Nama Usaha"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"/>
+
+            <Spinner
+                android:id="@+id/spBusinessType"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etAddress"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="Alamat Lengkap"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#F5F5F5"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- DATA PEMILIK (Vertical tapi Compact) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Data Pemilik"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etOwnerName"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="Nama Pemilik"
+                android:inputType="textPersonName"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etPhone"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="No. Handphone"
+                android:inputType="phone"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etEmail"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="Email"
+                android:inputType="textEmailAddress"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etPin"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="PIN (6 Angka)"
+                android:inputType="numberPassword"
+                android:maxLength="6"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etReferral"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@drawable/rounded_edittext"
+                android:hint="Kode Referal (Opsional)"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- AGREEMENT -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="top">
+
+                <CheckBox
+                    android:id="@+id/cbAgree"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:scaleX="0.9"
+                    android:scaleY="0.9"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Setuju Syarat &amp; Ketentuan serta Kebijakan Privasi"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    android:layout_marginTop="6dp"/>
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnRegister"
+                android:layout_width="match_parent"
+                android:layout_height="45dp"
+                android:text="DAFTAR SEKARANG"
+                android:backgroundTint="#1976D2"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:layout_marginTop="16dp"/>
+
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

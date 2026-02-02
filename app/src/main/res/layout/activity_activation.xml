@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <ImageView
+             android:id="@+id/btnLogout"
+             android:layout_width="30dp"
+             android:layout_height="30dp"
+             android:src="@android:drawable/ic_menu_close_clear_cancel"
+             android:layout_gravity="end"/>
+
+        <!-- TITLE -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AKTIVASI AKUN"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#00695C"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- INFO -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Silakan transfer agar akun aktif."
+            android:textColor="#E65100"
+            android:background="#FFF3E0"
+            android:padding="10dp"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- STORE INFO -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Data Toko (Bisa Diedit):"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+        
+        <EditText
+            android:id="@+id/etStoreName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Nama Toko"
+            android:textSize="16sp"
+            android:background="@android:drawable/edit_text"
+            android:padding="8dp"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/etStorePhone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="No. HP Toko"
+            android:inputType="phone"
+            android:textSize="16sp"
+            android:background="@android:drawable/edit_text"
+            android:padding="8dp"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView android:id="@+id/tvStoreType" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Type" android:textSize="16sp" android:padding="8dp"/>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#CCCCCC" android:layout_marginTop="16dp" android:layout_marginBottom="16dp"/>
+
+        <!-- BILLING -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tagihan:"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgPlanDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <RadioButton
+                android:id="@+id/rb1Month"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="1 Bulan (Rp 50.000)"
+                android:checked="true"
+                android:textSize="16sp"/>
+
+            <RadioButton
+                android:id="@+id/rb1Year"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="1 Tahun (Rp 450.000) - Hemat!"
+                android:textSize="16sp"/>
+        </RadioGroup>
+        
+        <!-- HIDDEN TV PLAN NAME FOR COMPATIBILITY (OPTIONAL) OR REMOVE -->
+        <!-- Replacing actual TextView -->
+        <TextView
+            android:id="@+id/tvTotalBill"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rp 0"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#00695C"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Transfer ke BCA: 398-132-6359\n(Heru Sartono)"
+            android:background="#E0F2F1"
+            android:padding="16dp"
+            android:textColor="#000000"
+            android:textStyle="bold"/>
+
+        <!-- COPY BUTTON (Image View as expected by code) -->
+         <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Salin Rekening" android:padding="8dp"/>
+             <ImageView
+                android:id="@+id/btnCopyRek" 
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:src="@android:drawable/ic_menu_save"/>
+         </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#CCCCCC" android:layout_marginTop="16dp" android:layout_marginBottom="16dp"/>
+
+        <TextView android:text="Catatan (Opsional):" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="4dp"/>
+        <EditText
+            android:id="@+id/etNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Contoh: Transfer atas nama Budi"
+            android:background="@android:drawable/edit_text"
+            android:padding="10dp"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- UPLOAD -->
+        <Button
+            android:id="@+id/btnSelectImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Upload Bukti Transfer"/>
+
+        <ImageView
+            android:id="@+id/ivProofPreview"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:background="#EEEEEE"
+            android:visibility="gone"
+            android:layout_marginTop="8dp"/>
+
+        <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="KIRIM BUKTI"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp"/>
+
+        <!-- BACK TO LOGIN -->
+        <Button
+            android:id="@+id/btnBackToLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Kembali ke Login"
+            android:background="@android:color/transparent"
+            android:textColor="#555555"
+            android:layout_marginTop="10dp"/>
+
+        <!-- Dummy Button to catch ID reference if needed (btnLogout was ImageView in Logic) -->
+        <!-- In Code: btnLogout = findViewById<ImageView>(R.id.btnLogout) -->
+        <!-- If I use Button here, it will crash ClassCastException -->
+        <!-- So I MUST use ImageView or change Code -->
+        <!-- Code expects ImageView. I will add a small X icon at top right -->
+    
+    </LinearLayout>
+</ScrollView>

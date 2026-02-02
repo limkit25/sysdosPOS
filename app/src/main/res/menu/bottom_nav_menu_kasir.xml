@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_bot_home"
+        android:icon="@drawable/icon_menu_toko"
+        android:title="Home" />
+
+    <item
+        android:id="@+id/nav_bot_kasir"
+        android:icon="@drawable/icon_menu_kasir"
+        android:title="Kasir" />
+
+    <item
+        android:id="@+id/nav_bot_laporan"
+        android:icon="@drawable/icon_menu_laporan"
+        android:title="Lapor" />
+</menu>

@@ -21,46 +21,16 @@ class UserListActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: UserAdapter
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_list)
 
-        // === SETUP MENU SAMPING ===
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // ID Baru
+        // === SETUP MENU SAMPING (DRAWER) -> REMOVED IN FAVOR OF BACK ARROW OR BOTTOM NAV ===
+        // Drawer Code Removed.
 
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
-
-        // Setup Header Menu
-        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
-        val realName = session.getString("fullname", "Admin")
-        val role = session.getString("role", "admin")
-
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // Navigasi
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(android.content.Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(android.content.Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START) // Tutup aja
-                // ... menu lain
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
 
         // === KODINGAN LAMA ===
         // HAPUS BARIS INI: val btnBack = findViewById<android.view.View>(R.id.btnBack)...
@@ -89,11 +59,7 @@ class UserListActivity : AppCompatActivity() {
 
     // Tambahkan ini di luar onCreate
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     private fun showUserDialog(userToEdit: User?) {

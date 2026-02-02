@@ -11,7 +11,7 @@ import com.sysdos.kasirpintar.data.model.StockLog
 import java.text.SimpleDateFormat
 import java.util.*
 
-class LogReportAdapter : RecyclerView.Adapter<LogReportAdapter.LogViewHolder>() {
+class LogReportAdapter(private val onItemClick: (StockLog) -> Unit) : RecyclerView.Adapter<LogReportAdapter.LogViewHolder>() {
 
     private var list = listOf<StockLog>()
 
@@ -51,6 +51,9 @@ class LogReportAdapter : RecyclerView.Adapter<LogReportAdapter.LogViewHolder>() 
         } else {
             holder.tvDetail.setTextColor(Color.parseColor("#FF9800")) // Orange
         }
+
+        // 🔥 KLIK ITEM -> PANGGIL CALLBACK
+        holder.itemView.setOnClickListener { onItemClick(log) }
     }
 
     override fun getItemCount() = list.size

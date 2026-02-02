@@ -110,14 +110,22 @@ class ProductRepository(
     suspend fun deleteUser(u: User) = productDao.deleteUser(u)
     suspend fun login(u: String, p: String) = productDao.login(u, p)
     suspend fun getUserByEmail(email: String) = productDao.getUserByEmail(email)
+    suspend fun getUserByPhone(phone: String) = productDao.getUserByPhone(phone)
 
     fun getShiftLogsByUser(userId: Int) = shiftDao.getAllLogs(userId)
+    fun getAllShiftLogsGlobal() = shiftDao.getAllShiftLogs() // 🔥 Baris Baru
     suspend fun insertShiftLog(log: ShiftLog) = shiftDao.insertLog(log)
 
     val purchaseHistory = stockLogDao.getPurchaseHistoryGroups()
     val allStockLogs = stockLogDao.getAllStockLogs()
     suspend fun recordPurchase(log: StockLog) = stockLogDao.insertLog(log)
+
     suspend fun getPurchaseDetails(pId: Long) = stockLogDao.getPurchaseDetails(pId)
+
+    // 🔥 BARU: Fetch Logs by Date & Type (For Export)
+    suspend fun getLogsByDateRangeAndType(start: Long, end: Long, type: String): List<StockLog> {
+        return stockLogDao.getLogsByDateRangeAndType(start, end, type)
+    }
 
     // SERVER SYNC
     suspend fun uploadCsvFile(file: File) {
@@ -274,6 +282,66 @@ class ProductRepository(
 
             } catch (e: Exception) {
                 Log.e("SysdosRepo", "Error Sync: ${e.message}")
+            }
+
+        }
+    }
+
+    suspend fun syncShiftLogsFromWeb(userId: Int) {
+        withContext(Dispatchers.IO) {
+            try {
+                val api = ApiClient.getLocalClient(context)
+                val response = api.getShiftLogs(userId).execute()
+                if (response.isSuccessful) {
+                    val logs = response.body()
+                    if (!logs.isNullOrEmpty()) {
+                        // Simpan ke Database Lokal
+                        logs.forEach { log ->
+                            // Cek Duplikat berdasarkan Timestamp + UserID
+                           shiftDao.insertLog(log)
+                        }
+                        Log.d("SysdosPOS", "✅ Berhasil Sync ${logs.size} Shift Logs dari Web")
+                    }
+                } else {
+                    Log.e("SysdosPOS", "❌ Gagal Sync Shift: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosPOS", "❌ Error Sync Shift: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun syncStoreConfigFromLocal() {
+        withContext(Dispatchers.IO) {
+            try {
+                // Ambil User Saat Ini untuk Branch ID
+                val prefs = context.getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
+                val email = prefs.getString("username", "admin") ?: "admin"
+                val currentUser = productDao.getUserByEmail(email)
+                val branchIdToSync = currentUser?.branchId ?: 0
+
+                val api = ApiClient.getLocalClient(context)
+                val responseConfig = api.getStoreConfig(branchIdToSync).execute()
+                
+                if (responseConfig.isSuccessful && responseConfig.body() != null) {
+                    val rawConfig = responseConfig.body()!!
+                    val serverConfig = rawConfig.copy(id = 1)
+                    
+                    storeConfigDao.saveConfig(serverConfig)
+
+                    // Simpan ke SharedPreferences
+                    val prefsStore = context.getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                    prefsStore.edit().apply {
+                        putString("name", serverConfig.storeName)
+                        putString("address", serverConfig.storeAddress)
+                        putString("phone", serverConfig.storePhone)
+                        putString("email", serverConfig.strukFooter)
+                        apply()
+                    }
+                    Log.d("SysdosPOS", "✅ Store Config Synced: ${serverConfig.storeName}")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosRepo", "Error Config Sync: ${e.message}")
             }
         }
     }

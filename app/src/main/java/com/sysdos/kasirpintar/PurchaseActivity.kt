@@ -25,6 +25,8 @@ import com.sysdos.kasirpintar.data.model.Supplier
 import com.sysdos.kasirpintar.viewmodel.ProductViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.lifecycle.lifecycleScope // 🔥 IMPORT CORRECT
+import kotlinx.coroutines.launch       // 🔥 IMPORT CORRECT
 
 class PurchaseActivity : AppCompatActivity() {
 
@@ -42,12 +44,13 @@ class PurchaseActivity : AppCompatActivity() {
     private lateinit var btnAddSupplier: ImageButton
     private lateinit var tvTotal: TextView
     private lateinit var svSearch: SearchView
+    private lateinit var etInvoiceNumber: EditText // 🔥 DEKLARASI BARU
     private lateinit var layoutInput: LinearLayout
     private lateinit var layoutHistory: LinearLayout
     private lateinit var btnTabInput: Button
     private lateinit var btnTabHistory: Button
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     // SCANNER
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
@@ -69,29 +72,10 @@ class PurchaseActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        // --- SETUP MENU SAMPING (BARU) ---
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer)
+        // --- SETUP MENU SAMPING (BARU) -> REMOVED IN FAVOR OF BOTTOM NAV ---
+        // Drawer Code Removed.
 
-        // 1. Klik Tombol Burger
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
 
-        // 2. Klik Item Menu
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_laporan -> startActivity(android.content.Intent(this, SalesReportActivity::class.java))
-                R.id.nav_stok -> startActivity(android.content.Intent(this, ProductListActivity::class.java))
-                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
-                // ... menu lain ...
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
 
         // --- KODINGAN LAMA MAS HERU ---
         layoutInput = findViewById(R.id.layoutInput)
@@ -102,8 +86,13 @@ class PurchaseActivity : AppCompatActivity() {
         btnAddSupplier = findViewById(R.id.btnAddSupplier)
         tvTotal = findViewById(R.id.tvTotalPurchase)
         svSearch = findViewById(R.id.svSearchProduct)
+        etInvoiceNumber = findViewById(R.id.etInvoiceNumber) // 🔥 BINDING BARU
 
         // Hapus baris btnBack.setOnClickListener karena sudah diganti btnMenuDrawer
+
+        // 🔥 SETUP BOTTOM NAV
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
+        com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
     }
 
     private fun setupRecyclerViews() {
@@ -157,6 +146,11 @@ class PurchaseActivity : AppCompatActivity() {
             options.setOrientationLocked(true)
             options.setCaptureActivity(ScanActivity::class.java)
             barcodeLauncher.launch(options)
+        }
+        
+        // 🔥 LISTENER EXPORT EXCEL
+        findViewById<Button>(R.id.btnExportExcel).setOnClickListener {
+            showExportDateDialog()
         }
 
         svSearch.setOnQueryTextFocusChangeListener { _, hasFocus ->
@@ -370,7 +364,14 @@ class PurchaseActivity : AppCompatActivity() {
     // --- SAVE & OTHERS ---
     private fun saveTransaction() {
         if (purchaseList.isEmpty()) { Toast.makeText(this, "Keranjang kosong!", Toast.LENGTH_SHORT).show(); return }
-        val supplierName = if(spSupplier.selectedItem != null && spSupplier.selectedItemPosition > 0) spSupplier.selectedItem.toString() else "Umum"
+        
+        // 🔥 VALIDASI SUPPLIER WAJIB DIPILIH
+        if (spSupplier.selectedItemPosition == 0) {
+            Toast.makeText(this, "⚠️ Harap pilih Supplier terlebih dahulu!", Toast.LENGTH_SHORT).show()
+            spSupplier.performClick() // Buka spinner otomatis biar user sadar
+            return
+        }
+        val supplierName = spSupplier.selectedItem.toString()
 
         AlertDialog.Builder(this).setTitle("Konfirmasi Simpan").setMessage("Stok akan bertambah. Lanjutkan?")
             .setPositiveButton("Ya") { _, _ ->
@@ -384,7 +385,8 @@ class PurchaseActivity : AppCompatActivity() {
                     val log = StockLog(
                         purchaseId = purchaseId, timestamp = purchaseId, productName = oldProduct.name,
                         supplierName = supplierName, quantity = item.qty, costPrice = item.cost,
-                        totalCost = item.qty * item.cost, type = "IN"
+                        totalCost = item.qty * item.cost, type = "IN",
+                        invoiceNumber = etInvoiceNumber.text.toString() // 🔥 SIMPAN NOMOR FAKTUR
                     )
                     viewModel.recordPurchase(log)
                 }
@@ -427,6 +429,109 @@ class PurchaseActivity : AppCompatActivity() {
                 Toast.makeText(context, "Supplier '$name' disimpan!", Toast.LENGTH_SHORT).show()
             } else { Toast.makeText(context, "Nama wajib diisi!", Toast.LENGTH_SHORT).show() }
         }.setNegativeButton("Batal", null).show()
+    }
+
+    // --- LOGIKA EXPORT EXCEL (CSV) ---
+    private fun showExportDateDialog() {
+        val context = this
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 10)
+        }
+
+        val tvInfo = TextView(context).apply { text = "Pilih Rentang Tanggal:"; textSize = 16f; setPadding(0,0,0,20) }
+        val btnStartDate = Button(context).apply { text = "Tanggal Awal" }
+        val btnEndDate = Button(context).apply { text = "Tanggal Akhir" }
+
+        var startMillis = System.currentTimeMillis()
+        var endMillis = System.currentTimeMillis()
+
+        btnStartDate.setOnClickListener {
+            val cal = Calendar.getInstance()
+            android.app.DatePickerDialog(context, { _, y, m, d ->
+                cal.set(y, m, d, 0, 0, 0)
+                startMillis = cal.timeInMillis
+                btnStartDate.text = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(cal.time)
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        btnEndDate.setOnClickListener {
+            val cal = Calendar.getInstance()
+            android.app.DatePickerDialog(context, { _, y, m, d ->
+                cal.set(y, m, d, 23, 59, 59)
+                endMillis = cal.timeInMillis
+                btnEndDate.text = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(cal.time)
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        layout.addView(tvInfo); layout.addView(btnStartDate); layout.addView(btnEndDate)
+
+        AlertDialog.Builder(context)
+            .setTitle("Export Laporan Belanja")
+            .setView(layout)
+            .setPositiveButton("DOWNLOAD") { _, _ ->
+                processExport(startMillis, endMillis)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun processExport(start: Long, end: Long) {
+        // Panggil ViewModel untuk ambil data (Harus dibuat di ViewModel dulu, tapi kita inject langsung ke DAO via repository klo bisa, atau pakai direct Coroutine di sini sementara)
+        // Karena ViewModel belum ada fungsi getLogsByDate, kita tambahkan via helper atau direct call. 
+        // Biar cepat & aman, kita luncurkan coroutine dari sini.
+        
+        Toast.makeText(this, "Sedang memproses...", Toast.LENGTH_SHORT).show()
+
+        // GUNAKAN lifecycleScope.launch (Standard)
+        lifecycleScope.launch {
+            // Akses DAO via Database instance (bypass ViewModel utk kecepatan dev)
+            val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(applicationContext)
+            val logs = db.stockLogDao().getLogsByDateRangeAndType(start, end, "IN")
+
+            if (logs.isEmpty()) {
+                Toast.makeText(this@PurchaseActivity, "Tidak ada data pada tanggal tsb", Toast.LENGTH_SHORT).show()
+            } else {
+                generateCSV(logs, start, end)
+            }
+        }
+    }
+
+    private fun generateCSV(logs: List<StockLog>, start: Long, end: Long) {
+        val sb = StringBuilder()
+        sb.append("Tanggal,Nomor Faktur,Supplier,Nama Barang,Qty,Harga Satuan,Total\n")
+
+        val dateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault())
+        
+        for (log in logs) {
+            val date = dateFormat.format(Date(log.timestamp))
+            // Escape koma dengan tanda kutip jika perlu
+            val namaBarang = log.productName.replace(",", " ")
+            val supplier = log.supplierName.replace(",", " ")
+            
+            sb.append("$date,${log.invoiceNumber},$supplier,$namaBarang,${log.quantity},${log.costPrice.toLong()},${log.totalCost.toLong()}\n")
+        }
+
+        val fileName = "Laporan_Belanja_${System.currentTimeMillis()}.csv"
+        val file = java.io.File(getExternalFilesDir(null), fileName)
+        
+        try {
+            file.writeText(sb.toString())
+            shareFile(file)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "Gagal membuat file: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareFile(file: java.io.File) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "${packageName}.provider", file)
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
+        intent.type = "text/csv" // Atau "application/vnd.ms-excel"
+        intent.putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        
+        startActivity(android.content.Intent.createChooser(intent, "Kirim Laporan Ke..."))
     }
 
     private fun formatRupiah(number: Double): String = String.format(Locale("id", "ID"), "Rp %,d", number.toLong()).replace(',', '.')
@@ -485,7 +590,11 @@ class PurchaseActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val item = list[position]
             val date = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault()).format(Date(item.timestamp))
-            holder.tvHeader.text = "FAKTUR: ${item.supplierName}"; holder.tvHeader.setTextColor(Color.parseColor("#1976D2")); holder.tvHeader.setTypeface(null, android.graphics.Typeface.BOLD)
+            
+            // 🔥 TAMPILKAN INVOICE NUMBER JIKA ADA
+            val displayTitle = if (item.invoiceNumber.isNotEmpty()) item.invoiceNumber else item.supplierName
+            
+            holder.tvHeader.text = "FAKTUR: $displayTitle"; holder.tvHeader.setTextColor(Color.parseColor("#1976D2")); holder.tvHeader.setTypeface(null, android.graphics.Typeface.BOLD)
             holder.tvSub.text = "$date\n(Ketuk untuk lihat detail)"
             holder.itemView.setOnClickListener { onClick(item.purchaseId) }
         }
@@ -508,10 +617,6 @@ class PurchaseActivity : AppCompatActivity() {
         override fun getItemCount(): Int = items.size
     }
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 }

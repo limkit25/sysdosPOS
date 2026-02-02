@@ -1,188 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1976D2"
     android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
+        android:layout_height="?attr/actionBarSize"
         android:background="#1976D2"
-        android:fitsSystemWindows="true">
+        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical"
+        android:elevation="4dp">
+
+        <!-- Burger Button Removed -->
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tentang Aplikasi"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginStart="16dp"/>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F8F9FA"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="#1976D2"
-            android:paddingHorizontal="16dp"
-            android:gravity="center_vertical"
-            android:elevation="4dp">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="30dp">
 
-            <ImageButton
-                android:id="@+id/btnMenuDrawer"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_menu"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#FFFFFF"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:contentDescription="Menu"/>
+            <ImageView
+                android:layout_width="250dp"
+                android:layout_height="200dp"
+                android:src="@drawable/logo_toko"
+                android:layout_marginBottom="16dp"/>
+
+            <TextView
+                android:id="@+id/tvAppVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Versi 1.0.0"
+                android:textColor="#757575"
+                android:layout_marginBottom="24dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tentang Aplikasi"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
+                android:text="Aplikasi POS Kasir berbasis Cloud &amp; Offline Hybrid. Kelola stok, penjualan, dan laporan keuangan dalam satu genggaman."
+                android:gravity="center"
+                android:textColor="#555555"
+                android:lineSpacingExtra="4dp"
+                android:layout_marginBottom="40dp"/>
+
+            <Button
+                android:id="@+id/btnUpgradePremium"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="👑 UPGRADE PREMIUM (Rp 999.000) Lifetime"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:layout_marginStart="16dp"/>
-        </LinearLayout>
+                android:textColor="#000000"
+                android:backgroundTint="#FFD700"
+                android:layout_marginBottom="30dp"
+                app:iconTint="#000000"
+                app:cornerRadius="8dp"/>
 
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#F8F9FA"
-            android:fillViewport="true">
+            <Button
+                android:id="@+id/btnCheckUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="🔍 CEK UPDATE APLIKASI"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#1565C0"
+                android:backgroundTint="#E3F2FD"
+                android:layout_marginBottom="30dp"
+                app:cornerRadius="8dp"/>
 
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:padding="30dp">
+                android:text="HUBUNGI KAMI"
+                android:textStyle="bold"
+                android:textColor="#1976D2"
+                android:layout_marginBottom="10dp"/>
 
-                <ImageView
-                    android:layout_width="250dp"
-                    android:layout_height="200dp"
-                    android:src="@drawable/logo_toko"
-                    android:layout_marginBottom="16dp"/>
-
-
-
-                <TextView
-                    android:id="@+id/tvAppVersion"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Versi 1.0.0"
-                    android:textColor="#757575"
-                    android:layout_marginBottom="24dp"/>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Aplikasi POS Kasir berbasis Cloud &amp; Offline Hybrid. Kelola stok, penjualan, dan laporan keuangan dalam satu genggaman."
-                    android:gravity="center"
-                    android:textColor="#555555"
-                    android:lineSpacingExtra="4dp"
-                    android:layout_marginBottom="40dp"/>
-
-                <Button
-                    android:id="@+id/btnUpgradePremium"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:text="👑 UPGRADE PREMIUM (Rp 999.000) Lifetime"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="#000000"
-                    android:backgroundTint="#FFD700"
-                    android:layout_marginBottom="30dp"
-                    app:iconTint="#000000"
-                    app:cornerRadius="8dp"/>
-
-                <TextView
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnContactWA"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="12dp"
+                android:clickable="true"
+                android:foreground="?attr/selectableItemBackground">
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="HUBUNGI KAMI"
-                    android:textStyle="bold"
-                    android:textColor="#1976D2"
-                    android:layout_marginBottom="10dp"/>
-
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/btnContactWA"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="8dp"
-                    app:cardElevation="2dp"
-                    android:layout_marginBottom="12dp"
-                    android:clickable="true"
-                    android:foreground="?attr/selectableItemBackground">
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/whatsapp"
+                        app:tint="#25D366"/>
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="16dp"
-                        android:gravity="center_vertical">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/whatsapp"
-                            app:tint="#25D366"/>
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Chat WhatsApp Admin"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="16dp"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
+                        android:text="Chat WhatsApp Admin"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="16dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/btnContactEmail"
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnContactEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="12dp"
+                android:clickable="true"
+                android:foreground="?attr/selectableItemBackground">
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="8dp"
-                    app:cardElevation="2dp"
-                    android:layout_marginBottom="12dp"
-                    android:clickable="true"
-                    android:foreground="?attr/selectableItemBackground">
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@android:drawable/ic_dialog_email"
+                        app:tint="#D44638"/>
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="16dp"
-                        android:gravity="center_vertical">
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@android:drawable/ic_dialog_email"
-                            app:tint="#D44638"/>
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Kirim Email Support"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginStart="16dp"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
+                        android:text="Kirim Email Support"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="16dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="© 2026 Sysdos Technology"
-                    android:textSize="12sp"
-                    android:textColor="#999999"
-                    android:layout_marginTop="30dp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="© 2026 Sysdos Technology"
+                android:textSize="12sp"
+                android:textColor="#999999"
+                android:layout_marginTop="30dp"/>
 
-            </LinearLayout>
-        </ScrollView>
-    </LinearLayout>
-
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navView"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:fitsSystemWindows="true"
-        app:headerLayout="@layout/nav_header"
-        app:menu="@menu/nav_menu"
-        app:itemIconTint="#1976D2"
-        app:itemTextColor="#333333"/>
-
-</androidx.drawerlayout.widget.DrawerLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

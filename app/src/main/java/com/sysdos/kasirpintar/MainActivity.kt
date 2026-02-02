@@ -64,8 +64,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var session: SharedPreferences
     private lateinit var shiftPrefs: SharedPreferences
 
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     // 🔥 HELPER: Ambil Key Unik Berdasarkan Username yg Login
     private val currentUserKey: String
@@ -87,57 +87,17 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        // ===============================================================
-        // 🔥 2. SETUP MENU SAMPING (NAVIGATION DRAWER) - MASUKKAN DISINI
-        // ===============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenuDrawer = findViewById<android.view.View>(R.id.btnMenuDrawer) // Tombol Burger
 
-        // A. Aksi Klik Tombol Burger -> Buka Laci
-        btnMenuDrawer.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
-
-        // B. Setup Header (Nama User & Role)
-        // Ambil data dari session yang nanti di-init di bawah, atau ambil langsung disini
-        val tempSession = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        val realName = tempSession.getString("fullname", "Kasir")
-        val role = tempSession.getString("role", "kasir")
-
-        val headerView = navView.getHeaderView(0)
-        headerView.findViewById<TextView>(R.id.tvHeaderName).text = realName
-        headerView.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-
-        // C. Aksi Klik Item Menu
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> {
-                    // Pindah ke Dashboard
-                    startActivity(Intent(this, DashboardActivity::class.java))
-                    finish() // Tutup halaman Kasir
-                }
-                R.id.nav_kasir -> {
-                    // Sudah di halaman Kasir, tutup laci saja
-                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-                }
-                R.id.nav_laporan -> startActivity(Intent(this, SalesReportActivity::class.java))
-                R.id.nav_stok -> startActivity(Intent(this, ProductListActivity::class.java))
-                R.id.nav_user -> startActivity(Intent(this, UserListActivity::class.java))
-                R.id.nav_logout -> {
-                    // Logika logout bisa dipanggil disini atau redirect ke Dashboard dulu
-                    Toast.makeText(this, "Silakan Logout dari Dashboard", Toast.LENGTH_SHORT).show()
-                }
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
         // 1. INIT PREFERENCES
         session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         shiftPrefs = getSharedPreferences("shift_prefs", Context.MODE_PRIVATE)
 
         printerHelper = PrinterHelper(this)
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
+
+        // 🔥 SETUP BOTTOM NAV (Moved after viewModel init)
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
+        com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
 
         // 2. AUTO CONNECT PRINTER
         val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
@@ -220,14 +180,13 @@ class MainActivity : AppCompatActivity() {
                 // 1. Ganti Judul Aplikasi
                 supportActionBar?.title = config.storeName
 
-                // 2. Ganti di Header Menu Samping
-                if (::navView.isInitialized) {
-                    val headerView = navView.getHeaderView(0)
-                    val tvRole = headerView.findViewById<TextView>(R.id.tvHeaderRole)
-                    val currentRole = session.getString("role", "KASIR")?.uppercase()
-                    tvRole.text = "$currentRole  |  ${config.storeName}"
-                }
+                // 2. Ganti di Header Menu Samping (REMOVED)
             }
+        }
+
+        // 5. OBSERVE LICENSE STATUS (REALTIME BLOCKING)
+        viewModel.licenseStatus.observe(this) {
+            checkLicenseBlocking()
         }
 
 
@@ -261,16 +220,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 7. HANDLE BACK BUTTON (YANG DIPERBARUI)
+        // 7. HANDLE BACK BUTTON
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // 🔥 Cek dulu: Kalau menu samping terbuka, tutup menu dulu
-                if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-                } else {
-                    // Kalau menu tertutup, baru jalankan fungsi Back biasa (Finish)
-                    finish()
-                }
+                // Konfirmasi keluar? Atau biarkan default finish?
+                // Default:
+                finish()
             }
         })
 
@@ -284,7 +239,44 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onFailure(call: retrofit2.Call<List<com.sysdos.kasirpintar.api.ProductResponse>>, t: Throwable) {}
         })
+
+        // 10. AUTO-CHECK LICENSE ON STARTUP
+        val email = session.getString("username", "") ?: ""
+        if (email.isNotEmpty()) {
+            viewModel.checkServerLicense(email) // Cek ke server background
+        }
     }
+
+    override fun onResume() {
+        super.onResume()
+        checkLicenseBlocking()
+    }
+
+    private fun checkLicenseBlocking() {
+        val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+        val isExpired = prefs.getBoolean("is_expired", false)
+        // Opsional: Cek juga is_full_version == false kalau mau strict
+        
+        if (isExpired) {
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("⚠️ Masa Aktif Habis")
+            builder.setMessage("Lisensi aplikasi Anda telah berakhir.\nSilakan perbarui langganan untuk melanjutkan transaksi.")
+            builder.setCancelable(false) // Gak bisa di-cancel tombol back
+            
+            builder.setPositiveButton("PERPANJANG") { _, _ ->
+                // Arahkan ke Settings supaya bisa Aktivasi
+                val intent = Intent(this, StoreSettingsActivity::class.java)
+                startActivity(intent)
+            }
+            
+            builder.setNegativeButton("KELUAR") { _, _ ->
+                finishAffinity() // Tutup aplikasi total
+            }
+            
+            builder.show()
+        }
+    }
+
     private fun updateTotalHeader() {
         val tvTotalTop = cartDialog?.findViewById<TextView>(R.id.tvPreviewTotalTop)
         viewModel.totalPrice.value?.let { total ->

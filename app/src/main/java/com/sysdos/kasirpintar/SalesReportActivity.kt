@@ -41,54 +41,33 @@ class SalesReportActivity : AppCompatActivity() {
     private lateinit var btnToggleProfit: ImageView
 
     // UI Navigasi
-    private lateinit var btnOpenTopProducts: Button
     private lateinit var btnOpenHistory: Button
 
     // Variable Sensor Laba
     private var actualProfitValue: Double = 0.0
     private var isProfitVisible: Boolean = false
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sales_report)
 
         // =============================================================
-        // 🔥 1. SETUP MENU SAMPING (DRAWER)
+        // 🔥 1. SETUP MENU SAMPING (DRAWER) -> REMOVED IN FAVOR OF BOTTOM NAV
         // =============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // ID Baru
 
-        // Klik Tombol Burger
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
-
-        // Setup Header & Session
+        // Setup Header & Session (KEEP THIS FOR REUSE IF NEEDED, OR DELETE IF UNUSED)
         val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
 
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
 
-        // Logika Navigasi
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> startActivity(android.content.Intent(this, ProductListActivity::class.java))
-                R.id.nav_laporan -> drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
+
+        // 🔥 SETUP BOTTOM NAV
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
+        viewModel = ViewModelProvider(this)[ProductViewModel::class.java] // Init viewModel dulu sebelum dipake
+        com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
 
         // =============================================================
         // 🔥 2. LOGIKA LAPORAN (Kodingan Lama)
@@ -106,18 +85,17 @@ class SalesReportActivity : AppCompatActivity() {
         barChart = findViewById(R.id.chartRevenue)
         btnToggleProfit = findViewById(R.id.btnToggleProfit)
 
-        btnOpenTopProducts = findViewById(R.id.btnOpenTopProducts)
         btnOpenHistory = findViewById(R.id.btnOpenHistory)
 
         // LISTENERS
         // ❌ HAPUS BARIS btnBack INI KARENA SUDAH DIGANTI btnMenuDrawer
         // findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
+
+
         findViewById<android.widget.ImageButton>(R.id.btnPrintDaily).setOnClickListener { printDailyRecap() }
 
-        btnOpenTopProducts.setOnClickListener {
-            startActivity(android.content.Intent(this, TopProductsActivity::class.java))
-        }
+
 
         btnOpenHistory.setOnClickListener {
             startActivity(android.content.Intent(this, HistoryActivity::class.java))
@@ -134,10 +112,30 @@ class SalesReportActivity : AppCompatActivity() {
 
         setupChartConfig()
 
+        // CHART TOGGLE INIT
+        btn7Days = findViewById(R.id.btnChart7Days)
+        btn30Days = findViewById(R.id.btnChart30Days)
+        
+        btn7Days.setOnClickListener {
+            chartDuration = 7
+            updateToggleUI()
+            updateChartData(fullList)
+        }
+        
+        btn30Days.setOnClickListener {
+            chartDuration = 30
+            updateToggleUI()
+            updateChartData(fullList)
+        }
+        updateToggleUI() // Set initial state
+
         // 3. PRIVASI KASIR (Sembunyikan Laba)
         // Kita pakai variabel 'role' yang sudah diambil di atas supaya tidak double
+        // 3. PRIVASI KASIR (Sembunyikan Laba)
         if (role == "kasir") {
             cardProfit.visibility = android.view.View.GONE
+            tvProfit.text = "Rp ***" // Default Text
+            btnToggleProfit.visibility = android.view.View.GONE // Hilangkan tombol intip
         }
 
         // 4. OBSERVE DATA
@@ -147,11 +145,7 @@ class SalesReportActivity : AppCompatActivity() {
         }
     }
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     private fun updateSummaryAndChart(list: List<Transaction>) {
@@ -238,21 +232,46 @@ class SalesReportActivity : AppCompatActivity() {
         barChart.axisLeft.axisMinimum = 0f
     }
 
+    // UI Chart Toggle
+    private lateinit var btn7Days: TextView
+    private lateinit var btn30Days: TextView
+    private var chartDuration = 7
+
+
+
+    private fun updateToggleUI() {
+        if (chartDuration == 7) {
+            btn7Days.setBackgroundResource(R.drawable.bg_toggle_selected)
+            btn7Days.setTextColor(Color.WHITE)
+            btn30Days.background = null
+            btn30Days.setTextColor(Color.parseColor("#757575"))
+        } else {
+            btn30Days.setBackgroundResource(R.drawable.bg_toggle_selected)
+            btn30Days.setTextColor(Color.WHITE)
+            btn7Days.background = null
+            btn7Days.setTextColor(Color.parseColor("#757575"))
+        }
+    }
+
     private fun updateChartData(transactions: List<Transaction>) {
         val salesMap = LinkedHashMap<String, Double>()
         val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
         val calendar = Calendar.getInstance()
 
-        calendar.add(Calendar.DAY_OF_YEAR, -6)
+        // Mundur ke belakang sebanyak (chartDuration - 1) hari
+        calendar.add(Calendar.DAY_OF_YEAR, -(chartDuration - 1))
 
-        for (i in 0..6) {
+        // Siapkan map kosong utk setiap tanggal
+        for (i in 0 until chartDuration) {
             val dateKey = sdf.format(calendar.time)
             salesMap[dateKey] = 0.0
             calendar.add(Calendar.DAY_OF_YEAR, 1)
         }
 
+        // Isi data transaksi
+        val formatCheck = SimpleDateFormat("dd/MM", Locale.getDefault()) // Pastikan format sama
         for (trx in transactions) {
-            val dateKey = sdf.format(Date(trx.timestamp))
+            val dateKey = formatCheck.format(Date(trx.timestamp))
             if (salesMap.containsKey(dateKey)) {
                 salesMap[dateKey] = salesMap[dateKey]!! + trx.totalAmount
             }
@@ -270,9 +289,20 @@ class SalesReportActivity : AppCompatActivity() {
 
         val dataSet = BarDataSet(entries, "Omzet")
         dataSet.color = Color.parseColor("#1976D2")
+        dataSet.valueTextSize = 10f
 
         barChart.data = BarData(dataSet)
         barChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
+        
+        // 🔥 OPTIMASI TAMPILAN 30 HARI
+        if (chartDuration > 7) {
+            // Agar tidak desak-desakan
+            barChart.setVisibleXRangeMaximum(7f) // Tampilkan max 7 bar, sisanya scroll
+            barChart.moveViewToX(entries.size.toFloat()) // Scroll ke paling kanan (hari ini)
+        } else {
+            barChart.fitScreen() // Reset zoom
+        }
+        
         barChart.notifyDataSetChanged()
         barChart.invalidate()
     }

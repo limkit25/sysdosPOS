@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1976D2"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -22,16 +23,7 @@
             android:gravity="center_vertical"
             android:elevation="4dp">
 
-            <ImageButton
-                android:id="@+id/btnMenuDrawer"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_menu"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#FFFFFF"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:contentDescription="Menu"/>
+            <!-- Burger Menu Removed -->
 
             <TextView
                 android:layout_width="0dp"
@@ -57,7 +49,8 @@
 
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:fillViewport="true"
             android:background="#F5F8FA">
 
@@ -196,12 +189,53 @@
                             android:background="#E0E0E0"
                             android:layout_marginVertical="16dp"/>
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Tren Penjualan (7 Hari)"
-                            android:textStyle="bold"
-                            android:textColor="#333"/>
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="Tren Penjualan"
+                                android:textStyle="bold"
+                                android:textColor="#333"/>
+                                
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_toggle_container"
+                                android:orientation="horizontal"
+                                android:padding="2dp">
+                                
+                                <TextView
+                                    android:id="@+id/btnChart7Days"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="match_parent"
+                                    android:text="7 Hari"
+                                    android:gravity="center"
+                                    android:paddingHorizontal="12dp"
+                                    android:background="@drawable/bg_toggle_selected"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold"/>
+
+                                <TextView
+                                    android:id="@+id/btnChart30Days"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="match_parent"
+                                    android:text="30 Hari"
+                                    android:gravity="center"
+                                    android:paddingHorizontal="12dp"
+                                    android:background="@null"
+                                    android:textColor="#757575"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold"/>
+                            </LinearLayout>
+                        </LinearLayout>
 
                         <com.github.mikephil.charting.charts.BarChart
                             android:id="@+id/chartRevenue"
@@ -218,17 +252,7 @@
                     android:layout_marginTop="24dp"
                     android:paddingHorizontal="16dp">
 
-                    <Button
-                        android:id="@+id/btnOpenTopProducts"
-                        android:layout_width="match_parent"
-                        android:layout_height="60dp"
-                        android:text="🏆 LIHAT PRODUK TERLARIS"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:backgroundTint="#4CAF50"
-                        android:textColor="#FFFFFF"
-                        app:cornerRadius="10dp"
-                        android:layout_marginBottom="12dp"/>
+
 
                     <Button
                         android:id="@+id/btnOpenHistory"
@@ -244,17 +268,17 @@
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#FFFFFF"
+            app:menu="@menu/bottom_nav_menu"
+            app:itemIconTint="@drawable/selector_nav_color"
+            app:itemTextColor="@drawable/selector_nav_color"
+            app:labelVisibilityMode="labeled"
+            app:elevation="8dp"/>
     </LinearLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navView"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:fitsSystemWindows="true"
-        app:headerLayout="@layout/nav_header"
-        app:menu="@menu/nav_menu"
-        app:itemIconTint="#1976D2"
-        app:itemTextColor="#333333"/>
-
-</androidx.drawerlayout.widget.DrawerLayout>
+</LinearLayout>

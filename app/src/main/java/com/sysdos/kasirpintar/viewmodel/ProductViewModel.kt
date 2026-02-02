@@ -12,8 +12,6 @@ import com.sysdos.kasirpintar.data.ProductRepository
 import com.sysdos.kasirpintar.data.model.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import androidx.lifecycle.asLiveData
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,10 +22,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val shiftDao = AppDatabase.getDatabase(application).shiftDao()
         val stockLogDao = AppDatabase.getDatabase(application).stockLogDao()
         val storeConfigDao = AppDatabase.getDatabase(application).storeConfigDao()
-        val branchDao = AppDatabase.getDatabase(application).branchDao() // 🔥 DAO BARU
-
-        // 🔥 TAMBAHAN BARU:
         val transactionDao = AppDatabase.getDatabase(application).transactionDao()
+        // 🔥 TAMBAHAN BARU:
+        val branchDao = AppDatabase.getDatabase(application).branchDao()
 
         repository = ProductRepository(
             application,
@@ -35,8 +32,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             shiftDao,
             stockLogDao,
             storeConfigDao,
-            branchDao, // 🔥 Inject BranchDao
-            transactionDao // <--- 🔥 MASUKKAN INI DI PALING BELAKANG
+            branchDao,     // <--- Inserted BranchDao
+            transactionDao // <--- Correctly passed as last argument
         )
     }
 
@@ -55,6 +52,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     val allShiftLogs: LiveData<List<ShiftLog>> = _currentUserId.switchMap { uid ->
         repository.getShiftLogsByUser(uid).asLiveData()
     }
+    // 🔥 PERBAIKAN: List Global (Untuk yang mau lihat semua history)
+    val allShiftLogsGlobal: LiveData<List<ShiftLog>> = repository.getAllShiftLogsGlobal().asLiveData()
 
     val stockLogs: LiveData<List<StockLog>> = repository.allStockLogs.asLiveData()
     val purchaseHistory: LiveData<List<StockLog>> = repository.purchaseHistory.asLiveData()
@@ -64,36 +63,17 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     private val _totalPrice = MutableLiveData(0.0)
     val totalPrice: LiveData<Double> = _totalPrice
-    
     private val _isOnline = MutableLiveData<Boolean>(false)
     val isOnline: LiveData<Boolean> = _isOnline
 
-    // 🔥 LIVE DATA UNTUK NAMA CABANG (Supaya tidak stuck "Memuat...")
-    // Menggunakan switchMap agar otomatis update saat user berubah (Login/Init)
+    // 🔥 LIVE DATA LISENSI
+    private val _licenseStatus = MutableLiveData<String>()
+    val licenseStatus: LiveData<String> = _licenseStatus
+
+    // 🔥 FIX: Tambahkan branchName
     val branchName: LiveData<String> = _currentUserId.switchMap { uid ->
-        if (uid > 0) {
-            liveData {
-                emit("Memuat...")
-                // Cari User dulu untuk dapat BranchID
-                val user = try { repository.allUsers.first().find { it.id == uid } } catch (e: Exception) { null }
-                
-                if (user != null) {
-                    if (user.branchId != null && user.branchId!! > 0) {
-                        // Observe Flow dari Database (Realtime)
-                        emitSource(
-                            repository.getBranchById(user.branchId!!)
-                            .map { branch -> branch?.name ?: "Cabang #${user.branchId}" }
-                            .asLiveData()
-                        )
-                    } else {
-                        emit("Pusat")
-                    }
-                } else {
-                    emit("User ???")
-                }
-            }
-        } else {
-            MutableLiveData("Belum Login")
+        allUsers.map { users ->
+            users.find { it.id == uid }?.branch?.name ?: "Pusat"
         }
     }
 
@@ -134,6 +114,20 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 _isOnline.postValue(false)
             }
+
+            // 🔥 SYNC STORE CONFIG DAN SHIFT LOGS
+            try {
+                // Ambil config toko dari server lokal
+                repository.syncStoreConfigFromLocal()
+                
+                 // 🔥 SYNC SHIFT LOGS DARI WEB
+                val currentUid = _currentUserId.value ?: 0
+                if (currentUid > 0) {
+                     repository.syncShiftLogsFromWeb(currentUid)
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosVM", "Gagal Sync config/shift: ${e.message}")
+            }
             // ❌ HAPUS: kotlinx.coroutines.delay(5000)
             // }
         }
@@ -171,6 +165,12 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     fun updateSupplier(supplier: Supplier) = viewModelScope.launch { repository.updateSupplier(supplier) }
 
     fun insertUser(user: User) = viewModelScope.launch { repository.insertUser(user) }
+    
+    // 🔥 SAFE INSERT: Pakai Callback untuk memastikan data masuk sebelum pindah Activity
+    fun insertUserWithCallback(user: User, onComplete: () -> Unit) = viewModelScope.launch {
+        repository.insertUser(user)
+        launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
+    }
     fun updateUser(user: User) = viewModelScope.launch { repository.updateUser(user) }
     fun deleteUser(user: User) = viewModelScope.launch { repository.deleteUser(user) }
     // 🔥 Panggil fungsi replace dari repo
@@ -476,7 +476,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun logoutAndReset(onComplete: () -> Unit) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        try { repository.clearAllData() } catch (e: Exception) {}
+        // 🔥 FIX OFFLINE LOGOUT: JANGAN HAPUS DATA DATABASE, CUKUP SESSION SAJA
+        // Agar kalau offline, user masih bisa login pakai data lokal yang tersimpan.
+        // try { repository.clearAllData() } catch (e: Exception) {} 
+        
         launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
     }
 
@@ -503,12 +506,17 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun checkServerLicense(email: String) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    fun checkServerLicense(userEmail: String) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         try {
+            // 🔥 LOGIKA BARU: Cek Lisensi Toko (Bukan User)
+            // Ambil email pemilik toko dari Config
+            val storeConfig = repository.getStoreConfigDirect()
+            val ownerEmail = if (!storeConfig?.storeEmail.isNullOrEmpty()) storeConfig!!.storeEmail else userEmail
+
             val api = ApiClient.webClient
             val deviceId = getDeviceId(getApplication())
             val deviceModel = getDeviceName()
-            val response = api.checkLicense(email, deviceId, deviceModel).execute()
+            val response = api.checkLicense(ownerEmail, deviceId, deviceModel).execute()
 
             if (response.isSuccessful && response.body() != null) {
                 val data = response.body()!!
@@ -526,19 +534,44 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                     "PREMIUM" -> {
                         editor.putBoolean("is_full_version", true)
                         editor.putString("license_msg", "FULL VERSION (Premium)")
+                        editor.putString("expiration_info", data.message) // 🔥 Simpan info expired
+
+                        // 🔥 FIX: SIMPAN EMAIL OWNER KE DATABASE AGAR USER LAIN KEBAGIAN LISENSI
+                        // (Hanya jika email ini benar-benar Premium)
+                        val currentConfig = repository.getStoreConfigDirect()
+                        if (currentConfig != null) {
+                            // Update Email saja
+                            repository.saveStoreConfig(currentConfig.copy(storeEmail = ownerEmail))
+                        } else {
+                            // Buat Config Baru (Default)
+                            repository.saveStoreConfig(StoreConfig(
+                                storeName = "Toko Saya",
+                                storeAddress = "Alamat Belum Diatur",
+                                storePhone = "-", 
+                                storeEmail = ownerEmail // Simpan disini
+                            ))
+                        }
                     }
                     "EXPIRED" -> {
                         editor.putBoolean("is_full_version", false)
                         editor.putBoolean("is_expired", true)
-                        editor.putString("license_msg", "Masa Trial Habis! Silakan Beli.")
+                        
+                        // 🔥 GUNAKAN PESAN DARI SERVER AGAR DINAMIS (BISA TRIAL ATAU PREMIUM EXPIRED)
+                        val msg = if(data.message.isNotEmpty()) data.message else "Masa Aktif Habis! Silakan Perpanjang."
+                        editor.putString("license_msg", msg)
+                        editor.putString("expiration_info", "Expired")
                     }
                     else -> {
                         editor.putBoolean("is_full_version", false)
                         editor.putBoolean("is_expired", false)
                         editor.putString("license_msg", "Trial Sisa ${data.days_left} Hari")
+                        editor.putString("expiration_info", "Trial (${data.days_left} Hari)")
                     }
                 }
                 editor.apply()
+
+                // 🔥 UPDATE LIVE DATA
+                _licenseStatus.postValue(data.message)
             }
         } catch (e: Exception) {
             Log.e("License", "Gagal cek lisensi: ${e.message}")
@@ -616,7 +649,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                         quantity = qty,
                         costPrice = product.costPrice,
                         totalCost = product.costPrice * qty,
-                        type = "VOID" // Tipe Khusus
+                        type = "VOID", // Tipe Khusus
+                        
+                        // 🔥 OTOMATIS GENERATE NOMOR VOID
+                        invoiceNumber = "VOID-${trx.id}"
                     )
                     repository.recordPurchase(log)
                 }
@@ -642,12 +678,18 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 result.value = filtered
             }
         }
+
         return result
+    }
+
+    // 🔥 FITUR BARU: Export Return/Void
+    suspend fun getLogsByDateRangeAndType(start: Long, end: Long, type: String): List<StockLog> {
+        return repository.getLogsByDateRangeAndType(start, end, type)
     }
     // ==========================================
     // 📦 FITUR RETUR STOK (VERSI FIX SESUAI DB ANDA)
     // ==========================================
-    fun returnStockToSupplier(product: Product, qtyToReturn: Int, reason: String, supplierName: String) = viewModelScope.launch {
+    fun returnStockToSupplier(product: Product, qtyToReturn: Int, reason: String, supplierName: String, returnNumber: String) = viewModelScope.launch {
 
         // 1. Kurangi Stok Produk
         val newStock = product.stock - qtyToReturn
@@ -670,7 +712,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             totalCost = product.costPrice * qtyToReturn,
 
             // Type "OUT" menandakan barang keluar
-            type = "OUT"
+            type = "OUT",
+            
+            // 🔥 SIMPAN NOMOR RETUR DI KOLOM INVOICE
+            invoiceNumber = returnNumber
         )
 
         // 3. Simpan Log (Pakai fungsi recordPurchase yang sudah ada di Repo)
@@ -681,4 +726,63 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val user = repository.getUserByEmail(email)
         onResult(user)
     }
+
+    fun getUserByPhone(phone: String, onResult: (User?) -> Unit) = viewModelScope.launch {
+        val user = repository.getUserByPhone(phone)
+        onResult(user)
+    }
+
+    // 🔥 FITUR BARU: Cek User di Server Lokal (Fallback jika tidak ada di Cloud)
+    fun checkUserOnLocalServer(email: String, onResult: (User?) -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val api = ApiClient.getLocalClient(getApplication())
+                val response = api.getAllUsers().execute()
+                if (response.isSuccessful && response.body() != null) {
+                    val users = response.body()!!
+                    val found = users.find { it.username == email }
+                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(found) }
+                } else {
+                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
+                }
+            } catch (e: Exception) {
+                launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
+            }
+        }
+    }
+
+    // 🔥 SYNC STORE CONFIG KHUSUS SAAT LOGIN LOKAL (Agar dapat Email Owner)
+    fun syncStoreConfigFromLocal(branchId: Int, onComplete: () -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val api = ApiClient.getLocalClient(getApplication())
+                // Request Config untuk Branch user ini (atau 0 jika pusat)
+                // Server akan return config yang berisi email owner
+                val response = api.getStoreConfig(branchId).execute()
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val serverConfig = response.body()!!.copy(id = 1)
+                    
+                    // Simpan ke DB Local
+                    repository.saveStoreConfig(serverConfig)
+                    
+                    // Simpan ke Prefs
+                    val prefsStore = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+                    prefsStore.edit().apply {
+                        putString("name", serverConfig.storeName)
+                        putString("address", serverConfig.storeAddress)
+                        putString("phone", serverConfig.storePhone)
+                        putString("email", serverConfig.strukFooter)
+                        apply()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
+            }
+        }
+    }
+
+
 }

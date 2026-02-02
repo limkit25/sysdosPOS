@@ -17,43 +17,17 @@ import com.sysdos.kasirpintar.viewmodel.ShiftAdapter // Pastikan nama adapternya
 class ShiftHistoryActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: ShiftAdapter
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shift_history)
 
-        // === 1. SETUP MENU SAMPING (DRAWER) ===
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<View>(R.id.btnMenuDrawer)
-
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
+        // === 1. SETUP MENU SAMPING (DRAWER) -> REMOVED ===
 
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
-
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
 
         // === 2. SETUP RECYCLERVIEW (INI YANG TADI KURANG) ===
         val rvShiftLogs = findViewById<RecyclerView>(R.id.rvShiftLogs)
@@ -67,7 +41,8 @@ class ShiftHistoryActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
         // Ambil data dari database melalui ViewModel
-        viewModel.allShiftLogs.observe(this) { logs ->
+        // Ambil data dari database melalui ViewModel (GLOBAL)
+        viewModel.allShiftLogsGlobal.observe(this) { logs ->
             if (logs != null && logs.isNotEmpty()) {
                 adapter.submitList(logs)
             } else {
@@ -77,10 +52,6 @@ class ShiftHistoryActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 }

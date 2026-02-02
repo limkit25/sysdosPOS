@@ -24,4 +24,8 @@ interface StockLogDao {
     // 3. Query Log biasa (Semua history) - Opsional jika masih dipakai
     @Query("SELECT * FROM stock_logs ORDER BY timestamp DESC")
     fun getAllStockLogs(): Flow<List<StockLog>>
+
+    // 4. QUERY EXPORT EXCEL (CSV)
+    @Query("SELECT * FROM stock_logs WHERE type = :type AND timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun getLogsByDateRangeAndType(start: Long, end: Long, type: String): List<StockLog>
 }

@@ -27,6 +27,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.system.exitProcess
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.google.api.client.extensions.android.http.AndroidHttp
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.json.gson.GsonFactory
+import com.google.api.services.drive.Drive
+import com.google.api.services.drive.DriveScopes
+import com.google.api.client.http.FileContent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Collections
 
 class StoreSettingsActivity : AppCompatActivity() {
 
@@ -55,6 +69,7 @@ class StoreSettingsActivity : AppCompatActivity() {
     // UI Backup
     private lateinit var btnBackup: Button
     private lateinit var btnRestore: Button
+    private lateinit var btnBackupDrive: Button
 
     // UI Lisensi
     private lateinit var tvLicenseStatus: TextView
@@ -67,15 +82,15 @@ class StoreSettingsActivity : AppCompatActivity() {
 
     // UI Umum
     private lateinit var tvTitle: TextView
-    private lateinit var btnBack: ImageButton
+    // private lateinit var btnBack: ImageButton (Removed)
 
     // Bluetooth Var
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private val deviceList = ArrayList<String>()
     private val deviceMacs = ArrayList<String>()
     private lateinit var listAdapter: ArrayAdapter<String>
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     private var isInitialSetup = false
 
@@ -84,40 +99,14 @@ class StoreSettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_store_settings)
 
         // =============================================================
-        // 🔥 1. SETUP MENU SAMPING (DRAWER) - KODE BARU
+        // 🔥 1. SETUP MENU SAMPING (DRAWER) -> REMOVED
         // =============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer) // Tombol Burger
 
-        // A. Klik Tombol Burger
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
-
-        // B. Setup Header Menu (Nama User)
+        // Keep session check if needed for other things, but removing drawer logic
         val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
 
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // C. Logika Pindah Halaman
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(android.content.Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(android.content.Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(android.content.Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(android.content.Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> { startActivity(android.content.Intent(this, UserListActivity::class.java)); finish() }
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
 
         // =============================================================
         // 🔥 2. KODINGAN LAMA MAS HERU (LANJUT DI BAWAH)
@@ -156,6 +145,7 @@ class StoreSettingsActivity : AppCompatActivity() {
 
         btnBackup = findViewById(R.id.btnBackupDB)
         btnRestore = findViewById(R.id.btnRestoreDB)
+        btnBackupDrive = findViewById(R.id.btnBackupDrive)
 
         tvLicenseStatus = findViewById(R.id.tvLicenseStatus)
         btnActivate = findViewById(R.id.btnActivateLicense)
@@ -181,13 +171,26 @@ class StoreSettingsActivity : AppCompatActivity() {
         lvPrinters.adapter = listAdapter
 
         setupUI(target)
+        setupUI(target)
         checkLicenseStatus()
+
+        // 🔥 AUTO-UPDATE LICENCE FROM SERVER
+        val sessionEmail = getSharedPreferences("session_kasir", Context.MODE_PRIVATE).getString("username", "") ?: ""
+        if (sessionEmail.isNotEmpty()) {
+            viewModel.checkServerLicense(sessionEmail)
+        }
+
+        viewModel.licenseStatus.observe(this) { msg: String ->
+            // Update UI Realtime
+            checkLicenseStatus()
+        }
 
         // LISTENERS
         // ❌ HAPUS BARIS INI: btnBack.setOnClickListener { finish() } ❌
 
         btnSave.setOnClickListener { saveStoreSettings() }
         btnActivate.setOnClickListener { showActivationDialog() }
+        btnBackupDrive.setOnClickListener { checkPremiumAndSyncDrive() }
 
         // Bluetooth Listener
         btnScanPrinter.setOnClickListener {
@@ -214,17 +217,13 @@ class StoreSettingsActivity : AppCompatActivity() {
         if (target == "PRINTER" && checkPermission()) showPairedDevices()
     }
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     private fun setupUI(target: String?) {
         if (isInitialSetup) {
             tvTitle.text = "Lengkapi Profil Toko"
-            btnBack.visibility = View.GONE
+            // btnBack removed
             cardSectionPrinter.visibility = View.GONE
             cardSectionLicense.visibility = View.GONE
             btnSave.text = "SIMPAN & MASUK APLIKASI"
@@ -249,21 +248,28 @@ class StoreSettingsActivity : AppCompatActivity() {
     private fun checkLicenseStatus() {
         val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
         val isFull = prefs.getBoolean("is_full_version", false)
+        val expInfo = prefs.getString("expiration_info", "Full Version (Premium)")
 
         if (isFull) {
-            tvLicenseStatus.text = "Status: FULL VERSION (Premium) ✅"
+            // Tampilkan Detail Expiry (misal: "Aktif s/d ....")
+            tvLicenseStatus.text = "Status: $expInfo ✅"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
             btnActivate.visibility = View.GONE
             btnBackup.isEnabled = true
             btnBackup.alpha = 1.0f
             btnBackup.text = "BACKUP DATABASE"
+            btnBackupDrive.isEnabled = true
+            btnBackupDrive.alpha = 1.0f
         } else {
-            tvLicenseStatus.text = "Status: TRIAL (Terbatas) ⏳"
+            val trialMsg = prefs.getString("license_msg", "TRIAL (Terbatas) ⏳")
+            tvLicenseStatus.text = "Status: $trialMsg"
             tvLicenseStatus.setTextColor(android.graphics.Color.parseColor("#E65100"))
             btnActivate.visibility = View.VISIBLE
             btnBackup.isEnabled = false
             btnBackup.alpha = 0.5f
             btnBackup.text = "BACKUP 🔒 (Premium)"
+            btnBackupDrive.isEnabled = false
+            btnBackupDrive.alpha = 0.5f
         }
     }
 
@@ -481,6 +487,90 @@ class StoreSettingsActivity : AppCompatActivity() {
         super.onDestroy()
         try { unregisterReceiver(receiver) } catch (e: Exception) {}
     }
+    // 🔥 GOOGLE DRIVE LOGIC 🔥
+    
+    private val driveSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            processDriveUpload()
+        } else {
+            Toast.makeText(this, "Login Google Gagal / Dibatalkan", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun checkPremiumAndSyncDrive() {
+        val prefs = getSharedPreferences("app_license", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("is_full_version", false)) {
+            Toast.makeText(this, "Fitur ini khusus Premium! 🔒", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val account = GoogleSignIn.getLastSignedInAccount(this)
+        if (account != null && GoogleSignIn.hasPermissions(account, Scope(DriveScopes.DRIVE_FILE))) {
+            processDriveUpload()
+        } else {
+            requestDriveSignIn()
+        }
+    }
+
+    private fun requestDriveSignIn() {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope(DriveScopes.DRIVE_FILE))
+            .build()
+        val client = GoogleSignIn.getClient(this, gso)
+        driveSignInLauncher.launch(client.signInIntent)
+    }
+
+    private fun processDriveUpload() {
+        val progress = android.app.ProgressDialog(this)
+        progress.setMessage("Mengupload Database ke Google Drive...")
+        progress.setCancelable(false)
+        progress.show()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val account = GoogleSignIn.getLastSignedInAccount(this@StoreSettingsActivity)
+                val credential = GoogleAccountCredential.usingOAuth2(
+                    this@StoreSettingsActivity, Collections.singleton(DriveScopes.DRIVE_FILE)
+                )
+                credential.selectedAccount = account?.account
+
+                val driveService = Drive.Builder(
+                    AndroidHttp.newCompatibleTransport(),
+                    GsonFactory(),
+                    credential
+                ).setApplicationName("Kasir Pintar").build()
+
+                val dbFile = getDatabasePath(DB_NAME)
+                
+                // FORCE WAL CHECKPOINT
+                AppDatabase.getDatabase(this@StoreSettingsActivity).openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
+
+                val fileMetadata = com.google.api.services.drive.model.File()
+                fileMetadata.name = "backup_kasir_${System.currentTimeMillis()}.db"
+                fileMetadata.mimeType = "application/x-sqlite3"
+
+                val mediaContent = FileContent("application/x-sqlite3", dbFile)
+
+                val file = driveService.files().create(fileMetadata, mediaContent)
+                    .setFields("id")
+                    .execute()
+
+                withContext(Dispatchers.Main) {
+                    progress.dismiss()
+                    Toast.makeText(this@StoreSettingsActivity, "Backup Terupload! ✅\nID: ${file.id}", Toast.LENGTH_LONG).show()
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace() // 🔥 PRINT LOG KE LOGCAT
+                withContext(Dispatchers.Main) {
+                    progress.dismiss()
+                    Toast.makeText(this@StoreSettingsActivity, "Gagal Upload: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     // 🔥 WAJIB TAMBAH INI BIAR GAK CRASH 🔥
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)

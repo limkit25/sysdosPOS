@@ -18,5 +18,8 @@ data class StockLog(
 
     // 🔥 KOLOM PENTING BUAT LAPORAN VOID & RETUR
     // Isi bisa: "IN" (Beli), "OUT" (Retur), "VOID" (Batal Transaksi)
-    val type: String = "IN"
+    val type: String = "IN",
+    
+    // 🔥 BARU: Nomor Faktur
+    val invoiceNumber: String = ""
 )

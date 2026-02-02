@@ -8,6 +8,7 @@ import retrofit2.http.*
 import com.google.gson.annotations.SerializedName
 import com.sysdos.kasirpintar.data.model.StockLog
 import com.sysdos.kasirpintar.data.model.ShiftLog
+import com.sysdos.kasirpintar.data.model.StoreConfig // 🔥 Fix Import
 
 interface ApiService {
 
@@ -26,14 +27,8 @@ interface ApiService {
     fun checkLicense(
         @Query("email") email: String,
         @Query("device_id") deviceId: String,
-        @Query("device_model") deviceModel: String
+        @Query("device_model") deviceModel: String // <--- TAMBAHAN
     ): Call<LicenseCheckResponse>
-
-    // 🔥 2b. GET STORE CONFIG (Dinamis per Cabang)
-    @GET("api/store-config")
-    fun getStoreConfig(
-        @Query("branch_id") branchId: Int
-    ): Call<com.sysdos.kasirpintar.data.model.StoreConfig>
 
     // 3. PEMBAYARAN MIDTRANS (Wajib Cloud)
     @POST("api/payment/create")
@@ -66,14 +61,6 @@ interface ApiService {
     @PUT("api/products")
     fun updateProduct(@Body product: ProductResponse): Call<ResponseBody>
 
-    // 5b. CREATE PRODUCT
-    @POST("api/products/create")
-    fun createProduct(@Body product: ProductResponse): Call<ResponseBody>
-
-    // 5c. DELETE PRODUCT
-    @DELETE("api/products/delete")
-    fun deleteProduct(@Query("id") id: Int): Call<ResponseBody>
-
     // 6. REGISTER USER LOKAL (Untuk kasir/karyawan di database lokal)
     @POST("api/users/register")
     fun registerLocalUser(@Body user: User): Call<ResponseBody>
@@ -90,19 +77,48 @@ interface ApiService {
     // 8. GET ALL USERS (SYNC DARI WEB)
     @GET("api/users")
     fun getAllUsers(): Call<List<User>>
-
-    // 8b. GET ALL BRANCHES (SYNC DARI WEB)
-    @GET("api/branches")
-    fun getBranches(): Call<List<com.sysdos.kasirpintar.data.model.Branch>>
     // 9. UPLOAD STOCK LOGS (BELANJA / VOID)
     @POST("api/stock-logs/sync")
     fun syncStockLogs(@Body logs: List<StockLog>): Call<ResponseBody>
+    // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
     // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
     // 10. UPLOAD SHIFT LOGS (BUKA/TUTUP TOKO)
     @POST("api/shifts/sync")
     fun syncShiftLogs(
         @Body logs: List<ShiftLog>,
         @Query("user_id") userId: Int
+    ): Call<ResponseBody>
+
+    // 10.B GET SHIFT LOGS (SYNC DARI WEB)
+    @GET("api/shifts")
+    fun getShiftLogs(@Query("user_id") userId: Int): Call<List<ShiftLog>>
+
+    // 11. GET BRANCHES (CABANG)
+    @GET("api/branches")
+    fun getBranches(): Call<List<com.sysdos.kasirpintar.data.model.Branch>>
+
+    // 12. GET STORE CONFIG
+    @GET("api/store-config")
+    fun getStoreConfig(@Query("branch_id") branchId: Int): Call<StoreConfig>
+
+    // 13. CREATE PRODUCT (SYNC DARI HP KE SERVER)
+    @POST("api/products/create")
+    fun createProduct(@Body product: ProductResponse): Call<ResponseBody>
+
+    // 14. DELETE PRODUCT (SYNC DARI HP KE SERVER)
+    @DELETE("api/products/delete")
+    fun deleteProduct(@Query("id") id: Int): Call<ResponseBody>
+
+    // 15. SUBMIT ACTIVATION (Isi Form Langganan)
+    @Multipart
+    @POST("api/activation/submit")
+    fun submitActivation(
+        @Part store_name: MultipartBody.Part,
+        @Part store_phone: MultipartBody.Part,
+        @Part plan_name: MultipartBody.Part,
+        @Part amount: MultipartBody.Part,
+        @Part note: MultipartBody.Part,
+        @Part proof_file: MultipartBody.Part
     ): Call<ResponseBody>
 }
 
@@ -154,7 +170,11 @@ data class ProductResponse(
 
     // 🔥 WAJIB PAKAI @SerializedName KARENA GOLANG PAKAI "imagePath"
     @SerializedName("imagePath")
-    val image_path: String?
+    val image_path: String?,
+
+    // 🔥 TAMBAHAN UNTUK VARIAN
+    @SerializedName("parent_id")
+    val parent_id: Int = 0
 )
 
 // Response Kategori (Lokal)

@@ -90,36 +90,11 @@ class ProductAdapter(
             }
 
             // ============================================================
-            // 🖼️ LOGIKA LOAD GAMBAR (FIX DOUBLE SLASH //)
+            // 🖼️ LOGIKA LOAD GAMBAR (Simple Version like StockOpname)
             // ============================================================
             if (!product.imagePath.isNullOrEmpty()) {
-                var finalUrl = product.imagePath
-
-                if (!finalUrl.startsWith("http")) {
-                    val session = com.sysdos.kasirpintar.utils.SessionManager(context)
-                    var baseUrl = session.getServerUrl() // "http://192.168.1.15:9000/"
-
-                    // Gabung dulu apa adanya (biarkan double slash terjadi)
-                    // Hasil: "http://192.168.1.15:9000//uploads/..."
-                    finalUrl = baseUrl + "/" + finalUrl.replace("/", "")
-                    // Eh salah, cara di atas ribet.
-
-                    // CARA PALING GAMPANG: Gabung saja dulu
-                    if (!finalUrl.startsWith("/")) finalUrl = "/$finalUrl"
-                    finalUrl = baseUrl + finalUrl
-                }
-
-                // 🔥 FIX FORCE: Paksa ganti //uploads menjadi /uploads
-                // Kita replace "9000//" jadi "9000/" supaya aman
-                finalUrl = finalUrl.replace(":9000//", ":9000/")
-
-                // Atau lebih ganas lagi: ganti semua // jadi / (kecuali http://)
-                // Tapi cara replace :9000// di atas sudah paling aman buat kasus Bapak.
-
-                android.util.Log.d("GLIDE_URL", "FORCE FIX: $finalUrl")
-
                 Glide.with(itemView.context)
-                    .load(finalUrl)
+                    .load(product.imagePath)
                     .placeholder(R.mipmap.ic_launcher)
                     .error(R.mipmap.ic_launcher)
                     .centerCrop()

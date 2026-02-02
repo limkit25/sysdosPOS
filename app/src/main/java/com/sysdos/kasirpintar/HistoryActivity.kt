@@ -49,9 +49,8 @@ class HistoryActivity : AppCompatActivity() {
     private lateinit var cardPiutang: androidx.cardview.widget.CardView
     private lateinit var tvTotalPiutang: TextView
 
-    // 🔥 1. VARIABEL MENU SAMPING
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,39 +59,14 @@ class HistoryActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
         // =============================================================
-        // 🔥 2. SETUP MENU SAMPING (DRAWER)
+        // 🔥 2. SETUP MENU SAMPING (DRAWER) -> REMOVED
         // =============================================================
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        val btnMenu = findViewById<View>(R.id.btnMenuDrawer) // Sesuai ID di XML baru
 
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
-
-        // Setup Header Menu
+        // Setup Header Menu (Keep logic for getting user info if needed, or remove if unused)
         val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
         val realName = session.getString("fullname", "Admin")
         val role = session.getString("role", "admin")
 
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // Logika Navigasi Pindah Halaman
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { startActivity(Intent(this, DashboardActivity::class.java)); finish() }
-                R.id.nav_kasir -> { startActivity(Intent(this, MainActivity::class.java)); finish() }
-                R.id.nav_stok -> { startActivity(Intent(this, ProductListActivity::class.java)); finish() }
-                R.id.nav_laporan -> { startActivity(Intent(this, SalesReportActivity::class.java)); finish() }
-                R.id.nav_user -> { startActivity(Intent(this, UserListActivity::class.java)); finish() }
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
 
         // =============================================================
         // 🔥 3. INISIALISASI VIEWS (KODINGAN LAMA ANDA)
@@ -196,11 +170,7 @@ class HistoryActivity : AppCompatActivity() {
 
     // 🔥 4. TAMBAH LOGIKA BACK BUTTON HP
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     // 🔥 FUNGSI HITUNG PIUTANG 🔥
@@ -322,18 +292,25 @@ class HistoryActivity : AppCompatActivity() {
     private fun processExport(start: Long, end: Long) {
         Toast.makeText(this, "Sedang menyiapkan data...", Toast.LENGTH_SHORT).show()
 
-        // Ambil User ID dari Session
+        // Ambil User ID & Role dari Session
         val prefs = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
-        // Ambil User ID yang login, kalau admin pakai ID admin
-        val currentUserId = 1 // Default Admin (Sesuaikan jika Mas Heru simpan ID di session)
+        val role = prefs.getString("role", "kasir") ?: "kasir"
+        val userId = prefs.getInt("user_id", 0) // Pastikan ID disimpan saat login
 
         // Panggil Database di Background (Coroutine)
         lifecycleScope.launch(Dispatchers.IO) {
 
             val db = com.sysdos.kasirpintar.data.AppDatabase.getDatabase(this@HistoryActivity)
+            val filteredData: List<Transaction>
 
-            // Ini akan aman karena berjalan di dalam coroutine (launch)
-            val filteredData = db.transactionDao().getTransactionsByDateRange(currentUserId, start, end)
+            // 🔥 LOGIKA BARU: Cek Role
+            if (role != "kasir") {
+                // ADMIN / OWNER -> Ambil SEMUA data (Global)
+                filteredData = db.transactionDao().getTransactionsByDateRangeGlobal(start, end)
+            } else {
+                // KASIR -> Hanya data sendiri
+                filteredData = db.transactionDao().getTransactionsByDateRange(userId, start, end)
+            }
 
             withContext(Dispatchers.Main) {
                 if (filteredData.isEmpty()) {

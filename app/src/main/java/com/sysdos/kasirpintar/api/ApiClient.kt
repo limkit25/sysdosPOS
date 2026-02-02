@@ -35,9 +35,9 @@ object ApiClient {
         // Cek: Bikin baru jika null ATAU jika user baru saja ganti IP di setting
         if (localRetrofit == null || localRetrofit?.baseUrl().toString() != dynamicUrl) {
             localRetrofit = Retrofit.Builder()
-                .baseUrl(dynamicUrl)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
+            .baseUrl(dynamicUrl)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
         }
         return localRetrofit!!.create(ApiService::class.java)
     }

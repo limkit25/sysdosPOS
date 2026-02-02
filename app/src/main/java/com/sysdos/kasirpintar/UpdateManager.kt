@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.widget.Toast // 🔥 TAMBAHAN
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
@@ -20,9 +21,9 @@ class UpdateManager(private val activity: Activity) {
 
     // GANTI URL INI DENGAN URL FILE JSON ANDA
     // ✅ GANTI JADI INI:
-    private val UPDATE_URL = "https://backend.sysdos.my.id/updates/update_info.json"
+    private val UPDATE_URL = "https://backend.sysdos.my.id/public/updates/update_info.json"
 
-    fun checkForUpdate() {
+    fun checkForUpdate(isManual: Boolean = false) {
         thread {
             try {
                 val jsonString = URL(UPDATE_URL).readText()
@@ -45,13 +46,25 @@ class UpdateManager(private val activity: Activity) {
                     activity.runOnUiThread {
                         showUpdateDialog(apkUrl, changeLog)
                     }
+                } else {
+                    // 🔥 Feedback jika manual check tapi tidak ada update
+                    if (isManual) {
+                        activity.runOnUiThread {
+                            android.widget.Toast.makeText(activity, "✅ Aplikasi sudah versi terbaru!", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                // 🔥 Feedback jika error (misal offline atau json salah)
+                if (isManual) {
+                    activity.runOnUiThread {
+                        android.widget.Toast.makeText(activity, "Gagal cek update: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }
-
     private fun showUpdateDialog(apkUrl: String, changeLog: String) {
         AlertDialog.Builder(activity)
             .setTitle("🚀 Update Tersedia!")
@@ -65,42 +78,107 @@ class UpdateManager(private val activity: Activity) {
     }
 
     private fun downloadAndInstall(url: String) {
-        val fileName = "update_kasir.apk"
-        val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("Mendownload Update...")
-            .setDescription("Mohon tunggu sebentar")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+        try {
+            val fileName = "update_kasir.apk"
+            
+            // 🔥 HAPUS FILE LAMA DULU
+            val file = File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
+            if (file.exists()) file.delete()
 
-        val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val downloadId = dm.enqueue(request)
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle("Mendownload Update...")
+                .setDescription("Mohon tunggu sebentar")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, fileName) // 🔥 DIGANTI AGAR TIDAK PERLU PERMISSION STORAGE
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
 
-        // Tunggu sampai download selesai, baru install
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(ctxt: Context, intent: Intent) {
-                if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) == downloadId) {
-                    installAPK(fileName)
-                    activity.unregisterReceiver(this)
+            val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = dm.enqueue(request)
+
+            // Tunggu sampai download selesai, baru install
+            val onComplete = object : BroadcastReceiver() {
+                override fun onReceive(ctxt: Context, intent: Intent) {
+                    val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                    if (id == downloadId) {
+                        try {
+                            val query = DownloadManager.Query().setFilterById(downloadId)
+                            val cursor = dm.query(query)
+                            if (cursor.moveToFirst()) {
+                                val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                                val status = cursor.getInt(statusIndex)
+
+                                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                    installAPK(fileName)
+                                } else {
+                                    val reasonIndex = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
+                                    val reason = cursor.getInt(reasonIndex)
+                                    val reasonText = when(reason) {
+                                        DownloadManager.ERROR_CANNOT_RESUME -> "Cannot Resume"
+                                        DownloadManager.ERROR_DEVICE_NOT_FOUND -> "Device Not Found"
+                                        DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "File Already Exists"
+                                        DownloadManager.ERROR_FILE_ERROR -> "File Error"
+                                        DownloadManager.ERROR_HTTP_DATA_ERROR -> "HTTP Data Error"
+                                        DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Memori Penuh"
+                                        DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Too Many Redirects"
+                                        DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Unhandled HTTP Code"
+                                        DownloadManager.ERROR_UNKNOWN -> "Unknown Error"
+                                        404 -> "File Tidak Ditemukan (404)"
+                                        403 -> "Akses Ditolak (403)"
+                                        else -> "Error Code $reason"
+                                    }
+                                    Toast.makeText(activity, "Gagal Download: $reasonText", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            cursor.close()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        } finally {
+                            try {
+                                activity.unregisterReceiver(this)
+                            } catch (e: Exception) {}
+                        }
+                    }
                 }
             }
+
+            if (Build.VERSION.SDK_INT >= 33) {
+                activity.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
+            } else {
+                activity.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            }
+        
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Gunakan runOnUiThread jaga-jaga kalau dipanggil dari thread lain (meski harusnya UI thread)
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Gagal Download: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
-        activity.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
     }
 
     private fun installAPK(fileName: String) {
-        val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName)
+        try {
+            // 🔥 PATH SESUAI DENGAN YANG DI DOWNLOAD (APP SPECIFIC)
+            val file = File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
 
-        if (file.exists()) {
-            val intent = Intent(Intent.ACTION_VIEW)
-            val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.provider", file)
+            if (file.exists()) {
+                val intent = Intent(Intent.ACTION_VIEW)
+                
+                // Menggunakan FileProvider untuk Android 7.0+
+                val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.provider", file)
 
-            intent.setDataAndType(uri, "application/vnd.android.package-archive")
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-            activity.startActivity(intent)
+                activity.startActivity(intent)
+            } else {
+                Toast.makeText(activity, "File Update Gagal Ditemukan!", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(activity, "Error Install: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }

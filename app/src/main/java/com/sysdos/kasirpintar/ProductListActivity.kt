@@ -43,8 +43,8 @@ import androidx.core.app.ActivityCompat
 class ProductListActivity : AppCompatActivity() {
 
     private lateinit var viewModel: ProductViewModel
-    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var navView: com.google.android.material.navigation.NavigationView
+    // Drawer Removed
+
 
     // 1. LAUNCHER PILIH FILE
     private val pickCsvLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -58,53 +58,11 @@ class ProductListActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this)[ProductViewModel::class.java]
 
         // =============================================================
-        // 🔥 BAGIAN BARU: LOGIKA MENU SAMPING (DRAWER)
+        // 🔥 BAGIAN BARU: LOGIKA MENU SAMPING (DRAWER) -> REMOVED IN FAVOR OF BOTTOM NAV
         // =============================================================
+        // Drawer Code Removed.
 
-        // 1. Inisialisasi
-        drawerLayout = findViewById(R.id.drawerLayout)
-        navView = findViewById(R.id.navView)
-        // Perhatikan ID-nya harus sesuai XML baru (btnMenuDrawer)
-        val btnMenu = findViewById<android.view.View>(R.id.btnMenuDrawer)
 
-        // 2. Klik Tombol Burger -> Buka Menu
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START)
-        }
-
-        // 3. Setup Header Menu (Nama User)
-        val session = getSharedPreferences("session_kasir", android.content.Context.MODE_PRIVATE)
-        val realName = session.getString("fullname", "Admin")
-        val role = session.getString("role", "admin")
-
-        if (navView.headerCount > 0) {
-            val header = navView.getHeaderView(0)
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderName).text = realName
-            header.findViewById<android.widget.TextView>(R.id.tvHeaderRole).text = "Role: ${role?.uppercase()}"
-        }
-
-        // 4. Logika Pindah Halaman saat Menu Diklik
-        navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> {
-                    startActivity(android.content.Intent(this, DashboardActivity::class.java))
-                    finish()
-                }
-                R.id.nav_kasir -> {
-                    startActivity(android.content.Intent(this, MainActivity::class.java))
-                    finish()
-                }
-                R.id.nav_stok -> {
-                    // Kita sudah di halaman Stok, tutup drawer aja
-                    drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-                }
-                R.id.nav_laporan -> startActivity(android.content.Intent(this, SalesReportActivity::class.java))
-                R.id.nav_user -> startActivity(android.content.Intent(this, UserListActivity::class.java))
-                // ... tambahkan menu lain jika perlu ...
-            }
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-            true
-        }
 
         // =============================================================
         // 🔥 KODINGAN LAMA ANDA (IMPORT & TABS) - LANJUT DISINI
@@ -145,6 +103,10 @@ class ProductListActivity : AppCompatActivity() {
         if (targetTab != -1 && targetTab < 2) {
             viewPager.setCurrentItem(targetTab, false)
         }
+
+        // 🔥 SETUP BOTTOM NAV
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
+        com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
     }
 
     // =================================================================
@@ -467,10 +429,6 @@ class ProductListActivity : AppCompatActivity() {
         viewModel.checkAndSync()
     }
     override fun onBackPressed() {
-        if (::drawerLayout.isInitialized && drawerLayout.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
-            drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 }

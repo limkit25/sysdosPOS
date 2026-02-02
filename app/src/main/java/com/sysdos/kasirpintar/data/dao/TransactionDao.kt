@@ -28,6 +28,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transaction_table WHERE userId = :uid AND timestamp BETWEEN :startDate AND :endDate ORDER BY timestamp DESC")
     suspend fun getTransactionsByDateRange(uid: Int, startDate: Long, endDate: Long): List<Transaction>
 
+    // 🔥 3. QUERY EXPORT ADMIN (GLOBAL - SEMUA KASIR) 🔥
+    @Query("SELECT * FROM transaction_table WHERE timestamp BETWEEN :startDate AND :endDate ORDER BY timestamp DESC")
+    suspend fun getTransactionsByDateRangeGlobal(startDate: Long, endDate: Long): List<Transaction>
+
     @Update
     suspend fun update(transaction: Transaction)
 

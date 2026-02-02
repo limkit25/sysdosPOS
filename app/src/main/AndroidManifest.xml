@@ -91,10 +91,16 @@
         <activity android:name=".ScanActivity" android:exported="false" />
         <activity android:name=".CategoryActivity" android:exported="false" android:label="Kelola Kategori" />
         <activity android:name=".UserListActivity" android:exported="false" android:label="Kelola User" />
+        <activity android:name=".ActivationActivity" android:screenOrientation="portrait"/>
         <activity android:name=".StoreSettingsActivity" android:exported="false" android:label="Pengaturan Toko" />
         <activity android:name=".WelcomeActivity" android:exported="false"  />
         <activity android:name=".AboutActivity" android:exported="false" android:label="Tentang Aplikasi" />
+        <activity android:name=".RegisterActivity" android:exported="false" android:label="Daftar Akun" android:screenOrientation="portrait" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".SubscriptionPlanActivity" android:screenOrientation="portrait"/>
         <activity android:name=".PaymentActivity" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity android:name=".CloseShiftActivity" android:screenOrientation="portrait" android:label="Tutup Shift" android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+        <activity android:name=".StockOpnameActivity" android:screenOrientation="portrait" android:label="Stok Opname"/>
+        <activity android:name=".ReportCenterActivity" android:screenOrientation="portrait" android:label="Pusat Laporan"/>
 
     </application>
 </manifest>

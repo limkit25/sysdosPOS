@@ -19,8 +19,8 @@ android {
         applicationId = "com.sysdos.kasirpintar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.5.4"
+        versionCode = 20
+        versionName = "1.6.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,12 +41,26 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    
+    packaging {
+        resources {
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
+        }
+    }
+
     // 🔥 LOGIKA GANTI NAMA APK JADI sysdosKasir.apk 🔥
     applicationVariants.all {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
             // Hasilnya nanti: sysdosKasir.apk
-            output?.outputFileName = "sysdosPOS-V1-5-4.apk"
+            output?.outputFileName = "sysdosPOS-V1-6-7.apk"
         }
     }
 }
@@ -62,8 +76,16 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-auth:20.7.0")
 
-
-    implementation(libs.androidx.credentials)
+    // 🔥 GOOGLE DRIVE API 🔥
+    implementation("com.google.http-client:google-http-client-gson:1.43.3")
+    implementation("com.google.http-client:google-http-client-android:1.43.3") // 🔥 TAMBAHAN PENTING
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
+    
+    // Exclude Guava to prevent conflict (common issue with Drive API)
+    configurations.all {
+         exclude(group = "com.google.guava", module = "listenablefuture")
+    }
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     testImplementation(libs.junit)
@@ -77,6 +99,9 @@ dependencies {
 
     // 2. COROUTINES (Untuk proses background biar HP gak nge-lag)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // 🔥 SLIDER DASHBOARD dependency
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
 
     // 3. LIFECYCLE (Untuk MVVM)
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")

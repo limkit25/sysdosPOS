@@ -97,6 +97,12 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
         etQty.inputType = InputType.TYPE_CLASS_NUMBER
         layout.addView(etQty)
 
+        // 🔥 Input Nomor Retur
+        val etReturnNumber = EditText(context)
+        etReturnNumber.hint = "Nomor Retur (Opsional)"
+        etReturnNumber.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        layout.addView(etReturnNumber)
+
         // Input Alasan
         val etReason = EditText(context)
         etReason.hint = "Alasan (ex: Busuk / Expired)"
@@ -109,6 +115,7 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
             .setPositiveButton("PROSES RETUR") { _, _ ->
                 val qtyStr = etQty.text.toString()
                 val reason = etReason.text.toString()
+                val returNo = etReturnNumber.text.toString()
 
                 if (qtyStr.isNotEmpty()) {
                     val qty = qtyStr.toInt()
@@ -122,7 +129,8 @@ class ProductFragment : Fragment(R.layout.fragment_tab_product) {
                             product = product,
                             qtyToReturn = qty,
                             reason = reason.ifEmpty { "Rusak/Expired" },
-                            supplierName = product.supplier ?: "Supplier Umum"
+                            supplierName = product.supplier ?: "Supplier Umum",
+                            returnNumber = returNo // 🔥 KIRIM NOMOR RETUR
                         )
                         Toast.makeText(context, "✅ Retur Berhasil Dicatat!", Toast.LENGTH_SHORT).show()
                     }

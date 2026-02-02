@@ -1,121 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1976D2"
     android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1976D2"
+        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical"
+        android:elevation="4dp">
+
+        <!-- Burger Button Removed -->
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Produk Terlaris"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#1976D2"
-        android:fitsSystemWindows="true">
+        android:background="#F5F8FA">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="#1976D2"
-            android:paddingHorizontal="16dp"
-            android:gravity="center_vertical"
-            android:elevation="4dp">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="#FFFFFF"
+            android:elevation="2dp">
 
-            <ImageButton
-                android:id="@+id/btnMenuDrawer"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_menu"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#FFFFFF"
-                android:padding="10dp"
-                android:scaleType="fitCenter"/>
+            <Button
+                android:id="@+id/btnFilterToday"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="Hari Ini"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Produk Terlaris"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginStart="8dp"/>
+            <Button
+                android:id="@+id/btnFilterWeek"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="7 Hari"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"/>
+
+            <Button
+                android:id="@+id/btnFilterMonth"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="30 Hari"
+                android:textSize="12sp"/>
         </LinearLayout>
 
         <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:background="#EEEEEE">
+            <TextView android:text="#" android:textStyle="bold" android:layout_width="30dp" android:layout_height="wrap_content" android:textColor="#333"/>
+            <TextView android:text="Nama Produk" android:textStyle="bold" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#333"/>
+            <TextView android:text="Terjual" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#333"/>
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTopProducts"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:background="#F5F8FA">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="12dp"
-                android:background="#FFFFFF"
-                android:elevation="2dp">
-
-                <Button
-                    android:id="@+id/btnFilterToday"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="Hari Ini"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="4dp"/>
-
-                <Button
-                    android:id="@+id/btnFilterWeek"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="7 Hari"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="4dp"/>
-
-                <Button
-                    android:id="@+id/btnFilterMonth"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="40dp"
-                    android:text="30 Hari"
-                    android:textSize="12sp"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="8dp"
-                android:background="#EEEEEE">
-                <TextView android:text="#" android:textStyle="bold" android:layout_width="30dp" android:layout_height="wrap_content" android:textColor="#333"/>
-                <TextView android:text="Nama Produk" android:textStyle="bold" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#333"/>
-                <TextView android:text="Terjual" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#333"/>
-            </LinearLayout>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvTopProducts"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="8dp"
-                android:clipToPadding="false"/>
-        </LinearLayout>
+            android:padding="8dp"
+            android:clipToPadding="false"/>
     </LinearLayout>
-
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navView"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:fitsSystemWindows="true"
-        app:headerLayout="@layout/nav_header"
-        app:menu="@menu/nav_menu"
-        app:itemIconTint="#1976D2"
-        app:itemTextColor="#333333"/>
-
-</androidx.drawerlayout.widget.DrawerLayout>
+</LinearLayout>

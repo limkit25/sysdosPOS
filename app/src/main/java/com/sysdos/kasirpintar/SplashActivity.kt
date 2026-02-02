@@ -36,16 +36,26 @@ class SplashActivity : AppCompatActivity() {
         // ---------------------------
 
         Handler(Looper.getMainLooper()).postDelayed({
-            // Cek apakah user sudah login sebelumnya?
+            // Cek Session Login
             val session = getSharedPreferences("session_kasir", Context.MODE_PRIVATE)
             val isLoggedIn = session.getBoolean("is_logged_in", false)
+
+            // Cek Apakah Ada Akun Tersimpan di HP ini?
+            val config = getSharedPreferences("app_config", Context.MODE_PRIVATE)
+            val hasLocalAccount = config.getBoolean("has_local_account", false)
 
             if (isLoggedIn) {
                 // Jika sudah login -> Langsung Dashboard
                 startActivity(Intent(this, DashboardActivity::class.java))
             } else {
-                // Jika BELUM login -> Ke Welcome Screen (Bukan LoginActivity lagi)
-                startActivity(Intent(this, WelcomeActivity::class.java))
+                if (hasLocalAccount) {
+                    // Ada akun di HP (cuma logout) -> Langsung Login
+                    startActivity(Intent(this, LoginActivity::class.java))
+                } else {
+                    // Belum ada akun sama sekali -> Tampilkan Welcome
+                    // Jangan set apapun disini, karena user bisa saja keluar lagi
+                    startActivity(Intent(this, WelcomeActivity::class.java))
+                }
             }
             finish()
         }, 2000) // 2 detik
@@ -78,7 +88,7 @@ class SplashActivity : AppCompatActivity() {
             return true // Trial Habis
         } else {
             val sisa = TRIAL_DAYS - daysUsed
-            Toast.makeText(this, "Sisa Masa Trial: $sisa Hari", Toast.LENGTH_LONG).show()
+            // Toast dihapus agar tidak mengganggu user di awal
             return false // Masih Aman
         }
     }
