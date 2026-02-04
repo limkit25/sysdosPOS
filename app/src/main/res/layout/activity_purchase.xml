@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:fitsSystemWindows="true"
     android:background="#1976D2">
 
+    <!-- MAIN CONTENT LAYER -->
     <LinearLayout
+        android:id="@+id/layoutMainContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -99,57 +99,64 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
-                        <TextView
-                            android:text="Pilih Supplier:"
-                            android:textColor="#616161"
-                            android:textSize="14sp"
-                            android:layout_marginBottom="6dp"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"/>
-
                         <LinearLayout
+                            android:id="@+id/layoutTopInputs"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_marginBottom="16dp"
-                            android:gravity="center_vertical">
+                            android:orientation="vertical">
 
-                            <Spinner
-                                android:id="@+id/spSupplier"
-                                android:layout_width="0dp"
-                                android:layout_weight="1"
+                            <TextView
+                                android:text="Pilih Supplier:"
+                                android:textColor="#616161"
+                                android:textSize="14sp"
+                                android:layout_marginBottom="6dp"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"/>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="16dp"
+                                android:gravity="center_vertical">
+
+                                <Spinner
+                                    android:id="@+id/spSupplier"
+                                    android:layout_width="0dp"
+                                    android:layout_weight="1"
+                                    android:layout_height="50dp"
+                                    android:background="@drawable/bg_rounded_white"
+                                    android:paddingHorizontal="8dp"/>
+
+                                <ImageButton
+                                    android:id="@+id/btnAddSupplier"
+                                    android:layout_width="50dp"
+                                    android:layout_height="50dp"
+                                    android:src="@android:drawable/ic_input_add"
+                                    android:background="@drawable/bg_rounded_green"
+                                    app:tint="#FFFFFF"
+                                    android:layout_marginStart="12dp"
+                                    android:elevation="2dp"/>
+                            </LinearLayout>
+
+                            <TextView
+                                android:text="Nomor Faktur (Opsional):"
+                                android:textColor="#616161"
+                                android:textSize="14sp"
+                                android:layout_marginBottom="6dp"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"/>
+
+                            <EditText
+                                android:id="@+id/etInvoiceNumber"
+                                android:layout_width="match_parent"
                                 android:layout_height="50dp"
                                 android:background="@drawable/bg_rounded_white"
-                                android:paddingHorizontal="8dp"/>
-
-                            <ImageButton
-                                android:id="@+id/btnAddSupplier"
-                                android:layout_width="50dp"
-                                android:layout_height="50dp"
-                                android:src="@android:drawable/ic_input_add"
-                                android:background="@drawable/bg_rounded_green"
-                                app:tint="#FFFFFF"
-                                android:layout_marginStart="12dp"
-                                android:elevation="2dp"/>
+                                android:hint="Contoh: INV-001/2025"
+                                android:paddingHorizontal="12dp"
+                                android:inputType="textCapCharacters"
+                                android:layout_marginBottom="16dp"/>
                         </LinearLayout>
-
-                        <TextView
-                            android:text="Nomor Faktur (Opsional):"
-                            android:textColor="#616161"
-                            android:textSize="14sp"
-                            android:layout_marginBottom="6dp"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"/>
-
-                        <EditText
-                            android:id="@+id/etInvoiceNumber"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:background="@drawable/bg_rounded_white"
-                            android:hint="Contoh: INV-001/2025"
-                            android:paddingHorizontal="12dp"
-                            android:inputType="textCapCharacters"
-                            android:layout_marginBottom="16dp"/>
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -168,37 +175,57 @@
                                 android:layout_marginEnd="12dp"
                                 android:elevation="2dp"/>
 
-                            <androidx.appcompat.widget.SearchView
-                                android:id="@+id/svSearchProduct"
+                            <TextView
+                                android:id="@+id/btnSearchTrigger"
                                 android:layout_width="match_parent"
                                 android:layout_height="50dp"
                                 android:background="@drawable/bg_rounded_white"
-                                app:queryHint="Cari Nama / SKU..."
-                                app:iconifiedByDefault="false"
-                                app:queryBackground="@android:color/transparent"/>
+                                android:text="Cari Nama / SKU..."
+                                android:textColor="#9E9E9E"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="12dp"
+                                app:drawableStartCompat="@android:drawable/ic_menu_search"
+                                android:drawablePadding="8dp"
+                                android:clickable="true"
+                                android:focusable="true"/>
                         </LinearLayout>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Keranjang Belanja"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:textColor="#424242"
-                    android:layout_marginHorizontal="20dp"
-                    android:layout_marginBottom="8dp"/>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvPurchaseItems"
+                <!-- CART CONTAINER -->
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:paddingHorizontal="16dp"
-                    android:clipToPadding="false"/>
+                    android:layout_weight="1">
 
+                    <LinearLayout
+                        android:id="@+id/layoutCartContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Keranjang Belanja"
+                            android:textStyle="bold"
+                            android:textSize="16sp"
+                            android:textColor="#424242"
+                            android:layout_marginHorizontal="20dp"
+                            android:layout_marginBottom="8dp"/>
+
+                        <androidx.recyclerview.widget.RecyclerView
+                            android:id="@+id/rvPurchaseItems"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:paddingHorizontal="16dp"
+                            android:clipToPadding="false"/>
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- BOTTOM ACTION BAR -->
                 <LinearLayout
+                    android:id="@+id/layoutBottomAction"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
@@ -299,4 +326,208 @@
             app:elevation="8dp"/>
     </LinearLayout>
 
-</LinearLayout>
+    <!-- OVERLAY 1: SEARCH SCREEN FULL -->
+    <LinearLayout
+        android:id="@+id/layoutSearchOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#1976D2"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:fitsSystemWindows="true"
+        android:elevation="20dp">
+
+        <!-- SEARCH HEADER -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#1976D2"
+            android:padding="12dp"
+            android:elevation="4dp"
+            android:gravity="center_vertical">
+
+            <ImageButton
+                android:id="@+id/btnBackFromSearch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_menu_revert"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"/>
+
+            <EditText
+                android:id="@+id/etSearchOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:background="@drawable/bg_rounded_white"
+                android:hint="Cari Nama / SKU..."
+                android:paddingHorizontal="16dp"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:layout_marginStart="8dp"
+                android:textSize="16sp"/>
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvSearchResultsFull"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#F5F8FA"
+            android:padding="12dp"
+            android:clipToPadding="false"/>
+    </LinearLayout>
+
+    <!-- OVERLAY 2: FORM INPUT FULL SCREEN (Layer 3) -->
+    <ScrollView
+        android:id="@+id/layoutFormInput"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:fitsSystemWindows="true"
+        android:elevation="30dp">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:id="@+id/tvFormProductName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Nama Produk"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#1976D2"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tvFormUnitInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Satuan Dasar: Pcs"
+                android:textSize="14sp"
+                android:textColor="#616161"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- OPSI GROSIR -->
+            <CheckBox
+                android:id="@+id/cbFormBulkMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mode Grosir / Konversi Satuan"
+                android:textSize="16sp"
+                android:textColor="#1976D2"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- INPUT UTAMA -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Jumlah Beli"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="16dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etFormQty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Harga Modal (Total / Satuan)"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="16dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etFormCost"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- AREA KONVERSI (HIDDEN) -->
+            <LinearLayout
+                android:id="@+id/layoutFormBulkDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#F5F5F5"
+                android:padding="16dp"
+                android:visibility="gone"
+                android:layout_marginBottom="24dp">
+
+                <RadioGroup
+                    android:id="@+id/rgFormConversion"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+                    <RadioButton
+                        android:id="@+id/rbFormManual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Manual (Dus/Pack)"
+                        android:checked="true"
+                        android:layout_marginEnd="16dp"/>
+                    <RadioButton
+                        android:id="@+id/rbFormKilo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Kg / Liter (x1000)"/>
+                </RadioGroup>
+
+                <EditText
+                    android:id="@+id/etFormIsiPerDus"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:hint="Isi per Dus/Pack (Qty)"
+                    android:inputType="number"
+                    android:background="@drawable/bg_rounded_white"
+                    android:paddingHorizontal="12dp"
+                    android:layout_marginBottom="8dp"/>
+
+                <EditText
+                    android:id="@+id/etFormTotalHarga"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:hint="Total Rupiah (Semua)"
+                    android:inputType="number"
+                    android:background="@drawable/bg_rounded_white"
+                    android:paddingHorizontal="12dp"/>
+                
+                <TextView
+                    android:id="@+id/tvFormPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Hasil: -"
+                    android:layout_marginTop="8dp"/>
+            </LinearLayout>
+
+            <!-- BUTTONS -->
+            <Button
+                android:id="@+id/btnFormSubmit"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="MASUKKAN KERANJANG"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
+
+            <Button
+                android:id="@+id/btnFormCancel"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:text="BATAL"
+                android:backgroundTint="#EF5350"/>
+        </LinearLayout>
+    </ScrollView>
+
+</FrameLayout>

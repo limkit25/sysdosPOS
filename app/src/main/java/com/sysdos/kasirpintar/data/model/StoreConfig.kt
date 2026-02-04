@@ -30,5 +30,10 @@ data class StoreConfig(
     // 🔥 TAMBAHAN KOLOM BARU
     @ColumnInfo(name = "tax_percentage") 
     @SerializedName("tax_percentage") // Server: tax_percentage? (Check model)
-    val taxPercentage: Double = 0.0
+    val taxPercentage: Double = 0.0,
+
+    // 🔥 MARKUP ONLINE ORDERS (Default 20%)
+    val markupGoFood: Double = 20.0,
+    val markupGrab: Double = 20.0,
+    val markupShopee: Double = 20.0
 )

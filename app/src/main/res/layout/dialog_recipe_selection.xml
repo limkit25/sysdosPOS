@@ -1,0 +1,88 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:minWidth="350dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Atur Resep / Komposisi"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Masukkan jumlah pemakaian bahan baku untuk 1 porsi produk ini."
+        android:textSize="12sp"
+        android:textColor="#757575"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- EMPTY STATE -->
+    <LinearLayout
+        android:id="@+id/llEmptyState"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@android:drawable/ic_menu_info_details"
+            app:tint="#BDBDBD"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Belum ada Bahan Baku"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Silakan tambah produk baru, lalu centang opsi 'Ini adalah Bahan Baku' (Contoh: Gula, Kopi, Tepung)."
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="#757575"
+            android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvIngredients"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="12dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        
+        <Button
+            android:id="@+id/btnAddInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="?"
+            style="@style/Widget.MaterialComponents.Button.TextButton"/>
+
+        <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="0dp"/>
+
+        <Button
+            android:id="@+id/btnSaveRecipe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SIMPAN RESEP"
+            android:backgroundTint="#4CAF50"/>
+    </LinearLayout>
+
+</LinearLayout>

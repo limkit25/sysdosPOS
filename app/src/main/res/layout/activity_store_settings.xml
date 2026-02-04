@@ -143,6 +143,16 @@
                                 android:layout_height="wrap_content"
                                 android:checked="true"/>
                         </LinearLayout>
+                        <Button
+                            android:id="@+id/btnMarkupSettings"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="ATUR MARKUP ONLINE (Gofood dll)"
+                            android:layout_marginTop="10dp"
+                            android:backgroundTint="#673AB7"
+                            android:drawableStart="@android:drawable/ic_menu_edit"
+                            android:drawableTint="#FFF"
+                            android:paddingStart="16dp"/>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
@@ -256,6 +266,41 @@
                             android:text="☁️ BACKUP KE GOOGLE DRIVE (Premium)"
                             android:backgroundTint="#4285F4"
                             android:layout_marginTop="8dp"/>
+
+                        <!-- 🔥 NEW: IMPORT / EXPORT DATA -->
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Export &amp; Import Data (Manual)"
+                            android:textStyle="bold"
+                            android:layout_marginTop="15dp"
+                            android:layout_marginBottom="5dp"/>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btnExportReport"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="EXPORT LAPORAN"
+                                android:backgroundTint="#FF9800"
+                                android:textSize="11sp"
+                                android:layout_marginEnd="5dp"/>
+
+                            <Button
+                                android:id="@+id/btnImportProduct"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="IMPORT PRODUK"
+                                android:backgroundTint="#009688"
+                                android:textSize="11sp"
+                                android:layout_marginStart="5dp"/>
+                        </LinearLayout>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 

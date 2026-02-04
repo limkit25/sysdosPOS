@@ -61,6 +61,11 @@ class AboutActivity : AppCompatActivity() {
             tvVersion.text = "Versi 1.0"
         }
 
+        // Logic Panduan Aplikasi
+        findViewById<Button>(R.id.btnHelpGuide).setOnClickListener {
+             startActivity(Intent(this, HelpActivity::class.java))
+        }
+
         // Logic Update Manual
         btnCheckUpdate.setOnClickListener {
              Toast.makeText(this, "Mengecek Update...", Toast.LENGTH_SHORT).show()
@@ -130,7 +135,11 @@ class AboutActivity : AppCompatActivity() {
                 Toast.makeText(this, "Gagal: Email user tidak ditemukan", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // 🔥 LOGIKA SIMULASI MENU (DUMMY DATA) -> Removed
     }
+
+    // Tambahkan ini di luar onCreate agar tombol Back HP menutup menu dulu
 
     // Tambahkan ini di luar onCreate agar tombol Back HP menutup menu dulu
     override fun onBackPressed() {

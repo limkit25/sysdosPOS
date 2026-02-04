@@ -34,6 +34,23 @@
             android:orientation="vertical"
             android:layout_marginStart="12dp">
 
+            <!-- 🔥 BADGE TIPE PRODUK (Menu/Bahan) -->
+            <TextView
+                android:id="@+id/tvTypeBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MENU / JASA"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/bg_rounded_primary"
+                android:visibility="gone"
+                android:layout_marginBottom="4dp"/>
+
             <TextView
                 android:id="@+id/tvProductName"
                 android:layout_width="wrap_content"

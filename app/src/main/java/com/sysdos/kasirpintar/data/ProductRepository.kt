@@ -23,8 +23,9 @@ class ProductRepository(
     private val shiftDao: ShiftDao,
     private val stockLogDao: StockLogDao,
     private val storeConfigDao: StoreConfigDao,
-    private val branchDao: BranchDao, // 🔥 Tambah ini
-    private val transactionDao: TransactionDao
+    private val branchDao: BranchDao,
+    private val transactionDao: TransactionDao,
+    private val recipeDao: RecipeDao // 🔥 Tambah ini (Phase 24)
 ) {
     // --- STORE CONFIG ---
     val storeConfig = storeConfigDao.getStoreConfig()
@@ -32,7 +33,7 @@ class ProductRepository(
     suspend fun getStoreConfigDirect(): StoreConfig? = storeConfigDao.getStoreConfigOneShot()
 
     // =================================================================
-    // 📦 1. PRODUK & VARIAN
+    // 📦 1. PRODUK & VARIAN & RESEP
     // =================================================================
 
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -60,6 +61,13 @@ class ProductRepository(
     suspend fun replaceVariants(productId: Int, variants: List<ProductVariant>) {
         productDao.deleteVariantsByProductId(productId)
         productDao.insertVariants(variants)
+    }
+
+    // 🔥 FITUR RESEP (PHASE 24)
+    suspend fun getIngredientsForProduct(productId: Int): List<Recipe> = recipeDao.getIngredientsForProduct(productId)
+    suspend fun replaceRecipes(productId: Int, recipes: List<Recipe>) {
+        recipeDao.deleteRecipeForProduct(productId)
+        recipeDao.insertRecipes(recipes)
     }
 
     suspend fun decreaseStock(productId: Int, quantity: Int) = productDao.decreaseStock(productId, quantity)
@@ -156,13 +164,26 @@ class ProductRepository(
                 if (responseProd.isSuccessful) {
                     val serverProducts = responseProd.body()
                     if (serverProducts != null) {
-                        // Hapus data lama di HP biar bersih & sama dengan server
+                        
+                        // 🔥 1. BACKUP DATA LOKAL (TrackStock, IsIngredient, Unit)
+                        // Ambil snapshot current products
+                        val localProducts = productDao.getAllProducts().first()
+                        val localMap = localProducts.associateBy { it.id }
+
+                        // 2. Hapus data lama di HP biar bersih & sama dengan server
                         productDao.deleteAllProducts()
 
                         serverProducts.forEach { apiItem ->
                             // Logic URL Gambar
                             val fullImagePath = if (!apiItem.image_path.isNullOrEmpty()) dynamicBaseUrl + apiItem.image_path else null
                             val serverCategory = if (apiItem.category.isNullOrEmpty()) "Umum" else apiItem.category
+
+                            // 🔥 RESTORE LOCAL FLAGS
+                            val existing = localMap[apiItem.id]
+                            val savedTrackStock = existing?.trackStock ?: true
+                            val savedIsIngredient = existing?.isIngredient ?: false
+                            val savedUnit = existing?.unit ?: "Pcs"
+                            val savedBarcode = existing?.barcode
 
                             // 🔥 PERBAIKAN FINAL (androidId DIHAPUS) 🔥
                             val newProd = Product(
@@ -175,9 +196,13 @@ class ProductRepository(
 
                                 stock = apiItem.stock,
                                 category = serverCategory,
-                                barcode = "", // Default kosong
-                                imagePath = fullImagePath
-                                // ❌ androidId = ... (DIBUANG KARENA TIDAK ADA DI MODEL)
+                                barcode = savedBarcode ?: "", // Restore barcode lokal jika ada
+                                imagePath = fullImagePath,
+                                
+                                // 🔥 KEMBALIKAN NILAI LOKAL PHASE 24
+                                trackStock = savedTrackStock,
+                                isIngredient = savedIsIngredient,
+                                unit = savedUnit
                             )
                             productDao.insertProduct(newProd)
                         }

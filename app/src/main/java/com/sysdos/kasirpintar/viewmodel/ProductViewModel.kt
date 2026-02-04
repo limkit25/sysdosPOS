@@ -25,6 +25,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val transactionDao = AppDatabase.getDatabase(application).transactionDao()
         // 🔥 TAMBAHAN BARU:
         val branchDao = AppDatabase.getDatabase(application).branchDao()
+        val recipeDao = AppDatabase.getDatabase(application).recipeDao() // 🔥 Phase 24
 
         repository = ProductRepository(
             application,
@@ -32,8 +33,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             shiftDao,
             stockLogDao,
             storeConfigDao,
-            branchDao,     // <--- Inserted BranchDao
-            transactionDao // <--- Correctly passed as last argument
+            branchDao,
+            transactionDao,
+            recipeDao // 🔥 Phase 24
         )
     }
 
@@ -41,6 +43,14 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
 
     // --- LIVE DATA ---
     val allProducts: LiveData<List<Product>> = repository.allProducts.asLiveData()
+
+    // 🔥 DATA POS: Hanya Tampilkan Produk JUAL (Bukan Bahan Baku)
+    val posProducts: LiveData<List<Product>> = MediatorLiveData<List<Product>>().apply {
+        addSource(allProducts) { list ->
+            value = list.filter { !it.isIngredient }
+        }
+    }
+
     val allCategories: LiveData<List<Category>> = repository.allCategories.asLiveData()
     val allSuppliers: LiveData<List<Supplier>> = repository.allSuppliers.asLiveData()
     val storeConfig: LiveData<StoreConfig?> = repository.storeConfig.asLiveData()
@@ -80,7 +90,38 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     init {
         loadCurrentUser()
         checkAndSync()
+        validateCompositeProducts() // 🔥 Fix Flags on Startup
     }
+
+    private fun validateCompositeProducts() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Tunggu sebentar biar DB siap
+                kotlinx.coroutines.delay(2000)
+                
+                // Ambil snapshot produk saat ini
+                val all = repository.allProducts.first()
+                var fixedCount = 0
+                
+                all.forEach { p ->
+                    val recipes = repository.getIngredientsForProduct(p.id)
+                    // Jika punya resep TAPI trackStock masih TRUE -> FIX IT
+                    if (recipes.isNotEmpty() && p.trackStock) {
+                        Log.d("AutoFix", "Fixing composite flag for ${p.name}")
+                        repository.update(p.copy(trackStock = false))
+                        fixedCount++
+                    }
+                }
+                
+                if (fixedCount > 0) {
+                     Log.d("AutoFix", "Fixed $fixedCount composite products.")
+                }
+            } catch (e: Exception) {
+                Log.e("SysdosVM", "AutoFix Error: ${e.message}")
+            }
+        }
+    }
+
     // 🔥 FUNGSI BARU: LiveData untuk Varian
     fun getVariants(productId: Int): LiveData<List<ProductVariant>> {
         return repository.getVariantsByProductId(productId).asLiveData()
@@ -100,13 +141,13 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     // Ganti 'private' jadi 'fun' (public) biar bisa dipanggil dari Activity
     fun checkAndSync() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            // ❌ HAPUS: while (true) {
+            // ❌ DISABLE SYNC FOR OFFLINE MODE (Permintaan User: Export/Import Only)
+            /*
             try {
                 val api = ApiClient.getLocalClient(getApplication())
                 val response = api.getCategories(0).execute()
                 _isOnline.postValue(response.isSuccessful)
 
-                // 🔥 TAMBAHAN: JIKA ONLINE, LANGSUNG TARIK DATA SEKALI
                 if (response.isSuccessful) {
                     repository.refreshProductsFromApi()
                 }
@@ -115,12 +156,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
                 _isOnline.postValue(false)
             }
 
-            // 🔥 SYNC STORE CONFIG DAN SHIFT LOGS
             try {
-                // Ambil config toko dari server lokal
                 repository.syncStoreConfigFromLocal()
-                
-                 // 🔥 SYNC SHIFT LOGS DARI WEB
                 val currentUid = _currentUserId.value ?: 0
                 if (currentUid > 0) {
                      repository.syncShiftLogsFromWeb(currentUid)
@@ -128,8 +165,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 Log.e("SysdosVM", "Gagal Sync config/shift: ${e.message}")
             }
-            // ❌ HAPUS: kotlinx.coroutines.delay(5000)
-            // }
+            */
         }
     }
 
@@ -154,6 +190,13 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     fun update(product: Product) = viewModelScope.launch {
         repository.update(product)
         try { repository.updateProductToServer(product) } catch (e: Exception) {}
+    }
+    
+    // 🔥 UPDATE DENGAN CALLBACK (Urutan Aman)
+    fun updateProductWithCallback(product: Product, onComplete: () -> Unit) = viewModelScope.launch {
+        repository.update(product)
+        try { repository.updateProductToServer(product) } catch (e: Exception) {}
+        launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
     }
     fun delete(product: Product) = viewModelScope.launch { repository.delete(product) }
 
@@ -180,6 +223,21 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // 🔥 FITUR RESEP (Phase 24)
+    fun getRecipeForProduct(productId: Int, onResult: (List<Recipe>) -> Unit) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        Log.d("RecipeDebug", "VM: Loading recipes for Product ID: $productId")
+        val recipes = repository.getIngredientsForProduct(productId)
+        Log.d("RecipeDebug", "VM: Loaded ${recipes.size} recipes for Product ID: $productId")
+        launch(kotlinx.coroutines.Dispatchers.Main) { onResult(recipes) }
+    }
+
+    fun updateRecipes(productId: Int, recipes: List<Recipe>, onComplete: () -> Unit = {}) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        Log.d("RecipeDebug", "VM: Updating recipes for Product ID: $productId. Count: ${recipes.size}")
+        repository.replaceRecipes(productId, recipes)
+        Log.d("RecipeDebug", "VM: Update complete for Product ID: $productId")
+        launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
+    }
+
     // --- LOGIN MANUAL (EMAIL & PASSWORD) ---
     fun login(u: String, p: String, onResult: (User?) -> Unit) = viewModelScope.launch {
         // 🔥 PERBAIKAN: Gunakan repository.login(u, p)
@@ -198,45 +256,63 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
         val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
 
-        val currentList = _cart.value?.toMutableList() ?: mutableListOf()
-        val index = currentList.indexOfFirst { it.id == product.id }
-        val stokGudang = product.stock
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // 🔥 SELF-HEALING: Cek kebenaran apakah produk ini punya resep?
+            val recipes = repository.getIngredientsForProduct(product.id)
+            val hasRecipe = recipes.isNotEmpty()
+            
+            // Logic TrackStock Final:
+            // Jika punya resep -> False (Jangan cek stok gudang)
+            // Jika bahan baku -> False
+            // Jika tidak punya resep -> Ikuti settingan asli produk
+            val realTrackStock = if (hasRecipe || product.isIngredient) false else product.trackStock
 
-        if (index != -1) {
-            // --- LOGIKA TAMBAH QTY ---
-            val existingItem = currentList[index]
-            val qtyBaru = existingItem.stock + 1
-
-            if (isStockSystemActive) {
-                // Pakai '>' supaya kalau qtyBaru == stokGudang masih boleh
-                if (qtyBaru > stokGudang) {
-                    onResult("❌ Stok Habis! Sisa: $stokGudang")
-                    return
-                }
+            // 🔥 AUTO-CORRECT DB JIKA SALAH
+            if (hasRecipe && product.trackStock) {
+                Log.d("StockDebug", "FIXING DATA: Product ${product.name} has recipes but trackStock=TRUE. Updating DB...")
+                repository.update(product.copy(trackStock = false))
             }
 
-            currentList[index] = existingItem.copy(stock = qtyBaru)
-            // ❌ JANGAN PANGGIL onResult DISINI DULU
-        } else {
-            // --- LOGIKA BARANG BARU ---
-            if (isStockSystemActive) {
-                if (stokGudang <= 0) {
-                    onResult("❌ Stok Kosong!")
-                    return
-                }
-            }
+            launch(kotlinx.coroutines.Dispatchers.Main) {
+                val currentList = _cart.value?.toMutableList() ?: mutableListOf()
+                val index = currentList.indexOfFirst { it.id == product.id }
+                val stokGudang = product.stock
 
-            currentList.add(product.copy(stock = 1))
-            // ❌ JANGAN PANGGIL onResult DISINI DULU
+                if (index != -1) {
+                    // --- LOGIKA TAMBAH QTY ---
+                    val existingItem = currentList[index]
+                    val qtyBaru = existingItem.stock + 1
+
+                    if (isStockSystemActive && realTrackStock) { // 🔥 Pakai realTrackStock
+                        if (qtyBaru > stokGudang) {
+                            onResult("❌ Stok Habis! Sisa: $stokGudang")
+                            return@launch
+                        }
+                    }
+
+                    currentList[index] = existingItem.copy(stock = qtyBaru)
+                } else {
+                    // --- LOGIKA BARANG BARU ---
+                    if (isStockSystemActive && realTrackStock) { // 🔥 Pakai realTrackStock
+                         Log.d("StockDebug", "AddToCart Check: ${product.name}, Track=$realTrackStock, Stock=$stokGudang")
+                        if (stokGudang <= 0) {
+                            onResult("❌ Stok Kosong! (Mode Stok: Aktif)")
+                            return@launch
+                        }
+                    }
+
+                    // Jika produk komposit, kita simpan versi aslinya ke keranjang 
+                    val productToCart = if (realTrackStock != product.trackStock) product.copy(trackStock = realTrackStock) else product
+                    
+                    currentList.add(productToCart.copy(stock = 1))
+                }
+
+                // ✅ UPDATE DATA
+                _cart.value = currentList
+                calculateTotal()
+                onResult("Berhasil")
+            }
         }
-
-        // ✅ UPDATE DATA DULU (WAJIB PERTAMA)
-        _cart.value = currentList
-        calculateTotal()
-
-        // ✅ BARU LAPORAN KE MAIN ACTIVITY (TERAKHIR)
-        // Dengan begini, saat MainActivity refresh, dia ngambil data yang SUDAH BARU.
-        onResult("Berhasil")
     }
 
     fun decreaseCartItem(product: Product) {
@@ -261,10 +337,48 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         calculateTotal()
     }
 
+    // 🔥 Phase 30: Online Order Markup
+    private var _currentMarkupPercentage = 0.0
+    private var _currentOrderType = "Dine In"
+
+    // 🔥 Function to Set Order Type (Called from UI Spinner)
+    // 🔥 Function to Set Order Type (Called from UI Spinner)
+    fun setOrderType(type: String) {
+        _currentOrderType = type
+        
+        // Ambil Config Terbaru (Pastikan StoreConfig sudah di-load di Activity)
+        val config = storeConfig.value
+        
+        // Ambil Persentase (Default 20.0 jika null) dan Bagi 100 agar jadi desimal (0.2)
+        val goFoodPct = (config?.markupGoFood ?: 20.0) / 100.0
+        val grabPct = (config?.markupGrab ?: 20.0) / 100.0
+        val shopeePct = (config?.markupShopee ?: 20.0) / 100.0
+
+        _currentMarkupPercentage = when (type) {
+            "GoFood" -> goFoodPct
+            "GrabFood" -> grabPct
+            "ShopeeFood" -> shopeePct
+            else -> 0.0
+        }
+        calculateTotal() // Recalculate total immediately
+    }
+
     private fun calculateTotal() {
-        var total = 0.0
-        _cart.value?.forEach { total += it.price * it.stock }
-        _totalPrice.value = total
+        var baseTotal = 0.0
+        _cart.value?.forEach { baseTotal += it.price * it.stock }
+        
+        // Apply Markup (Total yg ditampilkan ke UI sudah termasuk Markup)
+        val markupAmount = baseTotal * _currentMarkupPercentage
+        _totalPrice.value = baseTotal + markupAmount
+    }
+
+    // Helper untuk UI Checkout Breakdown
+    fun getCurrentOrderType(): String = _currentOrderType
+
+    fun getBaseSubtotal(): Double {
+        var baseTotal = 0.0
+        _cart.value?.forEach { baseTotal += it.price * it.stock }
+        return baseTotal
     }
 
     // --- SCANNER & USER ---
@@ -318,29 +432,69 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun importCsv(file: java.io.File) = viewModelScope.launch { repository.uploadCsvFile(file) }
+    fun importProducts(inputStream: java.io.InputStream, onResult: (String) -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // val inputStream is passed directly
+                val parsedList = com.sysdos.kasirpintar.utils.CsvImportHelper.parseCsv(inputStream)
+                
+                if (parsedList.isEmpty()) {
+                    launch(kotlinx.coroutines.Dispatchers.Main) { onResult("Gagal: File kosong atau format salah!") }
+                    return@launch
+                }
+
+                parsedList.forEach { parsed ->
+                    val product = parsed.product
+                    val variants = parsed.variants
+                    
+                    // 1. Insert Parent Product -> Get ID
+                    val parentId = repository.insertProductReturnId(product).toInt()
+                    
+                    // 2. Insert Variants (If any)
+                    if (variants.isNotEmpty()) {
+                        val finalVariants = variants.map { it.copy(productId = parentId) }
+                        repository.insertVariants(finalVariants)
+                    }
+                }
+
+                launch(kotlinx.coroutines.Dispatchers.Main) { onResult("✅ Sukses Import ${parsedList.size} Produk!") }
+            } catch (e: Exception) {
+                launch(kotlinx.coroutines.Dispatchers.Main) { onResult("Error: ${e.message}") }
+            }
+        }
+    }
     fun syncUser(user: User) = viewModelScope.launch { repository.syncUserToServer(user) }
 
     fun checkout(
         subtotal: Double, discount: Double, tax: Double, paymentMethod: String,
         cashReceived: Double, changeAmount: Double, note: String = "", userId: Int = 0,
         onResult: (Transaction?) -> Unit
-    ) = viewModelScope.launch {
+    ) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { // 🔥 Run di IO Thread
 
         // 1. Validasi Keranjang
         val cartItems = _cart.value ?: emptyList()
-        if (cartItems.isEmpty()) { onResult(null); return@launch }
+        if (cartItems.isEmpty()) { 
+             launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null) }
+             return@launch 
+        }
 
         // 2. Siapkan Data Transaksi (Header & Summary)
+        // 🔥 RE-CALCULATE BASE SUBTOTAL (Murni Barang)
+        var baseSubtotal = 0.0
         val itemsForUpload = ArrayList(cartItems)
         val summaryBuilder = StringBuilder()
         var totalProfit = 0.0
 
         for (item in cartItems) {
+            baseSubtotal += item.price * item.stock // Harga asli tanpa markup
+            
             // Format: Nama|Qty|Harga|Total
             summaryBuilder.append("${item.name}|${item.stock}|${item.price.toLong()}|${(item.price * item.stock).toLong()};")
             totalProfit += (item.price - item.costPrice) * item.stock
         }
+        
+        // 🔥 HITUNG MARKUP
+        val markupValue = baseSubtotal * _currentMarkupPercentage
 
         val finalUserId = if (userId != 0) userId else (_currentUserId.value ?: 0)
         val finalSummary = summaryBuilder.toString().removeSuffix(";") + (if(note.isNotEmpty()) " || $note" else "")
@@ -348,20 +502,32 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         val trx = Transaction(
             timestamp = System.currentTimeMillis(),
             itemsSummary = finalSummary,
-            totalAmount = subtotal + tax - discount,
-            subtotal = subtotal, discount = discount, tax = tax,
-            profit = totalProfit,
+            
+            // 🔥 Formula Total: Base + Markup + Tax - Discount
+            // Perhatikan parameter 'subtotal' yang dikirim UI mungkin sudah mengandung Markup karena UI observe totalPrice.
+            // Jadi kita abaikan param 'subtotal' dan pakai 'baseSubtotal' hitungan sendiri biar akurat.
+            totalAmount = baseSubtotal + markupValue + tax - discount,
+            subtotal = baseSubtotal,
+            
+            discount = discount, 
+            tax = tax,
+            profit = totalProfit + markupValue, // 🔥 Profit juga nambah dari Markup (Service fee itu untung)
+            
             paymentMethod = paymentMethod,
             cashReceived = cashReceived, changeAmount = changeAmount,
             userId = finalUserId,
-            note = note
+            note = note,
+            
+            // 🔥 DATA MARKUP
+            orderType = _currentOrderType,
+            markupAmount = markupValue
         )
 
         // 3. Simpan Transaksi ke Database
         val trxId = repository.insertTransaction(trx)
 
         // ============================================================
-        // 🔥 LOGIKA PINTAR: CEK "SAKLAR STOK" DULU SEBELUM POTONG 🔥
+        // 🔥 LOGIKA STOK & RESEP (PHASE 24) 🔥
         // ============================================================
 
         // Ambil Settingan Toko
@@ -371,43 +537,57 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         // HANYA KURANGI STOK JIKA SAKLAR ON
         if (isStockSystemActive) {
 
-            // Grouping Item (Agar varian & produk induk dihitung satu kesatuan)
-            val stockDeductions = mutableMapOf<Int, Int>()
+            // Map ID Produk -> Jumlah Kurang (Double agar support resep pecahan 0.5 kg)
+            val stockDeductions = mutableMapOf<Int, Double>()
 
             cartItems.forEach { item ->
                 // Jika ID item < 0 (Varian), pakai parentId. Jika positif, pakai ID sendiri.
                 val realId = if (item.id < 0) item.parentId else item.id
-                val currentTotal = stockDeductions.getOrDefault(realId, 0)
-                stockDeductions[realId] = currentTotal + item.stock
+                val qtyJual = item.stock.toDouble()
+                
+                // 1. Cek apakah produk ini punya Resep?
+                val ingredients = repository.getIngredientsForProduct(realId)
+                
+                if (ingredients.isNotEmpty()) {
+                    // A. PRODUK KOMPOSIT: Kurangi stok bahan baku
+                    ingredients.forEach { ing ->
+                        val totalBahan = ing.quantity * qtyJual
+                        val current = stockDeductions.getOrDefault(ing.ingredientId, 0.0)
+                        stockDeductions[ing.ingredientId] = current + totalBahan
+                    }
+                    // Stok produk utama TIDAK dikurangi (stok virtual)
+                } else {
+                    // B. PRODUK BIASA: Kurangi stok produk itu sendiri
+                    val current = stockDeductions.getOrDefault(realId, 0.0)
+                    stockDeductions[realId] = current + qtyJual
+                }
             }
 
             // Eksekusi Potong Stok di Database
             stockDeductions.forEach { (productId, totalQtyToDeduct) ->
-                // Ambil data produk TERBARU dari Database (Penting agar tidak minus error)
+                // Ambil data produk TERBARU dari Database
                 val masterItem = repository.getProductById(productId)
 
-                if (masterItem != null) {
-                    val newStock = masterItem.stock - totalQtyToDeduct
+                if (masterItem != null && masterItem.trackStock) { // 🔥 Cek Flag trackStock
+                    val newStock = masterItem.stock - totalQtyToDeduct.toInt() // Convert Double ke Int (sementara DB pakai INT)
                     repository.update(masterItem.copy(stock = newStock))
                 }
             }
         }
-        // JIKA SAKLAR OFF (STOK LOS) -> KITA LEWATI PROSES DI ATAS.
-        // STOK DI DATABASE TIDAK BERUBAH SAMA SEKALI.
-
+        
         // ============================================================
 
         // 4. Reset Keranjang & Selesai
-        _cart.value = emptyList()
-        _totalPrice.value = 0.0
-
-        val finalTrx = trx.copy(id = trxId.toInt())
-        onResult(finalTrx)
+        launch(kotlinx.coroutines.Dispatchers.Main) {
+            _cart.value = emptyList()
+            _totalPrice.value = 0.0
+            
+            val finalTrx = trx.copy(id = trxId.toInt())
+            onResult(finalTrx)
+        }
 
         // 5. Upload ke Server (Background)
-        viewModelScope.launch {
-            try { repository.uploadTransactionToServer(finalTrx, itemsForUpload) } catch (e: Exception) {}
-        }
+        try { repository.uploadTransactionToServer(trx.copy(id = trxId.toInt()), itemsForUpload) } catch (e: Exception) {}
     }
 
     fun openShift(user: String, modal: Double) = viewModelScope.launch {
@@ -437,8 +617,9 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- TOKO ---
-    // 🔥 UPDATE: Tambah Parameter 'tax' di ujung
-    fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?, tax: Double) = viewModelScope.launch {
+    // 🔥 UPDATE: Tambah Parameter 'tax' dan Markup
+    fun saveStoreSettings(name: String, address: String, phone: String, footer: String, printerMac: String?, tax: Double,
+                          markupGoFood: Double, markupGrab: Double, markupShopee: Double) = viewModelScope.launch {
 
         // Membuat objek konfigurasi baru
         val config = StoreConfig(
@@ -449,7 +630,10 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             storeEmail = "", // Default kosong (karena tidak ada input di UI Settings)
             strukFooter = footer, // 🔥 Pastikan ini 'strukFooter' sesuai file StoreConfig.kt Anda
             printerMac = printerMac,
-            taxPercentage = tax // 🔥 Simpan Pajak
+            taxPercentage = tax, // 🔥 Simpan Pajak
+            markupGoFood = markupGoFood,
+            markupGrab = markupGrab,
+            markupShopee = markupShopee
         )
 
         // Simpan ke Database via Repository

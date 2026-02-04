@@ -23,5 +23,9 @@ data class Transaction(
 
     // 🔥 TAMBAHAN BARU (WAJIB ADA BIAR GAK ERROR MERAH)
     // Default value "" agar data lama tidak error
-    val note: String = ""
+    val note: String = "",
+
+    // 🔥 Phase 30: Online Order Support
+    val orderType: String = "Dine In", // e.g. "Gojek", "Grab"
+    val markupAmount: Double = 0.0     // e.g. 3000.0
 ) : Parcelable

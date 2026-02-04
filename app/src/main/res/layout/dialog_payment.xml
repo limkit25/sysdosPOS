@@ -40,6 +40,20 @@
             app:tint="#1976D2"/>
     </LinearLayout>
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+        <LinearLayout
+            android:id="@+id/llPaymentDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp">
+            <!-- Rows will be added programmatically -->
+        </LinearLayout>
+    </ScrollView>
+
     <EditText
         android:id="@+id/etAmountReceived"
         android:layout_width="match_parent"

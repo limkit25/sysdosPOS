@@ -21,10 +21,11 @@ import kotlinx.coroutines.launch
         Supplier::class,
         StockLog::class,
         StoreConfig::class,
-        Branch::class,        // 🔥 WAJIB DITAMBAHKAN
-        ProductVariant::class // 🔥 WAJIB DITAMBAHKAN DI SINI
+        Branch::class,
+        ProductVariant::class,
+        Recipe::class // 🔥 WAJIB DITAMBAHKAN (Phase 24)
     ],
-    version = 9, // 🔥 NAIKKAN VERSI (Misal dari 7 jadi 8) BIAR AMAN
+    version = 13, // 🔥 NAIKKAN VERSI KE 13 (Config Markup)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,12 +37,44 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun supplierDao(): SupplierDao
     abstract fun stockLogDao(): StockLogDao
     abstract fun storeConfigDao(): StoreConfigDao
-    abstract fun branchDao(): BranchDao // 🔥 Tambah ini
-    abstract fun transactionDao(): TransactionDao // (Pastikan ini ada juga jika dipakai)
+    abstract fun branchDao(): BranchDao
+    abstract fun transactionDao(): TransactionDao
+    abstract fun recipeDao(): RecipeDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        // 🔥 MIGRATION 10 -> 11 (Add 'unit' column)
+        private val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'Pcs'")
+            }
+        }
+
+        // 🔥 MIGRATION 11 -> 12 (Add 'orderType' & 'markupAmount' to Transaction)
+        private val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Perhatikan nama tabel harus sesuai Entity @Entity(tableName = "transaction_table")
+                try {
+                    database.execSQL("ALTER TABLE transaction_table ADD COLUMN orderType TEXT NOT NULL DEFAULT 'Dine In'")
+                    database.execSQL("ALTER TABLE transaction_table ADD COLUMN markupAmount REAL NOT NULL DEFAULT 0.0")
+                } catch (e: Exception) {
+                    // Ignore duplicate column errors if any
+                }
+            }
+        }
+
+        // 🔥 MIGRATION 12 -> 13 (Add 'markup' columns to store_config)
+        private val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                 try {
+                     database.execSQL("ALTER TABLE store_config ADD COLUMN markupGoFood REAL NOT NULL DEFAULT 20.0")
+                     database.execSQL("ALTER TABLE store_config ADD COLUMN markupGrab REAL NOT NULL DEFAULT 20.0")
+                     database.execSQL("ALTER TABLE store_config ADD COLUMN markupShopee REAL NOT NULL DEFAULT 20.0")
+                 } catch (e: Exception) {}
+            }
+        }
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -50,7 +83,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sysdos_pos_db"
                 )
-                    .fallbackToDestructiveMigration() // Reset data jika struktur berubah
+                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13) // 🔥 TAMBAHKAN MIGRASI BARU
+                    .fallbackToDestructiveMigration() // Jaga-jaga
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

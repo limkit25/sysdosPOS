@@ -23,5 +23,12 @@ data class Product(
     // 🔥 KOLOM BARU: Penanda Induk
     // Jika 0 = Produk Asli
     // Jika >0 = Produk Varian (Isinya ID Produk Induk)
-    val parentId: Int = 0
+    val parentId: Int = 0,
+    
+    // 🔥 KOLOM BARU (Phase 24: Recipe)
+    val isIngredient: Boolean = false, // True = Bahan Baku (Gula, Kopi)
+    val trackStock: Boolean = true,     // True = Stok berkurang saat dijual (False = Service/Digital)
+    
+    // 🔥 UNIT (Phase 24 Part 2)
+    val unit: String = "Pcs"           // Satuan Dasar (Pcs, Gr, Ml, Cm)
 ) : Parcelable

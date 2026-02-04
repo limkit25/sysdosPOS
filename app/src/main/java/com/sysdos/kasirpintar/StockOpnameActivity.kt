@@ -29,25 +29,27 @@ class StockOpnameActivity : AppCompatActivity() {
     private lateinit var viewModel: ProductViewModel
     private lateinit var adapter: OpnameProductAdapter
     private var allProducts: List<Product> = emptyList()
+    private var opnameList: List<Product> = emptyList() // 🔥 Filtered List
 
-    // 🔥 SCAN LAUNCHER
+    // 🔥 SCAN LAUNCHER (Restored)
     private val scanLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             val barcode = result.data?.getStringExtra("SCANNED_BARCODE")
             if (!barcode.isNullOrEmpty()) {
                 val etSearch = findViewById<EditText>(R.id.etSearch)
                 etSearch.setText(barcode)
-                // Filter otomatis dijalankan oleh TextWatcher
                 Toast.makeText(this, "Barcode: $barcode", Toast.LENGTH_SHORT).show()
                 
-                // 🔥 Auto Open Dialog jika produk ditemukan cuma 1
-                val found = allProducts.find { (it.barcode ?: "") == barcode }
+                // Auto Open Dialog
+                val found = opnameList.find { (it.barcode ?: "") == barcode }
                 if (found != null) {
                    showAdjustmentDialog(found)
                 }
             }
         }
     }
+
+    // ...
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +69,10 @@ class StockOpnameActivity : AppCompatActivity() {
 
         viewModel.allProducts.observe(this) { products ->
             allProducts = products
-            adapter.submitList(products)
+            // 🔥 FILTER OPNAME: Hanya yg TrackStock=TRUE (Barang Fisik) ATAU isIngredient=TRUE (Bahan Baku)
+            // Menu Resep / Jasa (TrackStock=FALSE) otomatis HILANG dari list ini.
+            opnameList = products.filter { it.trackStock || it.isIngredient }
+            adapter.submitList(opnameList)
         }
     }
 
@@ -94,7 +99,8 @@ class StockOpnameActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s.toString().lowercase()
-                val filtered = allProducts.filter {
+                // 🔥 SEARCH DARI LIST OPNAME (YG SUDAH BERSIH)
+                val filtered = opnameList.filter {
                     it.name.lowercase().contains(query) || (it.barcode ?: "").contains(query)
                 }
                 adapter.submitList(filtered)
@@ -193,7 +199,7 @@ class StockOpnameActivity : AppCompatActivity() {
 
             fun bind(p: Product) {
                 tvName.text = p.name
-                tvStock.text = "Sistem: ${p.stock}"
+                tvStock.text = "Sistem: ${p.stock} ${p.unit}"
                 
                 // Basic Image Loading (Same as ProductAdapter)
                  if (!p.imagePath.isNullOrEmpty()) {

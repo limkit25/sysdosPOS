@@ -56,6 +56,11 @@ class StoreSettingsActivity : AppCompatActivity() {
     private lateinit var etStoreFooter: EditText
     private lateinit var etStoreTax: EditText
 
+    // 🔥 2. VARIABEL MARKUP ONLINE
+    private var markupGoFood: Double = 20.0
+    private var markupGrab: Double = 20.0
+    private var markupShopee: Double = 20.0
+
     // 🔥 1. VARIABEL BARU: SWITCH STOK 🔥
     private lateinit var switchStock: androidx.appcompat.widget.SwitchCompat
 
@@ -138,6 +143,9 @@ class StoreSettingsActivity : AppCompatActivity() {
         etStoreTax = findViewById(R.id.etStoreTax)
 
         switchStock = findViewById(R.id.switchStockSystem)
+        
+        // 🔥 INIT TOMBOL MARKUP
+        findViewById<Button>(R.id.btnMarkupSettings).setOnClickListener { showMarkupDialog() }
 
         btnSave = findViewById(R.id.btnSaveStore)
         btnScanPrinter = findViewById(R.id.btnScanPrinter)
@@ -158,10 +166,16 @@ class StoreSettingsActivity : AppCompatActivity() {
                 etStorePhone.setText(config.storePhone)
                 etStoreFooter.setText(config.strukFooter)
                 etStoreTax.setText(config.taxPercentage.toString().removeSuffix(".0"))
+                
+                // 🔥 LOAD MARKUP DATA
+                markupGoFood = config.markupGoFood
+                markupGrab = config.markupGrab
+                markupShopee = config.markupShopee
             }
         }
 
         // LOAD PENGATURAN STOK
+
         val prefs = getSharedPreferences("store_prefs", android.content.Context.MODE_PRIVATE)
         val isStockActive = prefs.getBoolean("use_stock_system", true)
         switchStock.isChecked = isStockActive
@@ -353,6 +367,60 @@ class StoreSettingsActivity : AppCompatActivity() {
             }
         }
 
+        // LAUNCHERS EXPORT & IMPORT
+        val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+            if (uri != null) {
+                try {
+                    val outputStream = contentResolver.openOutputStream(uri)
+                    if (outputStream != null) {
+                        viewModel.allTransactions.observe(this) { list ->
+                             if (list != null) {
+                                 Toast.makeText(this, "Mengekspor ${list.size} Transaksi...", Toast.LENGTH_SHORT).show()
+                                 
+                                 Thread {
+                                     try {
+                                         com.sysdos.kasirpintar.utils.CsvExportHelper.exportTransactions(outputStream, list)
+                                         runOnUiThread { Toast.makeText(this, "✅ Export Berhasil!", Toast.LENGTH_LONG).show() }
+                                     } catch(e: Exception) {
+                                         runOnUiThread { Toast.makeText(this, "Gagal: ${e.message}", Toast.LENGTH_SHORT).show() }
+                                     }
+                                 }.start()
+
+                                 viewModel.allTransactions.removeObservers(this) // Stop observing after first trigger
+                             }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Gagal Export: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                try {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    if (inputStream != null) {
+                         Toast.makeText(this, "Mengimpor Produk...", Toast.LENGTH_SHORT).show()
+                         viewModel.importProducts(inputStream) { msg ->
+                             Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                         }
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Gagal Import: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        findViewById<Button>(R.id.btnExportReport).setOnClickListener {
+            val timeStamp = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+            exportLauncher.launch("Laporan_Transaksi_$timeStamp.csv")
+        }
+
+        findViewById<Button>(R.id.btnImportProduct).setOnClickListener {
+            importLauncher.launch(arrayOf("text/csv", "application/vnd.ms-excel"))
+        }
+
         btnBackup.setOnClickListener {
             AppDatabase.getDatabase(this).openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
@@ -362,6 +430,49 @@ class StoreSettingsActivity : AppCompatActivity() {
         btnRestore.setOnClickListener {
             restoreLauncher.launch(arrayOf("application/*", "application/x-sqlite3", "application/octet-stream"))
         }
+    }
+
+    // 🔥 DIALOG ATUR MARKUP OLINE
+    private fun showMarkupDialog() {
+        // Layout Custom untuk Dialog
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 20)
+        }
+
+        fun createInput(label: String, initialVal: Double): EditText {
+            val tv = TextView(this).apply { 
+                text = label
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            val et = EditText(this).apply {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                setText(initialVal.toString().removeSuffix(".0"))
+                hint = "Contoh: 20"
+            }
+            layout.addView(tv)
+            layout.addView(et)
+            // Kasih jarak dikit
+            layout.addView(View(this@StoreSettingsActivity).apply { layoutParams = LinearLayout.LayoutParams(-1, 20) }) 
+            return et
+        }
+
+        val etGoFood = createInput("Markup GoFood (%)", markupGoFood)
+        val etGrab = createInput("Markup GrabFood (%)", markupGrab)
+        val etShopee = createInput("Markup ShopeeFood (%)", markupShopee)
+
+        AlertDialog.Builder(this)
+            .setTitle("Atur Markup Online")
+            .setView(layout)
+            .setPositiveButton("SIMPAN SEMENTARA") { _, _ ->
+                markupGoFood = etGoFood.text.toString().toDoubleOrNull() ?: 0.0
+                markupGrab = etGrab.text.toString().toDoubleOrNull() ?: 0.0
+                markupShopee = etShopee.text.toString().toDoubleOrNull() ?: 0.0
+                
+                Toast.makeText(this, "Markup diubah (Klik SIMPAN PENGATURAN untuk permanen)", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun saveStoreSettings() {
@@ -392,7 +503,8 @@ class StoreSettingsActivity : AppCompatActivity() {
 
         editor.apply()
 
-        viewModel.saveStoreSettings(name, address, phone, footer, printerMac, tax)
+        // 🔥 PASS SEMUA PARAMETER KE VIEWMODEL
+        viewModel.saveStoreSettings(name, address, phone, footer, printerMac, tax, markupGoFood, markupGrab, markupShopee)
 
         if (isInitialSetup) {
             Toast.makeText(this, "Setup Selesai! Selamat Datang.", Toast.LENGTH_SHORT).show()

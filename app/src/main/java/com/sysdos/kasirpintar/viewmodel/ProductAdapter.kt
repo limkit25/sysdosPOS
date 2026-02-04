@@ -45,11 +45,26 @@ class ProductAdapter(
         private val imgProduct: ImageView = itemView.findViewById(R.id.imgProduct)
         private val tvBadge: TextView = itemView.findViewById(R.id.tvCartBadge)
         private val tvSku: TextView = itemView.findViewById(R.id.tvProductSku)
+        // 🔥 NEW BADGE
+        private val tvType: TextView = itemView.findViewById(R.id.tvTypeBadge)
 
         fun bind(product: Product) {
-            // ... (Bagian bind Text Nama, Harga, SKU tetap sama) ...
+            
             tvName.text = product.name
             tvPrice.text = String.format(Locale("id", "ID"), "Rp %,d", product.price.toLong())
+
+            // 🔥 LOGIKA BADGE TIPE
+            if (product.isIngredient) {
+                tvType.visibility = View.VISIBLE
+                tvType.text = "BAHAN"
+                tvType.background.setTint(Color.parseColor("#FF9800")) // Orange
+            } else if (!product.trackStock) {
+                tvType.visibility = View.VISIBLE
+                tvType.text = "MENU / JASA"
+                tvType.background.setTint(Color.parseColor("#9C27B0")) // Ungu
+            } else {
+                tvType.visibility = View.GONE
+            }
 
             if (!product.barcode.isNullOrEmpty()) {
                 tvSku.text = "SKU: ${product.barcode}"
@@ -69,16 +84,20 @@ class ProductAdapter(
 
             val currentStock = product.stock - totalQtyInCart
 
+            // 🔥 LOGIKA TAMPILAN STOK (Support Variabel trackStock)
+            val shouldRestrictStock = isStockSystemActive && product.trackStock
+
             if (currentStock <= 0) {
-                if (!isStockSystemActive) {
-                    tvStock.text = "Stok: $currentStock (Los)"
-                    tvStock.setTextColor(Color.parseColor("#FF9800"))
+                if (!shouldRestrictStock) {
+                     // Produk Jasa / Menu Resep (Stok Virtual)
+                    tvStock.text = "Stok: - ${product.unit}"
+                    tvStock.setTextColor(Color.parseColor("#1976D2"))
                 } else {
                     tvStock.text = "Habis!"
                     tvStock.setTextColor(Color.RED)
                 }
             } else {
-                tvStock.text = "Stok: $currentStock"
+                tvStock.text = "Stok: $currentStock ${product.unit}"
                 tvStock.setTextColor(Color.parseColor("#1976D2"))
             }
 
@@ -105,12 +124,9 @@ class ProductAdapter(
 
             // ... (Bagian Klik Listener tetap sama) ...
             itemView.setOnClickListener {
-                if (isStockSystemActive) {
-                    if (currentStock > 0) onItemClick(product)
-                    else Toast.makeText(context, "Stok Habis!", Toast.LENGTH_SHORT).show()
-                } else {
-                    onItemClick(product)
-                }
+                // 🔥 HAPUS LOGIKA DI SINI (Request User)
+                // Biarkan MainActivity / ViewModel yang validasi
+                onItemClick(product)
             }
 
             itemView.setOnLongClickListener {

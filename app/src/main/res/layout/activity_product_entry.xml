@@ -146,6 +146,28 @@
                             android:layout_height="50dp" />
                     </LinearLayout>
 
+                    <!-- UNIT FIELD (NEW) -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Satuan Dasar (Misal: Pcs, Kg, Gr)"
+                        android:paddingStart="4dp"
+                        android:textColor="#757575"
+                        android:textSize="12sp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_rounded_white"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="12dp">
+                        
+                        <Spinner
+                            android:id="@+id/spProductUnit"
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"/>
+                    </LinearLayout>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -220,6 +242,57 @@
                             android:layout_height="wrap_content"
                             android:orientation="vertical"
                             android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+
+                    <!-- INGREDIENT TOGGLE -->
+                    <CheckBox
+                        android:id="@+id/cbIsIngredient"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Ini adalah Bahan Baku (Gula, Kopi, dll)"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="12dp"/>
+
+                    <!-- RECIPE SECTION -->
+                    <LinearLayout
+                        android:id="@+id/llRecipeSection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#FAFAFA"
+                        android:padding="10dp"
+                        android:layout_marginBottom="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Resep / Komposisi"
+                                android:textStyle="bold"
+                                android:textColor="#1976D2"/>
+                            <View android:layout_width="0dp" android:layout_weight="1" android:layout_height="0dp"/>
+                            <Button
+                                android:id="@+id/btnAddIngredient"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:text="+ Atur Resep"
+                                android:textSize="10sp"
+                                android:backgroundTint="#4CAF50"/>
+                        </LinearLayout>
+                        
+                        <TextView
+                            android:id="@+id/tvRecipeSummary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Belum ada resep diatur."
+                            android:textSize="12sp"
+                            android:textColor="#757575"
+                            android:layout_marginTop="8dp"/>
+                        
                     </LinearLayout>
 
                     <LinearLayout

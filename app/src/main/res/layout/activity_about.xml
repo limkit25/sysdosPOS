@@ -78,6 +78,18 @@
                 app:cornerRadius="8dp"/>
 
             <Button
+                android:id="@+id/btnHelpGuide"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="📖 PANDUAN APLIKASI"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#388E3C"
+                android:backgroundTint="#E8F5E9"
+                android:layout_marginBottom="16dp"
+                app:cornerRadius="8dp"/>
+
+            <Button
                 android:id="@+id/btnCheckUpdate"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
@@ -88,6 +100,8 @@
                 android:backgroundTint="#E3F2FD"
                 android:layout_marginBottom="30dp"
                 app:cornerRadius="8dp"/>
+
+
 
             <TextView
                 android:layout_width="match_parent"

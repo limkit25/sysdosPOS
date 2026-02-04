@@ -40,17 +40,45 @@ class PurchaseActivity : AppCompatActivity() {
     // UI
     private lateinit var adapterInput: PurchaseInputAdapter
     private lateinit var adapterHistory: HistoryGroupAdapter
+    private lateinit var adapterSearch: SearchProductAdapter // 🔥 ADAPTER PENCARIAN
     private lateinit var spSupplier: Spinner
     private lateinit var btnAddSupplier: ImageButton
     private lateinit var tvTotal: TextView
-    private lateinit var svSearch: SearchView
-    private lateinit var etInvoiceNumber: EditText // 🔥 DEKLARASI BARU
+    private lateinit var etInvoiceNumber: EditText
     private lateinit var layoutInput: LinearLayout
     private lateinit var layoutHistory: LinearLayout
+    
+    // 🔥 VIEW BARU UTK UI PENCARIAN
+    private lateinit var layoutCartContent: LinearLayout
+    private lateinit var layoutBottomAction: LinearLayout
+    private lateinit var layoutSearchOverlay: LinearLayout // 🔥 NEW PARENT
+    private lateinit var rvSearchFull: RecyclerView
+    private lateinit var btnSearchTrigger: TextView
+    private lateinit var btnBackFromSearch: ImageButton
+    private lateinit var etSearchOverlay: EditText
+
     private lateinit var btnTabInput: Button
     private lateinit var btnTabHistory: Button
-    // Drawer Removed
 
+    // 🔥 VIEW BARU UTK FORM INPUT FULL SCREEN
+    private lateinit var layoutFormInput: ScrollView
+    private lateinit var tvFormProductName: TextView
+    private lateinit var tvFormUnitInfo: TextView
+    private lateinit var cbFormBulkMode: CheckBox
+    private lateinit var etFormQty: TextView // TextInputEditText extends TextView
+    private lateinit var etFormCost: TextView
+    private lateinit var layoutFormBulkDetails: LinearLayout
+    private lateinit var rgFormConversion: RadioGroup
+    private lateinit var rbFormManual: RadioButton
+    private lateinit var rbFormKilo: RadioButton
+    private lateinit var etFormIsiPerDus: TextView
+    private lateinit var etFormTotalHarga: TextView
+    private lateinit var tvFormPreview: TextView
+    private lateinit var btnFormSubmit: Button
+    private lateinit var btnFormCancel: Button
+
+    // STATE PENCARIAN & VAR
+    private var selectedProductForInput: Product? = null
 
     // SCANNER
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
@@ -58,6 +86,8 @@ class PurchaseActivity : AppCompatActivity() {
             findAndAddProduct(result.contents)
         }
     }
+
+    private lateinit var layoutTopInputs: LinearLayout // 🔥 WRAPPER INPUT SUPPLIER/INVOICE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,15 +99,10 @@ class PurchaseActivity : AppCompatActivity() {
         setupRecyclerViews()
         observeData()
         setupListeners()
+        setupFormListeners() // 🔥 SETUP LISTENER FORM
     }
 
     private fun initViews() {
-        // --- SETUP MENU SAMPING (BARU) -> REMOVED IN FAVOR OF BOTTOM NAV ---
-        // Drawer Code Removed.
-
-
-
-        // --- KODINGAN LAMA MAS HERU ---
         layoutInput = findViewById(R.id.layoutInput)
         layoutHistory = findViewById(R.id.layoutHistory)
         btnTabInput = findViewById(R.id.btnTabInput)
@@ -85,54 +110,216 @@ class PurchaseActivity : AppCompatActivity() {
         spSupplier = findViewById(R.id.spSupplier)
         btnAddSupplier = findViewById(R.id.btnAddSupplier)
         tvTotal = findViewById(R.id.tvTotalPurchase)
-        svSearch = findViewById(R.id.svSearchProduct)
-        etInvoiceNumber = findViewById(R.id.etInvoiceNumber) // 🔥 BINDING BARU
+        etInvoiceNumber = findViewById(R.id.etInvoiceNumber)
+        
+        layoutTopInputs = findViewById(R.id.layoutTopInputs) // 🔥 BIND
 
-        // Hapus baris btnBack.setOnClickListener karena sudah diganti btnMenuDrawer
+        // 🔥 BIND FORM VIEWS
+        layoutCartContent = findViewById(R.id.layoutCartContent)
+        layoutBottomAction = findViewById(R.id.layoutBottomAction)
+        layoutSearchOverlay = findViewById(R.id.layoutSearchOverlay) // 🔥 BIND
+        rvSearchFull = findViewById(R.id.rvSearchResultsFull)
+        btnSearchTrigger = findViewById(R.id.btnSearchTrigger)
+        btnBackFromSearch = findViewById(R.id.btnBackFromSearch)
+        etSearchOverlay = findViewById(R.id.etSearchOverlay)
 
-        // 🔥 SETUP BOTTOM NAV
+        layoutFormInput = findViewById(R.id.layoutFormInput)
+        tvFormProductName = findViewById(R.id.tvFormProductName)
+        tvFormUnitInfo = findViewById(R.id.tvFormUnitInfo)
+        cbFormBulkMode = findViewById(R.id.cbFormBulkMode)
+        etFormQty = findViewById(R.id.etFormQty)
+        etFormCost = findViewById(R.id.etFormCost)
+        layoutFormBulkDetails = findViewById(R.id.layoutFormBulkDetails)
+        rgFormConversion = findViewById(R.id.rgFormConversion)
+        rbFormManual = findViewById(R.id.rbFormManual)
+        rbFormKilo = findViewById(R.id.rbFormKilo)
+        etFormIsiPerDus = findViewById(R.id.etFormIsiPerDus)
+        etFormTotalHarga = findViewById(R.id.etFormTotalHarga)
+        tvFormPreview = findViewById(R.id.tvFormPreview)
+        btnFormSubmit = findViewById(R.id.btnFormSubmit)
+        btnFormCancel = findViewById(R.id.btnFormCancel)
+
         val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
         com.sysdos.kasirpintar.utils.BottomNavHelper.setup(this, bottomNav, viewModel)
     }
 
     private fun setupRecyclerViews() {
-        // === 1. RecyclerView untuk LIST BARANG MASUK (Input Mode) ===
         val rvInput = findViewById<RecyclerView>(R.id.rvPurchaseItems)
         adapterInput = PurchaseInputAdapter(purchaseList,
             onDelete = { removeItem(it) },
-            onEdit = { showAddToCartDialog(it.product, it) }
+            onEdit = { openInputForm(it.product, it) } // 🔥 GANTI SHOW DIALOG
         )
-
-        // 🔥 LOGIKA RESPONSIVE: HP (List) vs TABLET (Grid)
-        val displayMetrics = resources.displayMetrics
-        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
-
-        if (screenWidthDp >= 600) {
-            // TABLET: Gunakan Grid 2 Kolom biar tidak terlalu lebar kosong
-            rvInput.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 2)
-        } else {
-            // HP: Tetap List ke Bawah
-            rvInput.layoutManager = LinearLayoutManager(this)
-        }
-
+        rvInput.layoutManager = LinearLayoutManager(this)
         rvInput.adapter = adapterInput
 
-
-        // === 2. RecyclerView untuk HISTORY (Riwayat Faktur) ===
         val rvHistory = findViewById<RecyclerView>(R.id.rvHistoryLog)
         adapterHistory = HistoryGroupAdapter { purchaseId -> showPurchaseDetailDialog(purchaseId) }
+        rvHistory.layoutManager = LinearLayoutManager(this)
+        rvHistory.adapter = adapterHistory
 
-        // 🔥 LOGIKA RESPONSIVE HISTORY JUGA
-        if (screenWidthDp >= 600) {
-            // TABLET: Grid 2 Kolom
-            rvHistory.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 2)
+        adapterSearch = SearchProductAdapter(emptyList()) { selectedProduct ->
+            // Saat Item diklik:
+            etSearchOverlay.setText("")
+            etSearchOverlay.clearFocus()
+            toggleSearchMode(false) 
+            
+            openInputForm(selectedProduct) // 🔥 BUKA FULL FORM
+        }
+        rvSearchFull.layoutManager = LinearLayoutManager(this)
+        rvSearchFull.adapter = adapterSearch
+    }
+
+    private fun toggleSearchMode(isActive: Boolean) {
+        if (isActive) {
+            layoutTopInputs.visibility = View.GONE
+            layoutCartContent.visibility = View.GONE
+            layoutBottomAction.visibility = View.GONE
+            layoutSearchOverlay.visibility = View.VISIBLE // 🔥 SHOW OVERLAY
+            layoutFormInput.visibility = View.GONE
+            
+            adapterSearch.updateList(purchaseableProducts) // 🔥 TAMPILKAN HANYA YG BISA DIBELI
+            etSearchOverlay.setText("") // Reset text
+            etSearchOverlay.requestFocus() // Focus ke input baru
         } else {
-            // HP: List
-            rvHistory.layoutManager = LinearLayoutManager(this)
+            layoutTopInputs.visibility = View.VISIBLE
+            layoutCartContent.visibility = View.VISIBLE
+            layoutBottomAction.visibility = View.VISIBLE
+            layoutSearchOverlay.visibility = View.GONE // 🔥 HIDE OVERLAY
+            layoutFormInput.visibility = View.GONE
+        }
+    }
+
+    // 🔥 PENGGANTI DIALOG -> FULL FORM LOGIC
+    private fun openInputForm(product: Product, existingItem: PurchaseItem? = null) {
+        selectedProductForInput = product
+        
+        // Hide others, Show Form
+        layoutTopInputs.visibility = View.GONE // 🔥 HIDE HEADER JUGA
+        layoutCartContent.visibility = View.GONE
+        layoutBottomAction.visibility = View.GONE
+        layoutSearchOverlay.visibility = View.GONE // 🔥 HIDE SEARCH OVERLAY
+        layoutFormInput.visibility = View.VISIBLE
+
+        // Reset & Fill Data
+        tvFormProductName.text = product.name
+        tvFormUnitInfo.text = "Satuan Dasar: ${product.unit} (Stok: ${product.stock})"
+        
+        cbFormBulkMode.isChecked = false
+        layoutFormBulkDetails.visibility = View.GONE
+        etFormQty.isEnabled = true
+        etFormCost.isEnabled = true
+        etFormQty.hint = "Jumlah Beli (${product.unit})"
+        
+        // Cek Unit -> Tampilkan Opsi Kg?
+        val unit = product.unit.lowercase()
+        if (unit.contains("gr") || unit.contains("ml") || unit.contains("cc")) {
+            rbFormKilo.visibility = View.VISIBLE
+            rbFormKilo.text = "Konversi ke ${product.unit} (x1000)" // Misal: Kg -> Gr
+        } else {
+            rbFormKilo.visibility = View.GONE
+        }
+        
+        // 🔥 UPDATE LABEL AGAR TIDAK BINGUNG
+        rbFormManual.text = "Input Langsung (${product.unit})"
+        rbFormManual.isChecked = true // Reset radio
+
+        if (existingItem != null) {
+            etFormQty.text = existingItem.qty.toString()
+            etFormCost.text = existingItem.cost.toInt().toString()
+        } else {
+            etFormQty.text = ""
+            etFormCost.text = product.costPrice.toInt().toString()
+        }
+        etFormIsiPerDus.text = ""
+        etFormTotalHarga.text = ""
+        tvFormPreview.text = ""
+        
+        etFormQty.requestFocus()
+    }
+
+    private fun setupFormListeners() {
+        btnFormCancel.setOnClickListener {
+            // Tutup Form -> Balik ke Search/Cart
+            layoutFormInput.visibility = View.GONE
+            toggleSearchMode(false) // Balik ke Cart
         }
 
-        rvHistory.adapter = adapterHistory
+        cbFormBulkMode.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                layoutFormBulkDetails.visibility = View.VISIBLE
+                etFormCost.isEnabled = false
+                etFormQty.hint = "Jumlah Beli (Pack/Kg/Dus)"
+            } else {
+                layoutFormBulkDetails.visibility = View.GONE
+                etFormCost.isEnabled = true
+                etFormQty.hint = "Jumlah Beli (${selectedProductForInput?.unit})"
+            }
+        }
+
+        rgFormConversion.setOnCheckedChangeListener { _, checkedId ->
+            if (checkedId == R.id.rbFormKilo) {
+                etFormIsiPerDus.text = "1000"
+                etFormIsiPerDus.isEnabled = false
+                etFormQty.hint = "Jumlah (Kg/Liter)"
+            } else {
+                etFormIsiPerDus.text = ""
+                etFormIsiPerDus.isEnabled = true
+                etFormIsiPerDus.hint = "Isi per Dus (Pcs)"
+                etFormQty.hint = "Jumlah Beli (Dus)"
+            }
+        }
+
+        // Calculator Watcher
+        val calculatorWatcher = object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                if (!cbFormBulkMode.isChecked) return
+                val product = selectedProductForInput ?: return
+
+                val qtyBeli = etFormQty.text.toString().toIntOrNull() ?: 0
+                val isiPerUnit = etFormIsiPerDus.text.toString().toIntOrNull() ?: 1
+                val totalUang = etFormTotalHarga.text.toString().toDoubleOrNull() ?: 0.0
+
+                val totalStokMasuk = qtyBeli * isiPerUnit
+                val hargaPerUnitDasar = if (totalStokMasuk > 0) totalUang / totalStokMasuk else 0.0
+
+                etFormCost.text = hargaPerUnitDasar.toInt().toString()
+                tvFormPreview.text = "Masuk Stok: $totalStokMasuk ${product.unit}\nModal Baru: Rp ${hargaPerUnitDasar.toInt()}/${product.unit}"
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        }
+        
+        // Pake cast ke TextView/EditText aman krn TextWatcher ada di TextView
+        etFormQty.addTextChangedListener(calculatorWatcher)
+        etFormIsiPerDus.addTextChangedListener(calculatorWatcher)
+        etFormTotalHarga.addTextChangedListener(calculatorWatcher)
+
+        btnFormSubmit.setOnClickListener {
+            val product = selectedProductForInput ?: return@setOnClickListener
+            var finalQty = etFormQty.text.toString().toIntOrNull() ?: 0
+            val finalCost = etFormCost.text.toString().toDoubleOrNull() ?: 0.0
+
+            if (cbFormBulkMode.isChecked) {
+                val isi = etFormIsiPerDus.text.toString().toIntOrNull() ?: 1
+                finalQty *= isi
+            }
+
+            if (finalQty > 0) {
+                addItemToCart(product, finalQty, finalCost)
+                
+                // Tutup Form & Search
+                layoutFormInput.visibility = View.GONE
+                toggleSearchMode(false)
+                Toast.makeText(this, "✅ Ditambahkan ke keranjang", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Jumlah tidak boleh 0", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
+
+    // ... (SISA KODE LISTENER, INIT VIEWS, DLL TETAP)
+
+
 
     private fun setupListeners() {
         btnTabInput.setOnClickListener { switchTab("INPUT") }
@@ -140,6 +327,7 @@ class PurchaseActivity : AppCompatActivity() {
         btnAddSupplier.setOnClickListener { showAddSupplierDialog() }
 
         findViewById<View>(R.id.btnScanBarcode).setOnClickListener {
+            // ... (Barcode logic sama)
             val options = ScanOptions()
             options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
             options.setBeepEnabled(true)
@@ -147,23 +335,46 @@ class PurchaseActivity : AppCompatActivity() {
             options.setCaptureActivity(ScanActivity::class.java)
             barcodeLauncher.launch(options)
         }
-        
         // 🔥 LISTENER EXPORT EXCEL
         findViewById<Button>(R.id.btnExportExcel).setOnClickListener {
             showExportDateDialog()
         }
 
-        svSearch.setOnQueryTextFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                showProductSearchDialog()
-                svSearch.clearFocus()
-            }
-        }
         findViewById<Button>(R.id.btnSavePurchase).setOnClickListener { saveTransaction() }
+
+        // 🔥 SEARCH LISTENERS (OVERLAY)
+        // 🔥 SEARCH LISTENERS (OVERLAY)
+        btnSearchTrigger.setOnClickListener {
+            toggleSearchMode(true)
+        }
+        
+        btnBackFromSearch.setOnClickListener {
+            toggleSearchMode(false)
+        }
+        
+        etSearchOverlay.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {}
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val keyword = s.toString().lowercase()
+                // 🔥 GUNAKAN purchaseableProducts AGAR MENU RACIKAN TIDAK MUNCUL
+                val filteredList = purchaseableProducts.filter {
+                    it.name.lowercase().contains(keyword) || (it.barcode ?: "").contains(keyword)
+                }
+                adapterSearch.updateList(filteredList)
+            }
+        })
     }
 
+    private var purchaseableProducts: List<Product> = emptyList() // Filtered List
+
     private fun observeData() {
-        viewModel.allProducts.observe(this) { allProducts = it }
+        viewModel.allProducts.observe(this) { products ->
+            allProducts = products
+            // 🔥 FILTER: Hanya Barang Fisik (trackStock=True) ATAU Bahan Baku (isIngredient=True)
+            // Menu racikan / Jasa (trackStock=False & isIngredient=False) TIDAK MASUK SINI
+            purchaseableProducts = products.filter { it.trackStock || it.isIngredient }
+        }
         viewModel.allSuppliers.observe(this) { suppliers ->
             supplierList = suppliers
             val names = suppliers.map { it.name }.toMutableList()
@@ -195,113 +406,13 @@ class PurchaseActivity : AppCompatActivity() {
     private fun findAndAddProduct(keyword: String) {
         val product = allProducts.find { it.barcode == keyword || it.name.equals(keyword, true) }
         if (product != null) {
-            showAddToCartDialog(product) // 🔥 PANGGIL DIALOG BARU
+            openInputForm(product) // 🔥 PANGGIL FULL FORM
         } else {
             Toast.makeText(this, "Barang tidak ditemukan", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // 🔥 FITUR UTAMA: DIALOG INPUT DENGAN KALKULATOR GROSIR 🔥
-    private fun showAddToCartDialog(product: Product, existingItem: PurchaseItem? = null) {
-        val context = this
-        val layout = LinearLayout(context)
-        layout.orientation = LinearLayout.VERTICAL
-        layout.setPadding(50, 40, 50, 20)
-
-        // 1. Opsi Mode
-        val cbBulkMode = CheckBox(context)
-        cbBulkMode.text = "Beli Satuan Besar (Dus/Pack/Kg)?"
-        cbBulkMode.textSize = 14f
-        cbBulkMode.setTextColor(Color.BLUE)
-
-        // 2. Input Utama
-        val etQty = EditText(context).apply { hint = "Jumlah Beli (Pcs)"; inputType = InputType.TYPE_CLASS_NUMBER }
-        val etCost = EditText(context).apply { hint = "Harga Modal (per Pcs)"; inputType = InputType.TYPE_CLASS_NUMBER }
-
-        // 3. Input Tambahan (Hidden Awalnya)
-        val layoutBulk = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
-        val etIsiPerDus = EditText(context).apply { hint = "Isi per Dus (Pcs)"; inputType = InputType.TYPE_CLASS_NUMBER }
-        val etTotalHarga = EditText(context).apply { hint = "Total Rupiah (Semua)"; inputType = InputType.TYPE_CLASS_NUMBER }
-        val tvPreview = TextView(context).apply { text = "Hasil: 0 Pcs @ Rp 0"; setPadding(0,10,0,0); setTextColor(Color.DKGRAY) }
-
-        layoutBulk.addView(etIsiPerDus)
-        layoutBulk.addView(etTotalHarga)
-        layoutBulk.addView(tvPreview)
-
-        layout.addView(cbBulkMode)
-        layout.addView(etQty)
-        layout.addView(etCost)
-        layout.addView(layoutBulk)
-
-        // ISI DATA DEFAULT JIKA EDIT
-        if (existingItem != null) {
-            etQty.setText(existingItem.qty.toString())
-            etCost.setText(existingItem.cost.toInt().toString())
-        } else {
-            etCost.setText(product.costPrice.toInt().toString())
-        }
-
-        // --- LOGIKA PERHITUNGAN OTOMATIS ---
-        cbBulkMode.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                layoutBulk.visibility = View.VISIBLE
-                etCost.isEnabled = false // Harga satuan dikunci, dihitung otomatis
-                etQty.hint = "Jumlah Beli (Dus/Pack)" // Ubah hint
-            } else {
-                layoutBulk.visibility = View.GONE
-                etCost.isEnabled = true
-                etQty.hint = "Jumlah Beli (Pcs)"
-            }
-        }
-
-        // Listener untuk hitung otomatis saat ngetik di mode Dus
-        val calculatorWatcher = object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-                if (!cbBulkMode.isChecked) return
-
-                val jumDus = etQty.text.toString().toIntOrNull() ?: 0
-                val isiPerDus = etIsiPerDus.text.toString().toIntOrNull() ?: 1
-                val totalUang = etTotalHarga.text.toString().toDoubleOrNull() ?: 0.0
-
-                val totalPcs = jumDus * isiPerDus
-                val hargaPerPcs = if (totalPcs > 0) totalUang / totalPcs else 0.0
-
-                // Update Preview & Field Cost
-                etCost.setText(hargaPerPcs.toInt().toString())
-                tvPreview.text = "Masuk Stok: $totalPcs Pcs\nModal Baru: Rp ${hargaPerPcs.toInt()}/pcs"
-            }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        }
-
-        etQty.addTextChangedListener(calculatorWatcher)
-        etIsiPerDus.addTextChangedListener(calculatorWatcher)
-        etTotalHarga.addTextChangedListener(calculatorWatcher)
-
-        // Tampilkan Dialog
-        AlertDialog.Builder(context)
-            .setTitle(product.name)
-            .setView(layout)
-            .setPositiveButton("MASUKKAN") { _, _ ->
-                var finalQty = etQty.text.toString().toIntOrNull() ?: 0
-                val finalCost = etCost.text.toString().toDoubleOrNull() ?: 0.0
-
-                // Jika Mode Grosir aktif, hitung ulang Qty-nya
-                if (cbBulkMode.isChecked) {
-                    val isi = etIsiPerDus.text.toString().toIntOrNull() ?: 1
-                    finalQty *= isi // Konversi Dus ke Pcs
-                }
-
-                if (finalQty > 0) {
-                    addItemToCart(product, finalQty, finalCost)
-                    svSearch.clearFocus()
-                } else {
-                    Toast.makeText(context, "Jumlah tidak boleh 0", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
+    // --- REMOVED showAddToCartDialog (OLD POPUP) ---
 
     private fun addItemToCart(product: Product, qty: Int, cost: Double) {
         // Cek jika item sudah ada, update/timpa
@@ -327,39 +438,7 @@ class PurchaseActivity : AppCompatActivity() {
         updateUI()
     }
 
-    // --- SMART SEARCH (DIPERTAHANKAN) ---
-    private fun showProductSearchDialog() {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_product_search, null)
-        val etSearch = dialogView.findViewById<EditText>(R.id.etSearchQuery)
-        val rvSearch = dialogView.findViewById<RecyclerView>(R.id.rvSearchResults)
 
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Cari Barang")
-            .setView(dialogView)
-            .setNegativeButton("Batal", null)
-            .create()
-
-        val searchAdapter = SearchProductAdapter(allProducts) { selectedProduct ->
-            dialog.dismiss()
-            showAddToCartDialog(selectedProduct) // 🔥 PANGGIL DIALOG KALKULATOR
-        }
-        rvSearch.layoutManager = LinearLayoutManager(this)
-        rvSearch.adapter = searchAdapter
-
-        etSearch.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {}
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val keyword = s.toString().lowercase()
-                val filteredList = allProducts.filter {
-                    it.name.lowercase().contains(keyword) || (it.barcode ?: "").contains(keyword)
-                }
-                searchAdapter.updateList(filteredList)
-            }
-        })
-        dialog.show()
-        etSearch.requestFocus()
-    }
 
     // --- SAVE & OTHERS ---
     private fun saveTransaction() {
@@ -562,7 +641,7 @@ class PurchaseActivity : AppCompatActivity() {
             val item = list[position]
 
             holder.tvName.text = item.product.name
-            holder.tvCalc.text = "${item.qty} pcs x ${formatRupiah(item.cost)} = ${formatRupiah(item.qty * item.cost)}"
+            holder.tvCalc.text = "${item.qty} ${item.product.unit} x ${formatRupiah(item.cost)} = ${formatRupiah(item.qty * item.cost)}"
 
             // Klik Tombol Sampah -> Hapus
             holder.btnDelete.setOnClickListener {
@@ -611,12 +690,19 @@ class PurchaseActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val product = items[position]
             holder.tvName.text = product.name; holder.tvName.setTextColor(Color.BLACK)
-            holder.tvInfo.text = "Stok: ${product.stock} | Modal: Rp ${product.costPrice.toInt()}"
+            holder.tvInfo.text = "Stok: ${product.stock} ${product.unit} | Modal: Rp ${product.costPrice.toInt()}"
             holder.itemView.setOnClickListener { onItemClick(product) }
         }
         override fun getItemCount(): Int = items.size
     }
     override fun onBackPressed() {
-        super.onBackPressed()
+        // Jika sedang mode pencarian, tutup dulu search-nya
+        if (layoutSearchOverlay.visibility == View.VISIBLE) {
+            toggleSearchMode(false)
+            etSearchOverlay.setText("")
+            etSearchOverlay.clearFocus()
+        } else {
+            super.onBackPressed()
+        }
     }
 }

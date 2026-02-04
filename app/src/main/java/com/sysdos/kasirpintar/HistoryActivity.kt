@@ -420,6 +420,11 @@ class HistoryActivity : AppCompatActivity() {
             rowTax.visibility = View.VISIBLE
         } else rowTax.visibility = View.GONE
 
+        // 🔥 LOGIC MARKUP LAYANAN (Dinamis)
+        // Menampilkan Order Type di Judul/Metode
+        val typeInfo = if(trx.orderType != "Dine In" && trx.orderType.isNotEmpty()) " [${trx.orderType}]" else ""
+        dialogView.findViewById<TextView>(R.id.tvDetailMethod).text = statusBayar + typeInfo
+
         // Render Items (SAMA)
         llItems.removeAllViews()
         val rawItems = trx.itemsSummary.split(";")
@@ -434,6 +439,34 @@ class HistoryActivity : AppCompatActivity() {
                 rowLayout.addView(TextView(this).apply { text = formatRupiah(parts[3].toDouble()); setTypeface(null, Typeface.BOLD); setTextColor(Color.BLACK); textSize = 14f; gravity = Gravity.END })
             }
             llItems.addView(rowLayout)
+        }
+
+        // 🔥 JIKA ADA MARKUP, TAMPILKAN SEBAGAI ITEM TAMBAHAN DI BAWAH
+        if (trx.markupAmount > 0) {
+            val rowMarkup = LinearLayout(this).apply { 
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 8, 0, 16) } 
+            }
+            
+            val label = TextView(this).apply { 
+                text = "Biaya Layanan (${trx.orderType})"
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor("#1976D2")) // Biru
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            }
+            
+            val value = TextView(this).apply { 
+                text = "+${formatRupiah(trx.markupAmount)}"
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor("#1976D2")) // Biru
+                textSize = 14f
+                gravity = Gravity.END
+            }
+            
+            rowMarkup.addView(label)
+            rowMarkup.addView(value)
+            llItems.addView(rowMarkup)
         }
 
         // ====================================================================
@@ -577,6 +610,11 @@ class HistoryActivity : AppCompatActivity() {
 
                 p.append("Kasir: $namaKasirStruk\n")
 
+                // 🔥 TAMBAH ORDER TYPE
+                if (trx.orderType.isNotEmpty() && trx.orderType != "Dine In") {
+                     p.append("Order: ${trx.orderType}\n")
+                }
+
                 // 🔥 CETAK MEJA & PELANGGAN DI SINI 🔥
                 if (infoPelanggan.isNotEmpty()) {
                     val formattedInfo = infoPelanggan.replace(" | ", "\n").trim()
@@ -617,6 +655,11 @@ class HistoryActivity : AppCompatActivity() {
 
                 if(trx.discount > 0) p.append(row("Diskon", trx.discount, true))
                 if(trx.tax > 0) p.append(row("Pajak", trx.tax))
+                
+                // 🔥 TAMBAH MARKUP ROW
+                if (trx.markupAmount > 0) {
+                     p.append(row("Layanan", trx.markupAmount))
+                }
 
                 p.append("--------------------------------\n")
                 p.append("\u001B\u0045\u0001${row("TOTAL", trx.totalAmount)}\u001B\u0045\u0000") // Bold Total
