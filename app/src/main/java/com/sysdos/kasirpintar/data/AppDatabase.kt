@@ -23,9 +23,10 @@ import kotlinx.coroutines.launch
         StoreConfig::class,
         Branch::class,
         ProductVariant::class,
-        Recipe::class // 🔥 WAJIB DITAMBAHKAN (Phase 24)
+        Recipe::class,
+        Expense::class // 🔥 WAJIB DITAMBAHKAN (Phase 34)
     ],
-    version = 13, // 🔥 NAIKKAN VERSI KE 13 (Config Markup)
+    version = 14, // 🔥 NAIKKAN VERSI KE 14
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun branchDao(): BranchDao
     abstract fun transactionDao(): TransactionDao
     abstract fun recipeDao(): RecipeDao
+    abstract fun expenseDao(): ExpenseDao // 🔥 Phase 34
 
     companion object {
         @Volatile
@@ -76,6 +78,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // 🔥 MIGRATION 13 -> 14 (Add Expense Table)
+        private val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `expenses` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `note` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `userId` INTEGER NOT NULL,
+                        `branchId` INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -83,7 +102,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sysdos_pos_db"
                 )
-                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13) // 🔥 TAMBAHKAN MIGRASI BARU
+                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14) // 🔥 TAMBAHKAN MIGRASI BARU
                     .fallbackToDestructiveMigration() // Jaga-jaga
                     .addCallback(DatabaseCallback())
                     .build()

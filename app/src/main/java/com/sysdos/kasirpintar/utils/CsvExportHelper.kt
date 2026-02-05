@@ -40,4 +40,38 @@ object CsvExportHelper {
         writer.flush()
         writer.close()
     }
+    fun generateExpenseReport(context: android.content.Context, expenses: List<com.sysdos.kasirpintar.data.model.Expense>, start: Long, end: Long): java.io.File? {
+        val fileName = "Laporan_Pengeluaran_${start}_${end}.csv"
+        val file = java.io.File(context.cacheDir, fileName)
+        
+        try {
+            val writer = file.bufferedWriter()
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            
+            // Header
+            writer.write("ID,Tanggal,Kategori,Jumlah,Catatan,UserID\n")
+            
+            for (exp in expenses) {
+                val dateStr = dateFormat.format(Date(exp.timestamp))
+                val cleanNote = exp.note.replace(",", " ").replace("\n", " ")
+                
+                val line = StringBuilder()
+                    .append(exp.id).append(",")
+                    .append(dateStr).append(",")
+                    .append(exp.category).append(",")
+                    .append(exp.amount).append(",")
+                    .append("\"").append(cleanNote).append("\",")
+                    .append(exp.userId)
+                
+                writer.write(line.toString())
+                writer.newLine()
+            }
+            writer.flush()
+            writer.close()
+            return file
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
 }

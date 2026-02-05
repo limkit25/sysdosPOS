@@ -355,8 +355,16 @@ class MainActivity : AppCompatActivity() {
         var taxPercentage = storeConfig?.taxPercentage ?: 0.0
         var taxValue = 0.0
 
-        val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer")
+        val methods = arrayOf("Tunai", "QRIS", "Debit", "Transfer", "GoFood", "GrabFood", "ShopeeFood")
         spMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
+
+        // 🔥 AUTO-SELECT PAYMENT METHOD FOR ONLINE ORDERS
+        val currentOrderType = viewModel.getCurrentOrderType()
+        when (currentOrderType) {
+            "GoFood" -> spMethod.setSelection(methods.indexOf("GoFood"))
+            "GrabFood" -> spMethod.setSelection(methods.indexOf("GrabFood"))
+            "ShopeeFood" -> spMethod.setSelection(methods.indexOf("ShopeeFood"))
+        }
 
         // Helper Add Row
         fun addRow(label: String, value: String, color: Int = Color.BLACK, isBold: Boolean = false) {
@@ -748,7 +756,7 @@ class MainActivity : AppCompatActivity() {
                     val prefs = getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
                     val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
 
-                    if (isStockSystemActive) {
+                    if (isStockSystemActive && masterProduct.trackStock) {
                         // Hitung total barang ini yang ada di keranjang
                         val totalInCart = currentCart.filter {
                             it.id == masterProduct.id || it.parentId == masterProduct.id

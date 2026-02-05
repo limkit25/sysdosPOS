@@ -12,6 +12,7 @@ import com.sysdos.kasirpintar.data.ProductRepository
 import com.sysdos.kasirpintar.data.model.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import java.io.File // 🔥 Fix
 
 class ProductViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -26,6 +27,7 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         // 🔥 TAMBAHAN BARU:
         val branchDao = AppDatabase.getDatabase(application).branchDao()
         val recipeDao = AppDatabase.getDatabase(application).recipeDao() // 🔥 Phase 24
+        val expenseDao = AppDatabase.getDatabase(application).expenseDao() // 🔥 Phase 34
 
         repository = ProductRepository(
             application,
@@ -35,7 +37,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             storeConfigDao,
             branchDao,
             transactionDao,
-            recipeDao // 🔥 Phase 24
+            recipeDao, // 🔥 Phase 24
+            expenseDao // 🔥 Phase 34
         )
     }
 
@@ -478,6 +481,47 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
              return@launch 
         }
 
+        // 🔥 VALIDASI STOK SEBELUM PROSES (PRE-CHECK)
+        // Ambil Settingan Toko
+        val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
+        val isStockSystemActive = prefs.getBoolean("use_stock_system", true)
+
+        if (isStockSystemActive) {
+            val totalRequiredInfo = mutableMapOf<Int, Double>() // ID -> Qty Needed
+
+            cartItems.forEach { item ->
+                val realId = if (item.id < 0) item.parentId else item.id
+                val qtyJual = item.stock.toDouble()
+                
+                // Cek apakah punya resep?
+                val ingredients = repository.getIngredientsForProduct(realId)
+                if (ingredients.isNotEmpty()) {
+                    ingredients.forEach { ing ->
+                        val current = totalRequiredInfo.getOrDefault(ing.ingredientId, 0.0)
+                        totalRequiredInfo[ing.ingredientId] = current + (ing.quantity * qtyJual)
+                    }
+                } else {
+                    val current = totalRequiredInfo.getOrDefault(realId, 0.0)
+                    totalRequiredInfo[realId] = current + qtyJual
+                }
+            }
+
+            // Cek ke Database
+            for ((id, needed) in totalRequiredInfo) {
+                val dbItem = repository.getProductById(id)
+                if (dbItem != null && dbItem.trackStock) {
+                    if (dbItem.stock < needed) {
+                        val name = dbItem.name
+                        launch(kotlinx.coroutines.Dispatchers.Main) { 
+                            Toast.makeText(getApplication(), "❌ Stok Tidak Cukup!\n$name kurang. (Sisa: ${dbItem.stock}, Butuh: ${needed})", Toast.LENGTH_LONG).show()
+                            onResult(null) 
+                        }
+                        return@launch
+                    }
+                }
+            }
+        }
+
         // 2. Siapkan Data Transaksi (Header & Summary)
         // 🔥 RE-CALCULATE BASE SUBTOTAL (Murni Barang)
         var baseSubtotal = 0.0
@@ -531,9 +575,8 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
         // ============================================================
 
         // Ambil Settingan Toko
-        val prefs = getApplication<Application>().getSharedPreferences("store_prefs", Context.MODE_PRIVATE)
-        val isStockSystemActive = prefs.getBoolean("use_stock_system", true) // Default: ON (Wajib Cek)
-
+        // Note: prefs & isStockSystemActive already declared above for Pre-Check
+        
         // HANYA KURANGI STOK JIKA SAKLAR ON
         if (isStockSystemActive) {
 
@@ -790,6 +833,42 @@ class ProductViewModel(application: Application) : AndroidViewModel(application)
             return capitalize(model)
         } else {
             return capitalize(manufacturer) + " " + model
+        }
+    }
+
+    // 🔥 PENGELUARAN (PHASE 34)
+    fun insertExpense(amount: Double, category: String, note: String, onComplete: () -> Unit) = viewModelScope.launch {
+        val uid = _currentUserId.value ?: 0
+        val expense = Expense(
+            amount = amount,
+            category = category,
+            note = note,
+            timestamp = System.currentTimeMillis(),
+            userId = uid
+            // branchId default 0
+        )
+        repository.insertExpense(expense)
+        launch(kotlinx.coroutines.Dispatchers.Main) { onComplete() }
+    }
+    
+    fun getExpensesByDate(start: Long, end: Long, onResult: (List<Expense>) -> Unit) = viewModelScope.launch {
+        val list = repository.getExpensesByDateRange(start, end)
+        launch(kotlinx.coroutines.Dispatchers.Main) { onResult(list) }
+    }
+    
+    // For Export Feature
+    fun exportExpensesToCsv(start: Long, end: Long, onResult: (File?, String?) -> Unit) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        val list = repository.getExpensesByDateRange(start, end)
+        if(list.isEmpty()) {
+            launch(kotlinx.coroutines.Dispatchers.Main) { onResult(null, "Tidak ada data pada tanggal yang dipilih.") }
+            return@launch
+        }
+        
+        // Use Helper to generate CSV
+        val file = com.sysdos.kasirpintar.utils.CsvExportHelper.generateExpenseReport(getApplication(), list, start, end)
+        launch(kotlinx.coroutines.Dispatchers.Main) { 
+            if (file != null) onResult(file, null)
+            else onResult(null, "Terjadi kesalahan saat membuat file.")
         }
     }
 

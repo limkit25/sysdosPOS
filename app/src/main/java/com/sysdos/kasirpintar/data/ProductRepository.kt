@@ -25,7 +25,8 @@ class ProductRepository(
     private val storeConfigDao: StoreConfigDao,
     private val branchDao: BranchDao,
     private val transactionDao: TransactionDao,
-    private val recipeDao: RecipeDao // 🔥 Tambah ini (Phase 24)
+    private val recipeDao: RecipeDao, // 🔥 Phase 24
+    private val expenseDao: ExpenseDao // 🔥 Phase 34
 ) {
     // --- STORE CONFIG ---
     val storeConfig = storeConfigDao.getStoreConfig()
@@ -465,4 +466,10 @@ class ProductRepository(
     }
 
     suspend fun clearAllData() = AppDatabase.getDatabase(context).clearAllTables()
+
+    // 🔥 PENGELUARAN (PHASE 34)
+    suspend fun getAllExpenses(): List<Expense> = expenseDao.getAllExpenses()
+    suspend fun insertExpense(expense: Expense) = expenseDao.insert(expense)
+    suspend fun getTotalExpenseByDate(start: Long, end: Long): Double = expenseDao.getTotalExpenseByDateRange(start, end) ?: 0.0
+    suspend fun getExpensesByDateRange(start: Long, end: Long): List<Expense> = expenseDao.getExpensesByDateRange(start, end)
 }

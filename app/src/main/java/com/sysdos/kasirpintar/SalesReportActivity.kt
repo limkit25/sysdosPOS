@@ -334,8 +334,24 @@ class SalesReportActivity : AppCompatActivity() {
                 "TRANSFER" -> tTrf += t.totalAmount
                 "DEBIT" -> tDebit += t.totalAmount
                 "PIUTANG" -> tPiutang += t.totalAmount
+                
+                // 🔥 Skip Online Orders (Dihitung Terpisah)
+                "GOFOOD", "GRABFOOD", "SHOPEEFOOD" -> {}
+                
                 else -> tTunai += t.totalAmount
             }
+        }
+        
+        // 🔥 HITUNG ORDER ONLINE DARI LIST
+        var goFoodT = 0.0; var grabT = 0.0; var shopeeT = 0.0
+        var goFoodC = 0; var grabC = 0; var shopeeC = 0
+
+        for (t in todayTrx) {
+             when (t.orderType) {
+                 "GoFood" -> { goFoodT += t.totalAmount; goFoodC++ }
+                 "GrabFood" -> { grabT += t.totalAmount; grabC++ }
+                 "ShopeeFood" -> { shopeeT += t.totalAmount; shopeeC++ }
+             }
         }
         val tOmzet = tTunai + tQRIS + tTrf + tDebit + tPiutang
 
@@ -376,6 +392,14 @@ class SalesReportActivity : AppCompatActivity() {
                 r("Transfer", tTrf)
                 r("Debit", tDebit)
                 if (tPiutang > 0) r("PIUTANG (BON)", tPiutang) // Cetak Bon juga
+
+                if (goFoodC > 0 || grabC > 0 || shopeeC > 0) {
+                    p.append("--------------------------------\n")
+                    p.append("ORDER ONLINE:\n")
+                    if (goFoodC > 0) r("GoFood ($goFoodC)", goFoodT)
+                    if (grabC > 0) r("GrabFood ($grabC)", grabT)
+                    if (shopeeC > 0) r("ShopeeFood ($shopeeC)", shopeeT)
+                }
 
                 p.append("--------------------------------\n\u001B\u0045\u0001")
                 r("TOTAL OMZET", tOmzet)

@@ -87,6 +87,7 @@ class DashboardActivity : AppCompatActivity() {
         val cardStore = findViewById<CardView>(R.id.cardStore)
         val cardPrinter = findViewById<CardView>(R.id.cardPrinter)
         val cardStockOpname = findViewById<CardView>(R.id.cardStockOpname) // 🔥 NEW
+        val cardExpense = findViewById<CardView>(R.id.cardExpense) // 🔥 NEW
         val cardShift = findViewById<CardView>(R.id.cardShift)
         val cardAbout = findViewById<CardView>(R.id.cardAbout)
 
@@ -182,11 +183,11 @@ class DashboardActivity : AppCompatActivity() {
         authorizedCards.add(cardPOS)
         if (role == "admin") {
             authorizedCards.add(cardProduct); authorizedCards.add(cardCategory); authorizedCards.add(cardStockOpname); 
-            authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
+            authorizedCards.add(cardPurchase); authorizedCards.add(cardExpense); authorizedCards.add(cardReport)
             authorizedCards.add(cardUser); authorizedCards.add(cardStore); authorizedCards.add(cardPrinter)
         } else if (role == "manager") {
             authorizedCards.add(cardProduct); authorizedCards.add(cardCategory); authorizedCards.add(cardStockOpname);
-            authorizedCards.add(cardPurchase); authorizedCards.add(cardReport)
+            authorizedCards.add(cardPurchase); authorizedCards.add(cardExpense); authorizedCards.add(cardReport)
             authorizedCards.add(cardPrinter)
         } else {
             // 🔥 ROLE: KASIR (Hanya POS, About)
@@ -259,6 +260,7 @@ class DashboardActivity : AppCompatActivity() {
         cardProduct.setOnClickListener { startActivity(Intent(this, ProductListActivity::class.java)) }
         cardCategory.setOnClickListener { startActivity(Intent(this, CategoryActivity::class.java)) } // 🔥 NEW
         cardPurchase.setOnClickListener { startActivity(Intent(this, PurchaseActivity::class.java)) }
+        cardExpense.setOnClickListener { startActivity(Intent(this, ExpenseActivity::class.java)) } // 🔥 NEW
         cardStockOpname.setOnClickListener { startActivity(Intent(this, StockOpnameActivity::class.java)) } // 🔥 CLICK LISTENER
         cardReport.setOnClickListener { 
             startActivity(Intent(this, ReportCenterActivity::class.java)) 
@@ -483,6 +485,11 @@ class DashboardActivity : AppCompatActivity() {
 
                 // Hitung jumlah transaksi per metode
                 var countTunai = 0; var countQris = 0; var countDebit = 0; var countTrf = 0; var countPiutang = 0
+                
+                // 🔥 ONLINE ORDER COUNTERS
+                var goFoodTotal = 0.0; var goFoodCount = 0
+                var grabTotal = 0.0; var grabCount = 0
+                var shopeeTotal = 0.0; var shopeeCount = 0
 
                 for (trx in trxList) {
                     shiftSubtotal += trx.subtotal
@@ -491,13 +498,25 @@ class DashboardActivity : AppCompatActivity() {
                     shiftGrandTotal += trx.totalAmount
 
                     val m = trx.paymentMethod.lowercase()
+
                     when {
                         m.contains("tunai") -> countTunai++
                         m.contains("qris") -> countQris++
                         m.contains("debit") -> countDebit++
                         m.contains("transfer") -> countTrf++
                         m.contains("piutang") -> countPiutang++
+                        
+                        // 🔥 Skip karena sudah dihitung di Order Online
+                        m.contains("gofood") || m.contains("grab") || m.contains("shopee") -> {}
+                        
                         else -> countTunai++
+                    }
+                    
+                    // 🔥 HITUNG ORDER ONLINE
+                    when (trx.orderType) {
+                        "GoFood" -> { goFoodTotal += trx.totalAmount; goFoodCount++ }
+                        "GrabFood" -> { grabTotal += trx.totalAmount; grabCount++ }
+                        "ShopeeFood" -> { shopeeTotal += trx.totalAmount; shopeeCount++ }
                     }
                 }
 
@@ -547,6 +566,15 @@ class DashboardActivity : AppCompatActivity() {
                 if (trf > 0) p.append(row("Transfer ($countTrf Trx)", trf))
                 if (piutang > 0) p.append(row("Piutang ($countPiutang Trx)", piutang))
                 p.append("--------------------------------\n")
+                
+                // === 3. RINCIAN ORDER ONLINE (JIKA ADA) ===
+                if (goFoodCount > 0 || grabCount > 0 || shopeeCount > 0) {
+                     p.append("ORDER ONLINE:\n")
+                     if(goFoodCount > 0) p.append(row("GoFood ($goFoodCount)", goFoodTotal))
+                     if(grabCount > 0) p.append(row("GrabFood ($grabCount)", grabTotal))
+                     if(shopeeCount > 0) p.append(row("ShopeeFood ($shopeeCount)", shopeeTotal))
+                     p.append("--------------------------------\n")
+                }
 
                 // === 3. RINGKASAN PENJUALAN (OMZET) ===
                 // Ini yang diminta: Subtotal, Diskon, Pajak

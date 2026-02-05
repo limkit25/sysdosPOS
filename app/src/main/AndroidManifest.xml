@@ -102,6 +102,8 @@
         <activity android:name=".StockOpnameActivity" android:screenOrientation="portrait" android:label="Stok Opname"/>
         <activity android:name=".ReportCenterActivity" android:screenOrientation="portrait" android:label="Pusat Laporan"/>
         <activity android:name=".HelpActivity" android:screenOrientation="portrait" android:label="Panduan Aplikasi"/>
+        <activity android:name=".ExpenseActivity" android:screenOrientation="portrait" android:label="Pengeluaran" android:windowSoftInputMode="adjustResize"/> <!-- 🔥 Phase 34 -->
+        <activity android:name=".ExpenseReportActivity" android:screenOrientation="portrait" android:label="Laporan Pengeluaran"/> <!-- 🔥 New Report -->
 
     </application>
 </manifest>

@@ -40,5 +40,9 @@ class ReportCenterActivity : AppCompatActivity() {
         findViewById<CardView>(R.id.cardShiftHistory).setOnClickListener {
             startActivity(Intent(this, ShiftHistoryActivity::class.java))
         }
+
+        findViewById<CardView>(R.id.cardExpenseReport).setOnClickListener {
+            startActivity(Intent(this, ExpenseReportActivity::class.java))
+        }
     }
 }

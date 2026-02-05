@@ -19,8 +19,8 @@ android {
         applicationId = "com.sysdos.kasirpintar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.6.7"
+        versionCode = 21
+        versionName = "1.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,7 +60,7 @@ android {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
             // Hasilnya nanti: sysdosKasir.apk
-            output?.outputFileName = "sysdosPOS-V1-6-7.apk"
+            output?.outputFileName = "sysdosPOS-V1-6-8.apk"
         }
     }
 }
